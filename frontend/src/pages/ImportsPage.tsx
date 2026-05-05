@@ -43,7 +43,7 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
           <ul className="mt-2 space-y-1">
             {errors.map(r => (
               <li key={r.row_index} className="text-xs text-destructive">
-                Row {r.row_index + 1}: {r.notes ?? 'Unknown error'}
+                Row {r.row_index + 1}: <span>{r.notes ?? 'Unknown error'}</span>
               </li>
             ))}
           </ul>
