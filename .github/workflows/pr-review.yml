@@ -6,28 +6,19 @@ on:
 
 jobs:
   review:
-    name: Claude Code Review
+    name: Copilot Code Review
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@beta
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
-            Review this pull request. Focus on:
-            - Correctness: logic errors, edge cases, off-by-ones
-            - Security: SQL injection, XSS, auth bypasses, exposed secrets
-            - Rails conventions: N+1 queries, missing validations, unsafe scopes
-            - React/TypeScript: hook rules violations, missing dependencies, type safety
-            - Test coverage: missing cases for new code paths
-
-            Be concise. Skip praise. Only comment when there is something worth changing.
-            Group comments by file. Use inline suggestions where applicable.
+      - name: Request Copilot review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/requested_reviewers \
+            -f "reviewers[]=copilot-pull-request-review[bot]" || true
