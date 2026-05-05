@@ -19,8 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('currency_code', sa.String(length=10), nullable=False, server_default='INR'))
-    op.add_column('users', sa.Column('currency_locale', sa.String(length=20), nullable=False, server_default='en-IN'))
+    op.add_column('users', sa.Column('currency_code', sa.String(length=10), nullable=False, server_default=sa.text("'INR'")))
+    op.add_column('users', sa.Column('currency_locale', sa.String(length=20), nullable=False, server_default=sa.text("'en-IN'")))
 
 
 def downgrade() -> None:
