@@ -175,7 +175,6 @@ function SelectContent({
         className="isolate z-50"
       >
         <SelectPrimitive.Popup
-          keepMounted
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn(
