@@ -1,0 +1,365 @@
+FINTRACK: RAILS MIGRATION PLAN
+FastAPI/Python → Ruby on Rails
+===============================
+
+CONTEXT
+-------
+FinTrack backend is currently a FastAPI/Python monolith serving REST API at /api/v1/.
+Goal: Replace with a Ruby on Rails API-only app using a fresh PostgreSQL database.
+Frontend stays unchanged. Python backend archived as backend_python/.
+
+
+PROS & CONS
+-----------
+
+PROS:
+  + Convention over configuration — Rails generators reduce boilerplate vs FastAPI wiring
+  + ActiveRecord — callbacks (after_create), scopes, audited gem replace SQLAlchemy event listeners
+  + Rake tasks — built into Rails; replaces Typer CLI with no external dependency
+  + Rails console — replaces `uv run python -m app.cli console`, richer REPL
+  + Ecosystem — jwt, rack-cors, kaminari, audited, rspec all well-maintained and opinionated
+  + Migrations — simpler than Alembic; datetime-stamp workaround in alembic/env.py gone
+  + Test ergonomics — RSpec + FactoryBot > pytest + httpx AsyncClient setup
+
+CONS:
+  - Full rewrite risk: ~3,000+ lines of Python across 12 services, 12 routers, 13 models
+  - No async: FastAPI is ASGI/async; Rails synchronous by default (instrument fetch blocks thread)
+  - Loss of Pydantic validation: Rails needs explicit params.permit + model validations, no auto OpenAPI docs
+  - Learning curve: slower feature velocity during transition
+  - audited gem vs custom AuditLog table: audited creates own `audits` table — old audit_logs data lost
+    unless a custom audit observer is written to keep the old table
+  - No tangible user-facing benefit: API surface, frontend, DB structure stay the same
+
+RECOMMENDATION:
+  Proceed — the DB drop+recreate removes the biggest enum compatibility risk.
+  Two high-risk areas to integration-test first:
+    1. STI models (Investment, TermAccount) — Rails STI uses `type` string column; subclasses need
+       careful mapping to preserve query behavior
+    2. Balance-update callback chain — after_create on Transaction must exactly replicate
+       _apply_balance_delta or account balances drift silently
+
+
+PHASE 0 — ARCHIVE PYTHON BACKEND
+----------------------------------
+  - git mv backend/ backend_python/
+  - Create new backend/ for Rails app
+
+
+PHASE 1 — RAILS APP BOOTSTRAP
+-------------------------------
+  Versions: Ruby 3.4.x (latest stable), Rails 8.0.x
+
+  gem install rails
+  rails new backend --api --database=postgresql --skip-test
+  cd backend
+
+  Key gems (Gemfile):
+    pg                              PostgreSQL adapter
+    bcrypt                          Password hashing (has_secure_password)
+    jwt                             JWT tokens (HS256, 7-day expiry)
+    rack-cors                       CORS for Vite dev server
+    kaminari                        Pagination
+    audited                         Audit trail (replaces SQLAlchemy balance event listeners)
+    rspec-rails                     Test framework
+    factory_bot_rails               Test factories
+    shoulda-matchers                Model/validation matchers
+    redis                           Redis cache adapter
+    puma                            App server
+    dotenv-rails                    .env file support
+
+  config/database.yml         → point to fintrack_db / fintrack_user
+  config/routes.rb            → all routes under /api/v1 namespace
+  config/initializers/cors.rb → allow http://localhost:5173 in development
+
+
+PHASE 2 — MODELS (ActiveRecord)
+---------------------------------
+  All 13 models, notable mappings:
+
+  Python Model      Rails Model       Notes
+  -----------       -----------       -----
+  User              User              has_secure_password; has_many :accounts, :platform_accounts,
+                                        :user_instruments, :investments, :transactions, :term_accounts
+  Bank              Bank              Read-only from API; has_many :accounts
+  Account           Account           belongs_to :bank, :user; audited only: [:balance]
+  Platform          Platform          Read-only from API
+  PlatformAccount   PlatformAccount   belongs_to :platform, :user
+  Instrument        Instrument        default_scope { order(:name, :ticker_symbol) }
+  UserInstrument    UserInstrument    Join table with timestamps; belongs_to :user, :instrument
+  Investment        Investment        STI via type column (stock/mutual_fund/fd/gold/crypto/ppf/nps/real_estate)
+                                        Subclasses: StockInvestment, MutualFundInvestment, etc.
+                                        Nullable type-specific columns (nav, units, price, etc.)
+  TermAccount       TermAccount       STI via type column (fd/ppf); belongs_to :account (parent savings)
+                                        Subclasses: Fd, Ppf
+  Transaction       Transaction       transaction_type enum (credit/debit) stored as string;
+                                        tags → PostgreSQL text[] via string array column;
+                                        polymorphic linked_account_type/linked_account_id (manual, no Rails macro)
+                                        public_id → UUID column with gen_random_uuid() default
+                                        Immutable from API (no update/destroy endpoints)
+  Follio            Follio            belongs_to :user_instrument
+  AuditLog          → audited gem     audited on Account and TermAccount tracks balance changes
+
+  app/models/concerns/ → shared concerns (pagination helpers, etc.)
+
+
+PHASE 3 — AUTHENTICATION
+--------------------------
+  Python: python-jose (JWT) + passlib (bcrypt)
+  Rails:  has_secure_password + jwt gem, no Devise
+
+  lib/json_web_token.rb
+    module JsonWebToken
+      SECRET = Rails.application.credentials.secret_key_base
+      EXPIRY = 7.days
+
+      def self.encode(payload)
+        JWT.encode(payload.merge(exp: EXPIRY.from_now.to_i), SECRET, 'HS256')
+      end
+
+      def self.decode(token)
+        JWT.decode(token, SECRET, true, algorithm: 'HS256').first
+      rescue JWT::DecodeError
+        nil
+      end
+    end
+
+  app/controllers/concerns/authenticatable.rb
+    → current_user method
+    → authenticate_user! before_action (returns 401 if missing/invalid token)
+
+  Endpoints preserved exactly:
+    POST /api/v1/auth/login
+    GET  /api/v1/auth/me
+    PUT  /api/v1/auth/me
+
+
+PHASE 4 — CONTROLLERS (40+ endpoints)
+---------------------------------------
+  All inherit: ApplicationController < ActionController::API
+               include Authenticatable
+
+  Python Router         Rails Controller                    Key actions
+  -------------         ----------------                    -----------
+  auth.py               Api::V1::AuthController             login, me, update_me
+  accounts.py           Api::V1::AccountsController         index, show, create, update, destroy, close
+  banks.py              Api::V1::BanksController            index, show
+  transactions.py       Api::V1::TransactionsController     index, create (NO update/destroy)
+  investments.py        Api::V1::InvestmentsController      index, show, create, update, destroy
+  instruments.py        Api::V1::InstrumentsController      index, show, types, create, update,
+                                                              track (POST), untrack (DELETE), tracked
+  term_accounts.py      Api::V1::TermAccountsController     index, show, create, close
+  platforms.py          Api::V1::PlatformsController        index, show
+  platform_accounts.py  Api::V1::PlatformAccountsController full CRUD
+  follios.py            Api::V1::FolliosController          full CRUD
+  reports.py            Api::V1::ReportsController          dashboard, spending_trends, investment_summary
+  client_errors.py      Api::V1::ClientErrorsController     create (unauthenticated, 204 response)
+
+  Routes (config/routes.rb):
+    namespace :api do
+      namespace :v1 do
+        post 'auth/login', to: 'auth#login'
+        get  'auth/me',    to: 'auth#me'
+        put  'auth/me',    to: 'auth#update_me'
+        resources :banks, only: [:index, :show]
+        resources :accounts do
+          member { post :close }
+        end
+        resources :transactions, only: [:index, :create]
+        resources :investments
+        resources :instruments do
+          collection { get :types; get :tracked }
+          member { post :track; delete :untrack }
+        end
+        resources :term_accounts, only: [:index, :show, :create] do
+          member { post :close }
+        end
+        resources :platforms, only: [:index, :show]
+        resources :platform_accounts
+        resources :follios
+        namespace :reports do
+          get :dashboard
+          get :spending_trends
+          get :investment_summary
+        end
+        post 'errors', to: 'client_errors#create'
+      end
+    end
+
+  Error shape: Rails default is { error: "message" }
+    Python was { detail: "message" }
+    → Update frontend api/client.ts error interceptor to handle both, or standardize on one
+
+
+PHASE 5 — SERVICE OBJECTS
+---------------------------
+  app/services/ — plain Ruby objects (no ActiveSupport::Concern needed)
+
+  Python Service                  Rails Service
+  ---------------                 -------------
+  transaction_service.py          Transactions::CreateService
+    (balance hooks, create/list)    wraps Transaction.create! + after_create balance callback
+  term_account_service.py         TermAccounts::CreateService
+    (paired transactions on FD,     handles FD paired debit+credit, maturity calc
+     maturity calc)                TermAccounts::CloseService
+  bank_service.py                 Accounts::CloseService
+    (close_account,                TermAccounts::CloseService
+     close_term_account)
+  instrument_service.py           Instruments::BrowseService (pagination, filters)
+                                  Instruments::TrackService (track/untrack)
+  investment_service.py           Investments::QueryService
+  report_service.py               Reports::DashboardService
+    (dashboard, spending            Reports::SpendingTrendsService
+     trends, investment summary)   Reports::InvestmentSummaryService
+  instrument_fetch_service.py     → rake tasks (Phase 7)
+
+  Balance callback (replaces _apply_balance_delta):
+    # app/models/transaction.rb
+    after_create :apply_balance_delta
+
+    private
+
+    def apply_balance_delta
+      # FD term accounts skip balance update (principal-based, not running balance)
+      return if linked_account_type == 'term_account' && linked_account.sub_type == 'fd'
+      delta = credit? ? amount : -amount
+      linked_account.increment!(:balance, delta)
+    end
+
+
+PHASE 6 — JSON RESPONSES
+--------------------------
+  Use plain render json: with explicit attribute hashes — no ActiveModel::Serializer magic.
+  Match Python Pydantic response schemas exactly (same field names, same nesting).
+
+  Error responses standardized to: { error: "message" }
+  Validation errors: { errors: { field: ["message"] } }
+
+
+PHASE 7 — RAKE TASKS (replaces CLI)
+-------------------------------------
+  Python CLI command            Rake task
+  ------------------            ---------
+  users create                  rails console (no rake task — admin-only, REPL preferred)
+  banks seed                    rake db:seed:banks    (reads db/seeds/banks.csv)
+  platforms seed                rake db:seed:platforms (reads db/seeds/platforms.csv)
+  banks list/create             rails console
+  instruments fetch             rake instruments:fetch (NSE + AMFI)
+  transactions correct <id>     rake transactions:correct[id]
+  transactions deactivate <id>  rake transactions:deactivate[id]
+
+  Seed CSV files: copy from backend_python/seeds/ to backend/db/seeds/
+
+
+PHASE 8 — DATABASE: DROP & RECREATE
+--------------------------------------
+  The existing fintrack_db is DROPPED and recreated fresh from Rails migrations.
+  This eliminates all PostgreSQL native enum type baggage.
+
+  Commands:
+    dropdb fintrack_db
+    createdb fintrack_db
+    psql -c "GRANT ALL ON DATABASE fintrack_db TO fintrack_user;"
+    cd backend && bundle exec rails db:migrate
+    bundle exec rake db:seed:banks
+    bundle exec rake db:seed:platforms
+
+  All 6 PG native enums → Rails string enums:
+    # No CREATE TYPE in DB — stored as varchar column
+    enum :transaction_type, { credit: 'credit', debit: 'debit' }, validate: true
+    enum :investment_type, { stock: 'stock', mutual_fund: 'mutual_fund', ... }, validate: true
+
+  Column type mapping:
+    Python/SQLAlchemy                     Rails Migration
+    -----------------                     ---------------
+    ARRAY(Text) for tags                  t.string :tags, array: true, default: []
+    UUID for public_id                    t.uuid :public_id, default: -> { "gen_random_uuid()" }
+    Enum (6 PG types)                     t.string :field_name, null: false  +  Rails enum on model
+    server_default: func.now()            t.timestamps  OR  default: -> { "NOW()" }
+    ondelete: "CASCADE"                   foreign_key: true, on_delete: :cascade
+    UniqueConstraint([col1, col2])        add_index :table, [:col1, :col2], unique: true
+
+  Migration order (FK dependency order):
+    1.  users
+    2.  banks, platforms
+    3.  accounts (→ users, banks)
+    4.  platform_accounts (→ users, platforms)
+    5.  instruments
+    6.  user_instruments (→ users, instruments)
+    7.  term_accounts (→ users, accounts)
+    8.  investments (→ users, user_instruments, platform_accounts)
+    9.  transactions (→ users; linked_account polymorphic = no FK)
+    10. follios (→ user_instruments)
+    11. audits (auto-created by: rails generate audited:install)
+
+
+PHASE 9 — REDIS / CACHING
+---------------------------
+  Python: redis-py called directly in report_service.py
+  Rails:  Rails.cache with redis_cache_store
+
+  config/environments/development.rb:
+    config.cache_store = :redis_cache_store, { url: ENV.fetch('REDIS_URL', 'redis://localhost:6379') }
+
+  Usage in service objects:
+    Rails.cache.fetch("dashboard/#{user.id}", expires_in: 5.minutes) do
+      # expensive query
+    end
+
+
+PHASE 10 — DEVELOPMENT SERVER & LOGS
+---------------------------------------
+  Procfile.dev changes:
+    backend: cd backend && bundle exec rails server -p 8000 2>&1 | tee ../logs/backend.log
+
+  Rails logs also go to backend/log/development.log (standard Rails).
+  logs/ folder at project root unchanged.
+  Makefile dev target unchanged.
+
+
+PHASE 11 — FRONTEND CHANGES (near-zero)
+-----------------------------------------
+  All Axios calls to /api/v1/* stay identical.
+
+  Required change (1 line):
+    frontend/src/api/client.ts — error response interceptor
+    Change: error.response?.data?.detail  →  error.response?.data?.error
+    (Rails error shape is { error: "..." }, Python was { detail: "..." })
+
+  No other frontend changes needed.
+
+
+PHASE 12 — VERIFICATION
+-------------------------
+  1. Start Rails server:  cd backend && bundle exec rails server -p 8000
+  2. Start frontend:      cd frontend && npm run dev
+  3. Smoke test via browser:
+       - Login / logout
+       - View accounts page — balance displayed correctly
+       - Create a credit transaction — account balance increments
+       - Create FD — paired debit on savings + FD created; savings balance decrements
+       - Browse instruments, track/untrack
+       - View reports (dashboard, spending trends, investment summary)
+  4. Run rspec:  cd backend && bundle exec rspec
+  5. Tail logs:  tail -f logs/backend.log
+
+
+CRITICAL FILES TO CREATE/MODIFY
+---------------------------------
+  New (Rails app):
+    backend/                                       new Rails API app root
+    backend/app/controllers/api/v1/*.rb            12 controllers
+    backend/app/models/*.rb                        13 models
+    backend/app/services/**/*.rb                   ~10 service objects
+    backend/lib/json_web_token.rb
+    backend/app/controllers/concerns/authenticatable.rb
+    backend/lib/tasks/*.rake                       instruments, transactions, db:seed namespaces
+    backend/db/migrate/*.rb                        10 migration files
+    backend/db/seeds/banks.csv                     copied from backend_python/seeds/
+    backend/db/seeds/platforms.csv                 copied from backend_python/seeds/
+
+  Modified:
+    Procfile.dev                                   backend process command
+    frontend/src/api/client.ts                     error.detail → error.error in interceptor
+
+  Archived:
+    backend/  →  backend_python/

@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — Rails Migration Plan</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 15px;
+        line-height: 1.7;
+        color: #1a1a1a;
+        background: #f6f8fa;
+        padding: 2rem 1rem;
+      }
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        padding: 2.5rem 3rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        border-bottom: 2px solid #0969da;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.4rem;
+        color: #0969da;
+      }
+      .subtitle {
+        color: #57606a;
+        font-size: 0.9rem;
+        margin-bottom: 2rem;
+      }
+      h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 2rem 0 0.6rem;
+        padding: 0.4rem 0.8rem;
+        background: #f0f6ff;
+        border-left: 4px solid #0969da;
+        border-radius: 0 4px 4px 0;
+        color: #0550ae;
+      }
+      h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 1.2rem 0 0.4rem;
+        color: #1a1a1a;
+      }
+      p {
+        margin-bottom: 0.75rem;
+      }
+      ul,
+      ol {
+        padding-left: 1.4rem;
+        margin-bottom: 0.75rem;
+      }
+      li {
+        margin-bottom: 0.25rem;
+      }
+      code {
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 0.85em;
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        color: #cf222e;
+      }
+      pre {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 0.85em;
+        line-height: 1.6;
+        color: #24292f;
+      }
+      pre code {
+        background: none;
+        border: none;
+        padding: 0;
+        color: inherit;
+        font-size: inherit;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+      }
+      th {
+        background: #f6f8fa;
+        font-weight: 600;
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d0d7de;
+        color: #24292f;
+      }
+      td {
+        padding: 0.45rem 0.75rem;
+        border: 1px solid #d0d7de;
+        vertical-align: top;
+      }
+      tr:nth-child(even) td {
+        background: #f6f8fa;
+      }
+      .pros-cons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .pros,
+      .cons {
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+      }
+      .pros {
+        background: #dafbe1;
+        border: 1px solid #82cfaa;
+      }
+      .cons {
+        background: #fff8c5;
+        border: 1px solid #d4a72c;
+      }
+      .pros h3 {
+        color: #1a7f37;
+        margin-top: 0;
+      }
+      .cons h3 {
+        color: #9a6700;
+        margin-top: 0;
+      }
+      .pros li::marker {
+        color: #1a7f37;
+      }
+      .cons li::marker {
+        color: #9a6700;
+      }
+      .recommendation {
+        background: #ddf4ff;
+        border: 1px solid #54aeff;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      .recommendation strong {
+        color: #0550ae;
+      }
+      .callout-warn {
+        background: #fff8c5;
+        border: 1px solid #d4a72c;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      .callout-info {
+        background: #ddf4ff;
+        border: 1px solid #54aeff;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      .callout-future {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      .phase-num {
+        display: inline-block;
+        background: #0969da;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 0.1rem 0.6rem;
+        margin-right: 0.4rem;
+        vertical-align: middle;
+      }
+      .phase-num-future {
+        display: inline-block;
+        background: #57606a;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 0.1rem 0.6rem;
+        margin-right: 0.4rem;
+        vertical-align: middle;
+      }
+      del {
+        color: #57606a;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #d0d7de;
+        margin: 1.5rem 0;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.15rem 0.5rem;
+        border-radius: 12px;
+        margin-right: 0.3rem;
+      }
+      .tag-required {
+        background: #ffd8d3;
+        color: #cf222e;
+      }
+      .tag-new {
+        background: #dafbe1;
+        color: #1a7f37;
+      }
+      .tag-archive {
+        background: #f6f8fa;
+        color: #57606a;
+        border: 1px solid #d0d7de;
+      }
+      .files-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      .files-box {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 0.8rem 1rem;
+      }
+      .files-box h4 {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
+      .files-box ul {
+        margin: 0;
+        padding-left: 1.2rem;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>FinTrack — Rails Migration Plan</h1>
+      <p class="subtitle">
+        FastAPI/Python → Ruby on Rails &nbsp;·&nbsp; API-only app &nbsp;·&nbsp;
+        Fresh PostgreSQL schema &nbsp;·&nbsp; Near-zero frontend changes
+      </p>
+
+      <!-- ── PROS / CONS ────────────────────────────────────────────────────── -->
+      <h2>Pros &amp; Cons</h2>
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>✅ Pros</h3>
+          <ul>
+            <li>
+              <strong>Convention over config</strong> — Rails generators cut
+              boilerplate vs FastAPI hand-wiring
+            </li>
+            <li>
+              <strong>ActiveRecord</strong> — callbacks, scopes,
+              <code>audited</code> gem replace SQLAlchemy event listeners
+            </li>
+            <li>
+              <strong>Rake tasks</strong> — built into Rails; replaces Typer CLI
+              with no extra dependency
+            </li>
+            <li>
+              <strong>Rails console</strong> — replaces
+              <code>uv run python -m app.cli console</code>, richer REPL
+            </li>
+            <li>
+              <strong>Ecosystem</strong> — jwt, rack-cors, kaminari, audited,
+              rswag all maintained and opinionated
+            </li>
+            <li>
+              <strong>Migrations</strong> — simpler than Alembic; datetime-stamp
+              workaround gone
+            </li>
+            <li>
+              <strong>Test ergonomics</strong> — RSpec + FactoryBot beats pytest
+              + httpx AsyncClient
+            </li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>⚠️ Cons</h3>
+          <ul>
+            <li>
+              <strong>Full rewrite risk</strong> — ~3,000+ lines across 12
+              services, 12 routers, 13 models
+            </li>
+            <li>
+              <del>PG native enums</del> — resolved: DB recreated; Rails string
+              enums used
+            </li>
+            <li>
+              <del>STI models</del> — resolved: no STI;
+              <code>type</code> columns renamed
+            </li>
+            <li>
+              <strong>No async</strong> — FastAPI is ASGI/async; Rails
+              synchronous by default
+            </li>
+            <li>
+              <strong>API docs</strong> — mitigated by rswag; requires writing
+              DSL vs FastAPI zero-effort
+            </li>
+            <li>
+              <strong>Context switch</strong> — slower feature velocity during
+              transition
+            </li>
+            <li>
+              <strong><code>audited</code> gem</strong> — creates own
+              <code>audits</code> table; old <code>audit_logs</code> data lost
+            </li>
+            <li>
+              <strong>No user-facing benefit</strong> — API surface and frontend
+              stay identical
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="recommendation">
+        <strong>Recommendation: Proceed.</strong> DB drop+recreate removes enum
+        risk. No STI — flat models match Python architecture exactly. One
+        high-risk area: <strong>balance-update callback chain</strong> —
+        <code>after_create</code> on <code>Transaction</code> must exactly
+        replicate <code>_apply_balance_delta</code> or account balances drift
+        silently. Integration-test this before reports and CLI tasks.
+      </div>
+
+      <hr />
+
+      <!-- ── PHASE 0 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">0</span> Archive Python Backend</h2>
+      <ul>
+        <li>
+          <code>git mv backend/ backend_python/</code> — preserves history
+        </li>
+        <li>Create new <code>backend/</code> for the Rails app</li>
+      </ul>
+
+      <!-- ── PHASE 1 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">1</span> Rails App Bootstrap</h2>
+      <p><strong>Versions:</strong> Ruby 3.4.x (latest stable), Rails 8.0.x</p>
+      <pre><code>gem install rails
+rails new backend --api --database=postgresql --skip-test
+cd backend</code></pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Gem</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>pg</code></td>
+            <td>PostgreSQL adapter</td>
+          </tr>
+          <tr>
+            <td><code>bcrypt</code></td>
+            <td>Password hashing (<code>has_secure_password</code>)</td>
+          </tr>
+          <tr>
+            <td><code>jwt</code></td>
+            <td>JWT tokens — HS256, 7-day expiry</td>
+          </tr>
+          <tr>
+            <td><code>rack-cors</code></td>
+            <td>CORS for Vite dev server on :5173</td>
+          </tr>
+          <tr>
+            <td><code>kaminari</code></td>
+            <td>Pagination</td>
+          </tr>
+          <tr>
+            <td><code>audited</code></td>
+            <td>Audit trail — replaces SQLAlchemy balance event listeners</td>
+          </tr>
+          <tr>
+            <td>
+              <code>rswag-api</code> + <code>rswag-ui</code> +
+              <code>rswag-specs</code>
+            </td>
+            <td>
+              Swagger/OpenAPI docs generated from RSpec; mounts Swagger UI at
+              <code>/api-docs</code>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>rspec-rails</code> + <code>factory_bot_rails</code> +
+              <code>shoulda-matchers</code>
+            </td>
+            <td>Test framework</td>
+          </tr>
+          <tr>
+            <td><code>redis</code></td>
+            <td>Redis cache adapter</td>
+          </tr>
+          <tr>
+            <td><code>puma</code></td>
+            <td>App server</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout-info">
+        <strong
+          >Environment config — Rails built-in credentials (no
+          dotenv-rails)</strong
+        >
+        <p style="margin: 0.5rem 0 0.3rem">
+          Rails 5.2+ ships encrypted credentials. No gem needed.
+        </p>
+        <ul style="padding-left: 1.4rem; margin: 0.3rem 0">
+          <li>
+            <strong>Secrets</strong> (<code>SECRET_KEY_BASE</code>, Redis URL) →
+            <code>config/credentials.yml.enc</code><br />
+            Edit with: <code>rails credentials:edit</code> &nbsp;·&nbsp; per-env
+            files: <code>config/credentials/production.yml.enc</code>
+          </li>
+          <li>
+            <strong>Database</strong> → <code>config/database.yml</code> reads
+            <code>ENV['DATABASE_URL']</code> natively
+          </li>
+          <li>
+            <strong>Local dev</strong> → env vars set in shell or
+            <code>Procfile.dev</code>
+          </li>
+        </ul>
+        <pre
+          style="margin: 0.5rem 0 0"
+        ><code># config/credentials.yml.enc  (rails credentials:edit)
+secret_key_base: &lt;generated&gt;
+redis_url: redis://localhost:6379
+
+# config/database.yml
+default: &amp;default
+  adapter: postgresql
+  pool: &lt;%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %&gt;
+  url: &lt;%= ENV["DATABASE_URL"] %&gt;</code></pre>
+      </div>
+
+      <ul>
+        <li>
+          <code>config/routes.rb</code> — all routes under
+          <code>/api/v1</code> namespace
+        </li>
+        <li>
+          <code>config/initializers/cors.rb</code> — allow
+          <code>http://localhost:5173</code> in development
+        </li>
+      </ul>
+
+      <!-- ── PHASE 2 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">2</span> Models (ActiveRecord)</h2>
+      <p>
+        <strong>No STI used anywhere.</strong> <code>type</code> is Rails'
+        reserved STI discriminator — both conflicting columns are renamed to
+        avoid it.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Python Model</th>
+            <th>Rails Model</th>
+            <th>Notable</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>User</code></td>
+            <td><code>User</code></td>
+            <td>
+              <code>has_secure_password</code>; has_many :accounts,
+              :platform_accounts, :user_instruments, :investments,
+              :transactions, :term_accounts
+            </td>
+          </tr>
+          <tr>
+            <td><code>Bank</code></td>
+            <td><code>Bank</code></td>
+            <td>Read-only from API; <code>has_many :accounts</code></td>
+          </tr>
+          <tr>
+            <td><code>Account</code></td>
+            <td><code>Account</code></td>
+            <td>
+              <code>belongs_to :bank, :user</code>;
+              <code>audited only: [:balance]</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>Platform</code></td>
+            <td><code>Platform</code></td>
+            <td>Read-only from API</td>
+          </tr>
+          <tr>
+            <td><code>PlatformAccount</code></td>
+            <td><code>PlatformAccount</code></td>
+            <td><code>belongs_to :platform, :user</code></td>
+          </tr>
+          <tr>
+            <td><code>Instrument</code></td>
+            <td><code>Instrument</code></td>
+            <td><code>default_scope { order(:name, :ticker_symbol) }</code></td>
+          </tr>
+          <tr>
+            <td><code>UserInstrument</code></td>
+            <td><code>UserInstrument</code></td>
+            <td>
+              Join table with timestamps;
+              <code>belongs_to :user, :instrument</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>Investment</code></td>
+            <td><code>Investment</code></td>
+            <td>
+              <strong>No STI.</strong> Flat model — Python has no subclasses,
+              only 1 validation branch. Column <code>type</code> →
+              <code>investment_type</code> (avoids Rails STI reserved word).
+              Nullable type-specific columns remain.
+              <code>enum :investment_type</code>.
+            </td>
+          </tr>
+          <tr>
+            <td><code>TermAccount</code></td>
+            <td><code>TermAccount</code></td>
+            <td>
+              <strong>No STI.</strong> Flat model — type-specific logic
+              (maturity calc, FD paired transactions, PPF 15-yr default) stays
+              in service objects. Column <code>type</code> →
+              <code>account_type</code>. <code>enum :account_type</code>.
+            </td>
+          </tr>
+          <tr>
+            <td><code>Transaction</code></td>
+            <td><code>Transaction</code></td>
+            <td>
+              <code>enum :transaction_type</code> (credit/debit);
+              <code>tags</code> → PG <code>text[]</code> array;
+              <code>public_id</code> → UUID;
+              <strong>polymorphic linked account — see callout below</strong>.
+              Immutable from API.
+            </td>
+          </tr>
+          <tr>
+            <td><code>Follio</code></td>
+            <td><code>Follio</code></td>
+            <td><code>belongs_to :user_instrument</code></td>
+          </tr>
+          <tr>
+            <td><code>AuditLog</code></td>
+            <td>→ <code>audited</code> gem</td>
+            <td>
+              <code>audited only: [:balance]</code> on Account and TermAccount
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout-warn">
+        <strong
+          >⚠️ Polymorphic Association on Transaction — Manual Handling
+          Required</strong
+        >
+        <p style="margin: 0.5rem 0 0.3rem">
+          A Transaction links to either an <code>Account</code> or a
+          <code>TermAccount</code> via <code>linked_account_type</code> (<code
+            >"account"</code
+          >
+          / <code>"term_account"</code>) and <code>linked_account_id</code>.
+        </p>
+        <p style="margin: 0.3rem 0">
+          <strong
+            >Why not
+            <code>belongs_to :linked_account, polymorphic: true</code>?</strong
+          >
+        </p>
+        <ul style="padding-left: 1.4rem; margin: 0.3rem 0">
+          <li>
+            Rails polymorphic expects the type column to hold the
+            <em>class name</em> (<code>"Account"</code>,
+            <code>"TermAccount"</code>). Existing values are lowercase — silent
+            load failures.
+          </li>
+          <li>
+            Rails polymorphic can enforce a FK constraint — but the schema
+            intentionally has no FK here (one FK can't reference two tables).
+          </li>
+        </ul>
+        <p style="margin: 0.4rem 0 0.3rem">
+          <strong>Solution — manual resolver method:</strong>
+        </p>
+        <pre style="margin: 0.3rem 0 0"><code># app/models/transaction.rb
+def linked_account
+  case linked_account_type
+  when 'account'      then Account.find(linked_account_id)
+  when 'term_account' then TermAccount.find(linked_account_id)
+  end
+end</code></pre>
+        <p style="margin: 0.5rem 0 0">
+          The <code>after_create :apply_balance_delta</code> callback calls
+          <code>linked_account</code> — same interface, no schema changes
+          required.
+        </p>
+      </div>
+
+      <!-- ── PHASE 3 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">3</span> Authentication</h2>
+      <p>No Devise — custom JWT to preserve existing endpoint paths exactly.</p>
+      <pre><code># lib/json_web_token.rb
+module JsonWebToken
+  SECRET = Rails.application.credentials.secret_key_base
+  EXPIRY = 7.days
+
+  def self.encode(payload)
+    JWT.encode(payload.merge(exp: EXPIRY.from_now.to_i), SECRET, 'HS256')
+  end
+
+  def self.decode(token)
+    JWT.decode(token, SECRET, true, algorithm: 'HS256').first
+  rescue JWT::DecodeError
+    nil
+  end
+end</code></pre>
+      <ul>
+        <li>
+          <code>app/controllers/concerns/authenticatable.rb</code> —
+          <code>current_user</code>,
+          <code>authenticate_user!</code> before_action (401 on fail)
+        </li>
+        <li>
+          Endpoints preserved: <code>POST /api/v1/auth/login</code>,
+          <code>GET /api/v1/auth/me</code>, <code>PUT /api/v1/auth/me</code>
+        </li>
+      </ul>
+
+      <!-- ── PHASE 4 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">4</span> Controllers (40+ endpoints)</h2>
+      <p>
+        All inherit
+        <code>ApplicationController &lt; ActionController::API</code> with
+        <code>include Authenticatable</code>.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Python Router</th>
+            <th>Rails Controller</th>
+            <th>Key actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>auth.py</code></td>
+            <td><code>Api::V1::AuthController</code></td>
+            <td>login, me, update_me</td>
+          </tr>
+          <tr>
+            <td><code>accounts.py</code></td>
+            <td><code>Api::V1::AccountsController</code></td>
+            <td>index, show, create, update, destroy, close</td>
+          </tr>
+          <tr>
+            <td><code>banks.py</code></td>
+            <td><code>Api::V1::BanksController</code></td>
+            <td>index, show</td>
+          </tr>
+          <tr>
+            <td><code>transactions.py</code></td>
+            <td><code>Api::V1::TransactionsController</code></td>
+            <td>index, create (no update/destroy)</td>
+          </tr>
+          <tr>
+            <td><code>investments.py</code></td>
+            <td><code>Api::V1::InvestmentsController</code></td>
+            <td>index, show, create, update, destroy</td>
+          </tr>
+          <tr>
+            <td><code>instruments.py</code></td>
+            <td><code>Api::V1::InstrumentsController</code></td>
+            <td>index, show, types, create, update, track, untrack, tracked</td>
+          </tr>
+          <tr>
+            <td><code>term_accounts.py</code></td>
+            <td><code>Api::V1::TermAccountsController</code></td>
+            <td>index, show, create, close</td>
+          </tr>
+          <tr>
+            <td><code>platforms.py</code></td>
+            <td><code>Api::V1::PlatformsController</code></td>
+            <td>index, show</td>
+          </tr>
+          <tr>
+            <td><code>platform_accounts.py</code></td>
+            <td><code>Api::V1::PlatformAccountsController</code></td>
+            <td>full CRUD</td>
+          </tr>
+          <tr>
+            <td><code>follios.py</code></td>
+            <td><code>Api::V1::FolliosController</code></td>
+            <td>full CRUD</td>
+          </tr>
+          <tr>
+            <td><code>reports.py</code></td>
+            <td><code>Api::V1::ReportsController</code></td>
+            <td>dashboard, spending_trends, investment_summary</td>
+          </tr>
+          <tr>
+            <td><code>client_errors.py</code></td>
+            <td><code>Api::V1::ClientErrorsController</code></td>
+            <td>create (unauthenticated, 204)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>Error shape change:</strong> Rails returns
+        <code>{ "error": "..." }</code>; Python returned
+        <code>{ "detail": "..." }</code> — one interceptor line change in
+        <code>frontend/src/api/client.ts</code>.
+      </p>
+
+      <!-- ── PHASE 5 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">5</span> Service Objects</h2>
+      <p>Plain Ruby objects in <code>app/services/</code>.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Python Service</th>
+            <th>Rails Service</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>transaction_service.py</code></td>
+            <td>
+              <code>Transactions::CreateService</code> +
+              <code>after_create</code> balance callback on
+              <code>Transaction</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>term_account_service.py</code></td>
+            <td>
+              <code>TermAccounts::CreateService</code> (FD paired debit+credit,
+              maturity calc), <code>TermAccounts::CloseService</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>bank_service.py</code></td>
+            <td>
+              <code>Accounts::CloseService</code>,
+              <code>TermAccounts::CloseService</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>instrument_service.py</code></td>
+            <td>
+              <code>Instruments::BrowseService</code>,
+              <code>Instruments::TrackService</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>investment_service.py</code></td>
+            <td><code>Investments::QueryService</code></td>
+          </tr>
+          <tr>
+            <td><code>report_service.py</code></td>
+            <td>
+              <code>Reports::DashboardService</code>,
+              <code>Reports::SpendingTrendsService</code>,
+              <code>Reports::InvestmentSummaryService</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>instrument_fetch_service.py</code></td>
+            <td>→ rake tasks (Phase 7)</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre><code># app/models/transaction.rb — replaces _apply_balance_delta
+after_create :apply_balance_delta
+
+private
+
+def apply_balance_delta
+  return if linked_account_type == 'term_account' &amp;&amp; linked_account.account_type == 'fd'
+  delta = credit? ? amount : -amount
+  linked_account.increment!(:balance, delta)
+end</code></pre>
+
+      <!-- ── PHASE 6 ─────────────────────────────────────────────────────────── -->
+      <h2>
+        <span class="phase-num">6</span> JSON Responses &amp; API Documentation
+      </h2>
+      <p>
+        <strong>Responses:</strong> plain <code>render json:</code> with
+        explicit attribute hashes — no serializer gem. Match Python Pydantic
+        field names exactly.
+      </p>
+      <p>
+        <strong>API Docs — rswag</strong> (Swagger/OpenAPI): RSpec request specs
+        written with rswag DSL serve as both tests and docs.
+        <code>rake rswag:specs:swaggerize</code> generates
+        <code>swagger/v1/swagger.json</code>. Swagger UI mounted at
+        <code>/api-docs</code> in development.
+      </p>
+      <pre><code># spec/requests/api/v1/accounts_spec.rb
+path '/api/v1/accounts' do
+  get 'List accounts' do
+    tags 'Accounts'
+    produces 'application/json'
+    security [bearerAuth: []]
+    response '200', 'accounts listed' do
+      schema type: :array, items: { '$ref' => '#/components/schemas/Account' }
+      run_test!
+    end
+  end
+end</code></pre>
+
+      <!-- ── PHASE 7 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">7</span> Rake Tasks (replaces CLI)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Python CLI command</th>
+            <th>Rake task</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>users create</code></td>
+            <td><code>rails console</code> — no rake task needed</td>
+          </tr>
+          <tr>
+            <td><code>banks seed</code></td>
+            <td>
+              <code>rake db:seed:banks</code> — reads
+              <code>db/seeds/banks.csv</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>platforms seed</code></td>
+            <td>
+              <code>rake db:seed:platforms</code> — reads
+              <code>db/seeds/platforms.csv</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>instruments fetch</code></td>
+            <td><code>rake instruments:fetch</code> (NSE + AMFI)</td>
+          </tr>
+          <tr>
+            <td><code>transactions correct &lt;id&gt;</code></td>
+            <td><code>rake transactions:correct[id]</code></td>
+          </tr>
+          <tr>
+            <td><code>transactions deactivate &lt;id&gt;</code></td>
+            <td><code>rake transactions:deactivate[id]</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ── PHASE 8 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">8</span> Database: Drop &amp; Recreate</h2>
+      <p>
+        Existing <code>fintrack_db</code>
+        <strong>dropped and recreated</strong> — clean Rails-idiomatic schema
+        with no PG enum type baggage.
+      </p>
+      <pre><code>dropdb fintrack_db
+createdb fintrack_db
+psql -c "GRANT ALL ON DATABASE fintrack_db TO fintrack_user;"
+cd backend &amp;&amp; bundle exec rails db:migrate
+bundle exec rake db:seed:banks
+bundle exec rake db:seed:platforms</code></pre>
+      <p>
+        <strong>All 6 PG native enums → Rails string enums</strong> (varchar
+        columns, no <code>CREATE TYPE</code>):
+      </p>
+      <pre><code>enum :transaction_type, { credit: 'credit', debit: 'debit' }, validate: true
+enum :investment_type,  { stock: 'stock', mutual_fund: 'mutual_fund', ... }, validate: true
+enum :account_type,     { fd: 'fd', ppf: 'ppf' }, validate: true</code></pre>
+      <table>
+        <thead>
+          <tr>
+            <th>Python / SQLAlchemy</th>
+            <th>Rails Migration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ARRAY(Text)</code> for <code>tags</code></td>
+            <td><code>t.string :tags, array: true, default: []</code></td>
+          </tr>
+          <tr>
+            <td><code>UUID</code> for <code>public_id</code></td>
+            <td>
+              <code
+                >t.uuid :public_id, default: -&gt; { "gen_random_uuid()" }</code
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>6 PG native enum types</td>
+            <td>
+              <code>t.string :field, null: false</code> + Rails
+              <code>enum</code> on model
+            </td>
+          </tr>
+          <tr>
+            <td><code>server_default: func.now()</code></td>
+            <td>
+              <code>t.timestamps</code> or
+              <code>default: -&gt; { "NOW()" }</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>ondelete: "CASCADE"</code></td>
+            <td><code>foreign_key: true, on_delete: :cascade</code></td>
+          </tr>
+          <tr>
+            <td><code>UniqueConstraint([col1, col2])</code></td>
+            <td><code>add_index :table, [:col1, :col2], unique: true</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p><strong>Migration order</strong> (FK dependency):</p>
+      <ol>
+        <li>users</li>
+        <li>banks, platforms</li>
+        <li>
+          accounts (→ users, banks), platform_accounts (→ users, platforms)
+        </li>
+        <li>instruments</li>
+        <li>user_instruments (→ users, instruments)</li>
+        <li>term_accounts (→ users, accounts)</li>
+        <li>investments (→ users, user_instruments, platform_accounts)</li>
+        <li>transactions (→ users; linked_account polymorphic — no FK)</li>
+        <li>follios (→ user_instruments)</li>
+        <li>
+          audits (auto-created by <code>rails generate audited:install</code>)
+        </li>
+      </ol>
+
+      <!-- ── PHASE 9 ─────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">9</span> Redis / Caching</h2>
+      <pre><code># config/environments/development.rb
+config.cache_store = :redis_cache_store, { url: Rails.application.credentials.redis_url }
+
+# In service objects
+Rails.cache.fetch("dashboard/#{user.id}", expires_in: 5.minutes) do
+  # expensive aggregation
+end</code></pre>
+
+      <!-- ── PHASE 10 ────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">10</span> Dev Server &amp; Logs</h2>
+      <pre><code># Procfile.dev
+backend: cd backend &amp;&amp; bundle exec rails server -p 8000 2&gt;&amp;1 | tee ../logs/backend.log</code></pre>
+      <p>
+        Rails also writes to <code>backend/log/development.log</code>.
+        <code>logs/</code> at project root and <code>Makefile</code>
+        <code>dev</code> target unchanged.
+      </p>
+
+      <!-- ── PHASE 11 ────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">11</span> Frontend Changes (near-zero)</h2>
+      <p>
+        All Axios calls to <code>/api/v1/*</code> stay identical.
+        <strong>One required change:</strong>
+      </p>
+      <pre><code>// frontend/src/api/client.ts — error interceptor
+// Change: error.response?.data?.detail
+// To:     error.response?.data?.error</code></pre>
+
+      <!-- ── PHASE 12 ────────────────────────────────────────────────────────── -->
+      <h2><span class="phase-num">12</span> Verification</h2>
+      <ol>
+        <li>
+          <code>cd backend &amp;&amp; bundle exec rails server -p 8000</code>
+        </li>
+        <li><code>cd frontend &amp;&amp; npm run dev</code></li>
+        <li>
+          Browser smoke tests: login · accounts + balance · create transaction
+          (balance increments) · create FD (paired debit on savings) · browse
+          &amp; track instruments · reports dashboard
+        </li>
+        <li><code>cd backend &amp;&amp; bundle exec rspec</code></li>
+        <li><code>tail -f logs/backend.log</code></li>
+      </ol>
+
+      <!-- ── PHASE 13 (FUTURE) ──────────────────────────────────────────────── -->
+      <h2>
+        <span class="phase-num-future">13</span> Future: GraphQL
+        <span style="font-size: 0.8rem; color: #57606a; font-weight: 400"
+          >(post-migration, additive)</span
+        >
+      </h2>
+      <div class="callout-future">
+        <p>
+          GraphQL was considered but deferred — it requires significant frontend
+          changes (Apollo Client, rewritten queries, new cache strategy) which
+          conflicts with the near-zero frontend constraint.
+        </p>
+        <p style="margin: 0.5rem 0 0.3rem">
+          <strong
+            >Best candidates for a future
+            <code>/api/graphql</code> endpoint</strong
+          >
+          (REST stays in place):
+        </p>
+        <ul style="padding-left: 1.4rem">
+          <li>
+            <code>GET /reports/dashboard</code> — aggregates accounts +
+            investments + transactions naturally as a graph query
+          </li>
+          <li>
+            <code>GET /investments</code> with multi-type filters — flexible
+            field selection maps well
+          </li>
+          <li><code>GET /instruments</code> with search + cursor pagination</li>
+        </ul>
+        <p style="margin: 0.5rem 0 0">
+          Gem: <code>graphql-ruby</code>. Add as a separate phase after Rails
+          migration stabilises, letting frontend migrate incrementally.
+        </p>
+      </div>
+
+      <!-- ── CRITICAL FILES ─────────────────────────────────────────────────── -->
+      <h2>Critical Files</h2>
+      <div class="files-grid">
+        <div class="files-box">
+          <h4><span class="tag tag-new">NEW</span> Rails app</h4>
+          <ul>
+            <li>
+              <code>backend/app/controllers/api/v1/*.rb</code> — 12 controllers
+            </li>
+            <li><code>backend/app/models/*.rb</code> — 13 models</li>
+            <li>
+              <code>backend/app/services/**/*.rb</code> — ~10 service objects
+            </li>
+            <li><code>backend/lib/json_web_token.rb</code></li>
+            <li>
+              <code>backend/app/controllers/concerns/authenticatable.rb</code>
+            </li>
+            <li>
+              <code>backend/lib/tasks/*.rake</code> — instruments, transactions,
+              db:seed
+            </li>
+            <li><code>backend/db/migrate/*.rb</code> — 10 migration files</li>
+            <li>
+              <code>backend/db/seeds/banks.csv</code> +
+              <code>platforms.csv</code>
+            </li>
+            <li>
+              <code>backend/spec/requests/api/v1/*_spec.rb</code> — rswag specs
+            </li>
+          </ul>
+        </div>
+        <div class="files-box">
+          <h4><span class="tag tag-required">MODIFIED</span></h4>
+          <ul>
+            <li><code>Procfile.dev</code> — backend process command</li>
+            <li>
+              <code>frontend/src/api/client.ts</code> — <code>.detail</code> →
+              <code>.error</code>
+            </li>
+          </ul>
+          <br />
+          <h4><span class="tag tag-archive">ARCHIVED</span></h4>
+          <ul>
+            <li><code>backend/</code> → <code>backend_python/</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

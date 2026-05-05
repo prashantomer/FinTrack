@@ -96,12 +96,13 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
 function SelectValue({
   placeholder,
   className,
+  children,
   ...props
-}: { placeholder?: string; className?: string }) {
+}: { placeholder?: string; className?: string; children?: React.ReactNode }) {
   const registry = React.useContext(SelectRegistryCtx)
   const value = registry?.currentValue ?? ""
   const label = value ? registry?.getLabel(value) : undefined
-  const isEmpty = !value
+  const isEmpty = !value && !children
 
   return (
     <span
@@ -113,7 +114,7 @@ function SelectValue({
       )}
       {...props}
     >
-      {isEmpty ? placeholder : (label ?? value)}
+      {children ?? (isEmpty ? placeholder : (label ?? value))}
     </span>
   )
 }

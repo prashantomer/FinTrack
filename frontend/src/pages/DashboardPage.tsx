@@ -123,15 +123,16 @@ function PortfolioCard({
       </CardHeader>
       <CardContent className="flex-1 p-0">
         {holdings.map((h) => {
+          const hType = h.type ?? h.investment_type ?? ''
           const pct = total > 0 ? (h.current_value / total) * 100 : 0
-          const color = INVESTMENT_COLORS[h.type as string] ?? '#94a3b8'
+          const color = INVESTMENT_COLORS[hType] ?? '#94a3b8'
           return (
-            <div key={h.type as string} className="px-6 py-3 border-b last:border-0">
+            <div key={hType || h.total_invested} className="px-6 py-3 border-b last:border-0">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                   <span className="text-sm font-medium truncate">
-                    {INVESTMENT_TYPE_LABELS[h.type as keyof typeof INVESTMENT_TYPE_LABELS]}
+                    {INVESTMENT_TYPE_LABELS[hType as keyof typeof INVESTMENT_TYPE_LABELS] ?? hType}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">{h.count}×</span>
                 </div>
@@ -227,8 +228,8 @@ function RecentTransactionsCard({ transactions, formatCurrency }: { transactions
                 ))}
               </div>
             </div>
-            <p className={`text-sm font-mono font-semibold shrink-0 ${t.type === 'credit' ? 'text-green-600' : 'text-red-500'}`}>
-              {t.type === 'credit' ? '+' : '−'}{fmt.format(t.amount)}
+            <p className={`text-sm font-mono font-semibold shrink-0 ${(t.type ?? t.transaction_type) === 'credit' ? 'text-green-600' : 'text-red-500'}`}>
+              {(t.type ?? t.transaction_type) === 'credit' ? '+' : '−'}{fmt.format(t.amount)}
             </p>
           </div>
         ))}
@@ -268,8 +269,8 @@ function UpcomingMaturitiesCard({ maturities, formatCurrency }: { maturities: Te
                 <TableCell className="font-mono text-sm">{ta.account_number || '—'}</TableCell>
                 <TableCell className="text-sm">{ta.bank_short_name}</TableCell>
                 <TableCell>
-                  <Badge variant={ta.type === 'fd' ? 'default' : 'secondary'}>
-                    {ta.type.toUpperCase()}
+                  <Badge variant={(ta.type ?? ta.account_type) === 'fd' ? 'default' : 'secondary'}>
+                    {(ta.type ?? ta.account_type ?? '').toUpperCase()}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{ta.maturity_date}</TableCell>
@@ -316,9 +317,9 @@ export function DashboardPage() {
     : null
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="shrink-0 border-b bg-background px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -377,6 +378,7 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-5">
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -440,6 +442,7 @@ export function DashboardPage() {
       {(dash?.upcoming_maturities?.length ?? 0) > 0 && (
         <UpcomingMaturitiesCard maturities={dash!.upcoming_maturities} formatCurrency={formatCurrency} />
       )}
+      </div>
     </div>
   )
 }

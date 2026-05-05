@@ -1,0 +1,12 @@
+name,short_name,type,is_system
+Zerodha,ZERODHA,broker,true
+Groww,GROWW,mf_platform,true
+Kite by Zerodha,KITE,broker,true
+Upstox,UPSTOX,broker,true
+Angel One,ANGEL,broker,true
+HDFC Securities,HDFCSEC,broker,true
+ICICI Direct,ICICIDIRECT,broker,true
+Coin by Zerodha,COIN,mf_platform,true
+MF Central,MFCENTRAL,mf_platform,true
+Paytm Money,PAYTMMONEY,mf_platform,true
+Direct (AMC),DIRECT,direct,true

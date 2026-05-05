@@ -20,9 +20,11 @@
    - 2.8 [Pages](#28-pages)
    - 2.9 [Dashboard & Charts](#29-dashboard--charts)
    - 2.10 [Investment Form — Dynamic Fields](#210-investment-form--dynamic-fields)
-   - 2.11 [Error Handling & Loading States](#211-error-handling--loading-states)
-   - 2.12 [Build Configuration](#212-build-configuration)
-   - 2.13 [Styling System](#213-styling-system)
+   - 2.11 [Instruments Page — Two-Table Pattern](#211-instruments-page--two-table-pattern)
+   - 2.12 [Pagination Patterns](#212-pagination-patterns)
+   - 2.13 [Error Handling & Loading States](#213-error-handling--loading-states)
+   - 2.14 [Build Configuration](#214-build-configuration)
+   - 2.15 [Styling System](#215-styling-system)
 
 ---
 
@@ -43,7 +45,8 @@ The frontend is a **React 19 SPA** built with Vite 8. In development it runs on 
 │                                                              │
 │  ┌───────────────────────────────────────────────────────┐   │
 │  │                   Pages / Components                  │   │
-│  │   Login  Register  Dashboard  Transactions  Investments│  │
+│  │  Login  Dashboard  Transactions  Investments  Accounts│   │
+│  │  Platforms  Instruments  Portfolio  Follios  Reports  │   │
 │  └───────────────────────┬───────────────────────────────┘   │
 │                          │                                   │
 │  ┌───────────────────────▼───────────────────────────────┐   │
@@ -66,8 +69,7 @@ The frontend is a **React 19 SPA** built with Vite 8. In development it runs on 
 App.tsx  (Router + Providers)
 │
 ├── PublicRoutes
-│   ├── LoginPage
-│   └── RegisterPage
+│   └── LoginPage          (no public registration — users created via CLI)
 │
 └── ProtectedRoute  (checks AuthContext → redirects if unauthenticated)
     └── AppShell  (persistent layout: sidebar + header)
@@ -77,16 +79,19 @@ App.tsx  (Router + Providers)
             ├── DashboardPage
             ├── TransactionsPage
             ├── InvestmentsPage
+            ├── PortfolioPage
             ├── AccountsPage
             ├── PlatformAccountsPage
-            └── InstrumentsPage
+            ├── InstrumentsPage
+            ├── FolliosPage
+            └── ReportsPage
 ```
 
 **Provider stack** (outermost → innermost, defined in `main.tsx`):
 
 ```
 <QueryClientProvider>        ← TanStack Query cache
-  <AuthProvider>             ← JWT state + login/logout
+  <AuthProvider>             ← JWT state + login/logout + user profile
     <RouterProvider>         ← React Router v7
       <App />
     </RouterProvider>
@@ -100,26 +105,31 @@ FinTrack uses **two distinct state layers** — no Redux, no Zustand:
 
 | Layer | Tool | What lives here |
 |-------|------|----------------|
-| **Server state** | TanStack Query v5 | Transactions list, investments list, dashboard totals, reports — anything that comes from the API |
-| **Auth state** | React Context | JWT token, decoded user object, `login()`, `logout()` |
+| **Server state** | TanStack Query v5 | Transactions, investments, accounts, instruments, dashboard, reports — anything fetched from the API |
+| **Auth state** | React Context | JWT token, user object (including `currency_code` + `currency_locale`), `login()`, `logout()` |
 
-**No global UI state store.** Component-local `useState` handles everything else (modal open/close, filter panel, form dirty state). The rule: if it comes from the server, it belongs in React Query. If it's the current user's identity, it belongs in AuthContext. Everything else is local.
+**No global UI state store.** Component-local `useState` handles everything else (modal open/close, filter state, form dirty state, selected page). The rule: if it comes from the server, it belongs in React Query. If it identifies the current user, it belongs in AuthContext. Everything else is local.
+
+`useCurrency()` derives a `formatCurrency` function from the user's `currency_code` and `currency_locale` stored in AuthContext — the displayed currency symbol updates without a page reload when the user changes their profile.
 
 ### 1.4 Routing Architecture
 
 React Router v7 with the data router API (`createBrowserRouter`):
 
 ```
-/login                 → LoginPage              (public)
-/register              → RegisterPage           (public)
-/                      → DashboardPage          (protected)
-/transactions          → TransactionsPage       (protected)
-/investments           → InvestmentsPage        (protected)
-/accounts              → AccountsPage           (protected)
-/platform-accounts     → PlatformAccountsPage   (protected)
-/instruments           → InstrumentsPage        (protected)
-*                      → NotFoundPage
+/login              → LoginPage              (public)
+/                   → DashboardPage          (protected)
+/transactions       → TransactionsPage       (protected)
+/investments        → InvestmentsPage        (protected)
+/portfolio          → PortfolioPage          (protected)
+/accounts           → AccountsPage           (protected)
+/platform-accounts  → PlatformAccountsPage   (protected)
+/instruments        → InstrumentsPage        (protected)
+/follios            → FolliosPage            (protected)
+/reports            → ReportsPage            (protected)
 ```
+
+There is **no `/register` route** — user registration is CLI-only (`uv run python -m app.cli users create`).
 
 **Route protection pattern:**
 
@@ -130,7 +140,7 @@ ProtectedRoute
   └── if token    → <Outlet />  (renders nested route)
 ```
 
-`AppShell` is a layout route wrapping all protected routes. It renders `<Outlet />` in its content area — so the sidebar and header are always mounted, only the page content changes on navigation.
+`AppShell` is a layout route wrapping all protected routes. It renders `<Outlet />` in its content area — sidebar and header are always mounted, only the page content changes on navigation.
 
 ### 1.5 Dev vs Production Flow
 
@@ -158,7 +168,7 @@ Browser :8000
                          (catch-all enables React Router client-side routing)
 ```
 
-Build command: `npm run build` → Vite outputs `frontend/dist/`. FastAPI detects the directory and auto-mounts it.
+Build command: `npm run build` → Vite outputs `frontend/dist/`. FastAPI detects the directory and auto-mounts it via the catch-all registered after all `/api/v1/` routers.
 
 ### 1.6 Tech Stack Rationale
 
@@ -169,12 +179,14 @@ Build command: `npm run build` → Vite outputs `frontend/dist/`. FastAPI detect
 | Language | TypeScript 6 | Full type coverage for API shapes matches backend Pydantic schemas |
 | Routing | React Router v7 | Data router API; nested layouts with Outlet |
 | Server state | TanStack Query v5 | Built-in cache, background refetch, mutation invalidation — eliminates hand-rolled fetch/loading/error boilerplate |
-| Forms | react-hook-form + Zod | Uncontrolled inputs = no re-render on keystroke; Zod schema can be shared as source of truth for field validation |
+| Forms | react-hook-form + Zod v4 | Uncontrolled inputs = no re-render on keystroke; Zod schema is the single source of truth for field validation |
 | HTTP client | Axios | Interceptors for auth header + 401 redirect; cleaner than fetch for all JSON APIs |
 | Charts | Recharts 3 | Pure React (no D3 imperative code), TypeScript-first, composable primitives |
 | UI components | shadcn/ui + Tailwind v4 | Unstyled accessible primitives, full design control, copied into codebase (not a black-box dependency) |
 | Icons | lucide-react | Tree-shakeable, consistent style, TypeScript types |
 | Date handling | date-fns | Immutable, tree-shakeable, no global locale mutation |
+| Toast notifications | sonner | Minimal API, accessible, works without a provider wrapping the whole tree |
+| Headless popover | @base-ui/react | Used for `InstrumentCombobox` — note: does **not** support `asChild` (unlike Radix UI), style `PopoverTrigger` directly |
 
 ---
 
@@ -187,7 +199,6 @@ frontend/
 ├── index.html                    ← Vite entry; mounts <div id="root">
 ├── vite.config.ts                ← Dev proxy + build config
 ├── tsconfig.json                 ← TypeScript config (strict mode)
-├── tailwind.config.ts            ← Tailwind v4 theme
 ├── components.json               ← shadcn/ui config (paths, style)
 │
 └── src/
@@ -195,223 +206,250 @@ frontend/
     ├── App.tsx                   ← createBrowserRouter, route definitions
     ├── vite-env.d.ts             ← Vite import.meta.env types
     │
-    ├── types/                    ← Shared TypeScript interfaces (mirrors backend schemas)
-    │   ├── auth.ts               ← User, Token, LoginRequest, RegisterRequest
-    │   ├── transaction.ts        ← Transaction, TransactionCreate, TransactionUpdate, filters
-    │   ├── investment.ts         ← Investment, InvestmentCreate subtypes, InvestmentType enum
-    │   ├── reports.ts            ← DashboardSummary, MonthlyTrend, InvestmentSummary
-    │   └── index.ts              ← AccountType, PlatformType, Bank, Account, Platform,
-    │                               PlatformAccount, Instrument, and all Create/Update variants
+    ├── types/
+    │   └── index.ts              ← All shared TypeScript interfaces (mirrors backend schemas):
+    │                               User, Bank, Account, AccountCreate, AccountClose,
+    │                               TermAccount, TermAccountCreate, TermAccountClose,
+    │                               Transaction, TransactionCreate, TransactionListResponse,
+    │                               Investment, InvestmentListResponse,
+    │                               Instrument, UserInstrument, Follio,
+    │                               DashboardReport, SpendingTrendsReport,
+    │                               InvestmentSummaryReport, PortfolioReport, PortfolioPosition,
+    │                               AuditLog, and all enum types
     │
-    ├── api/                      ← Axios call functions (pure async functions, no hooks)
+    ├── api/                      ← Axios call functions (pure async, no React, no hooks)
     │   ├── client.ts             ← Axios instance + interceptors
-    │   ├── auth.ts               ← login(), register(), getMe(), updateMe()
-    │   ├── transactions.ts       ← listTransactions(), createTransaction(), etc.
-    │   ├── investments.ts        ← listInvestments(), createInvestment(), etc.
-    │   ├── reports.ts            ← getDashboard(), getSpendingTrends(), getInvestmentSummary()
-    │   ├── banks.ts              ← listBanks(), listAccounts(), createAccount(), updateAccount(), deleteAccount()
-    │   ├── platforms.ts          ← listPlatforms(), listPlatformAccounts(), createPlatformAccount(), etc.
-    │   └── instruments.ts        ← listInstruments(), listTrackedInstruments(), createInstrument(),
-    │                               trackInstrument(), untrackInstrument()
+    │   ├── auth.ts               ← login(), getMe(), updateMe()
+    │   ├── banks.ts              ← listBanks, listAccounts, createAccount, updateAccount,
+    │   │                           closeAccount, deleteAccount
+    │   ├── term_accounts.ts      ← listTermAccounts, getTermAccount, createTermAccount,
+    │   │                           closeTermAccount
+    │   ├── transactions.ts       ← listTransactions (cursor-based), createTransaction
+    │   ├── investments.ts        ← listInvestments(type[], page, pageSize), getInvestment,
+    │   │                           createInvestment, updateInvestment, deleteInvestment
+    │   ├── instruments.ts        ← listInstruments (cursor-based infinite), listInstrumentTypes,
+    │   │                           listTrackedInstruments, createInstrument,
+    │   │                           trackInstrument, untrackInstrument, listUserInstruments
+    │   ├── platforms.ts          ← listPlatforms, listPlatformAccounts,
+    │   │                           createPlatformAccount, updatePlatformAccount,
+    │   │                           deletePlatformAccount
+    │   ├── follios.ts            ← listFollios, createFollio, updateFollio, deleteFollio
+    │   ├── reports.ts            ← getDashboard, refreshDashboard, getDashboardCacheStatus,
+    │   │                           getSpendingTrends, getInvestmentSummary, getPortfolio
+    │   └── audit.ts              ← getAccountAuditLogs, getTermAccountAuditLogs
     │
     ├── context/
-    │   └── AuthContext.tsx        ← createContext, AuthProvider, useAuthContext hook
+    │   └── AuthContext.tsx        ← createContext, AuthProvider, useAuthContext hook;
+    │                               stores token + User (incl. currency_code, currency_locale)
     │
     ├── hooks/                    ← React Query hooks (wrap api/ functions)
-    │   ├── useAuth.ts            ← useCurrentUser()
-    │   ├── useTransactions.ts    ← useTransactions(), useCreateTransaction(), etc.
-    │   ├── useInvestments.ts     ← useInvestments(), useCreateInvestment(), etc.
-    │   ├── useReports.ts         ← useDashboard(), useSpendingTrends(), useInvestmentSummary()
-    │   ├── useBanks.ts           ← useBanks(), useAccounts(), useCreateAccount(), useUpdateAccount(), useDeleteAccount()
-    │   ├── usePlatforms.ts       ← usePlatforms(), usePlatformAccounts(), useCreatePlatformAccount(), etc.
-    │   └── useInstruments.ts     ← useInstruments(), useTrackedInstruments(), useCreateInstrument(),
-    │                               useTrackInstrument(), useUntrackInstrument()
+    │   ├── useBanks.ts           ← useBanks, useAccounts, useCreateAccount,
+    │   │                           useUpdateAccount, useCloseAccount, useDeleteAccount
+    │   ├── useTermAccounts.ts    ← useTermAccounts, useCreateTermAccount, useCloseTermAccount
+    │   ├── useTransactions.ts    ← useTransactions (cursor-based), useCreateTransaction
+    │   ├── useInvestments.ts     ← useInvestments(types?, page, pageSize),
+    │   │                           useCreateInvestment, useUpdateInvestment, useDeleteInvestment
+    │   ├── useInstruments.ts     ← useInfiniteInstruments, useInstrumentTypes,
+    │   │                           useTrackedInstruments, useTrackInstrument,
+    │   │                           useUntrackInstrument, useUserInstruments
+    │   ├── usePlatforms.ts       ← usePlatforms, usePlatformAccounts,
+    │   │                           useCreatePlatformAccount, useUpdatePlatformAccount,
+    │   │                           useDeletePlatformAccount
+    │   ├── useFollios.ts         ← useFollios, useCreateFollio, useUpdateFollio,
+    │   │                           useDeleteFollio
+    │   ├── useReports.ts         ← useDashboard, useSpendingTrends,
+    │   │                           useInvestmentSummary, usePortfolio
+    │   ├── useAuditLogs.ts       ← useAccountAuditLogs, useTermAccountAuditLogs
+    │   ├── useCurrency.ts        ← returns formatCurrency() based on user's locale/currency
+    │   ├── useDebounce.ts        ← debounce utility hook
+    │   └── useTransactionFilters.ts ← manages transaction filter state (type, date range, cursor)
     │
     ├── components/
-    │   ├── ui/                   ← shadcn/ui primitives (Button, Card, Input, Command,
-    │   │                           Popover, InputGroup, etc.)
+    │   ├── ui/                   ← shadcn/ui primitives (Button, Card, Input, Label,
+    │   │                           Select, Table, Dialog, Form, Badge, Separator,
+    │   │                           Skeleton, Popover, Command, etc.)
     │   │
     │   ├── layout/
     │   │   ├── AppShell.tsx      ← Layout route: Sidebar + Header + <Outlet />
-    │   │   ├── Sidebar.tsx       ← Nav links (Dashboard, Transactions, Investments,
-    │   │   │                       Bank Accounts, Platforms, Instruments)
-    │   │   └── Header.tsx        ← User display, logout button
+    │   │   ├── Sidebar.tsx       ← Nav links (all 9 sections)
+    │   │   ├── Header.tsx        ← User display, logout button
+    │   │   └── PageHeader.tsx    ← Consistent page title + action button slot
     │   │
     │   ├── auth/
-    │   │   └── ProtectedRoute.tsx ← Checks AuthContext; redirects to /login if no token
+    │   │   └── ProtectedRoute.tsx ← Reads AuthContext; <Navigate to="/login" replace /> if no token
     │   │
     │   ├── transactions/
-    │   │   ├── TransactionTable.tsx    ← Table with sort, row actions (edit/delete)
-    │   │   ├── TransactionForm.tsx     ← Create/edit form; Bank Account select + Instrument combobox
-    │   │   └── TransactionFilters.tsx  ← Type/date range filter bar (category filter removed)
+    │   │   ├── TransactionTable.tsx    ← Cursor-paginated table; credit/debit badge
+    │   │   ├── TransactionForm.tsx     ← Create-only; linked account polymorphic select;
+    │   │   │                             bank_ref shown only for credit; tags as comma-separated input
+    │   │   └── TransactionFilters.tsx  ← type / date range filter bar
     │   │
     │   ├── investments/
-    │   │   ├── InvestmentTable.tsx     ← Table grouped or filtered by type
-    │   │   ├── InvestmentForm.tsx      ← Dynamic form + Instrument combobox + Platform Account select
-    │   │   └── InstrumentCombobox.tsx  ← Searchable combobox (shadcn Command + @base-ui/react Popover);
+    │   │   ├── InvestmentTable.tsx     ← Page-based paginated table filtered by type
+    │   │   ├── InvestmentForm.tsx      ← Dynamic fields by investment type; InstrumentCombobox;
+    │   │   │                             PlatformAccount select
+    │   │   └── InstrumentCombobox.tsx  ← @base-ui/react Popover + searchable list;
     │   │                                 props: value, onChange, filterType
     │   │
     │   └── dashboard/
-    │       ├── SummaryCards.tsx        ← Inbound / Outbound / Balance / Portfolio cards
-    │       └── SpendingChart.tsx       ← Recharts ComposedChart (bar + line), inbound/outbound keys
+    │       ├── SummaryCards.tsx        ← Credit / Debit / Account Balance / Portfolio cards
+    │       └── SpendingChart.tsx       ← Recharts ComposedChart (bar + line)
     │
     ├── pages/
-    │   ├── LoginPage.tsx
-    │   ├── RegisterPage.tsx
-    │   ├── DashboardPage.tsx
-    │   ├── TransactionsPage.tsx
-    │   ├── InvestmentsPage.tsx
-    │   ├── AccountsPage.tsx            ← CRUD for bank accounts (table + dialog form)
-    │   ├── PlatformAccountsPage.tsx    ← CRUD for platform accounts (table + dialog form)
-    │   ├── InstrumentsPage.tsx         ← Browse/search instruments; track/untrack; create dialog
-    │   └── NotFoundPage.tsx
+    │   ├── LoginPage.tsx               ← Public
+    │   ├── DashboardPage.tsx           ← Summary cards + spending chart
+    │   ├── TransactionsPage.tsx        ← Cursor-paginated transactions + filters + create dialog
+    │   ├── InvestmentsPage.tsx         ← Page-based pagination; sticky footer pagination bar
+    │   ├── PortfolioPage.tsx           ← Portfolio positions from /reports/portfolio
+    │   ├── AccountsPage.tsx            ← Open accounts + term accounts (FD/PPF);
+    │   │                                 closed records in separate table below active
+    │   ├── PlatformAccountsPage.tsx    ← CRUD for platform accounts
+    │   ├── InstrumentsPage.tsx         ← "In Portfolio" table + "Not Yet Invested" table;
+    │   │                                 BrowseSheet for infinite-scroll search
+    │   ├── FolliosPage.tsx             ← CRUD for follios
+    │   └── ReportsPage.tsx             ← Spending trends + investment summary charts/tables
     │
     └── lib/
-        ├── utils.ts              ← cn() (clsx + tailwind-merge), currency/date formatters
-        └── labels.ts             ← TRANSACTION_TYPE_LABELS, ACCOUNT_TYPE_LABELS, PLATFORM_TYPE_LABELS
+        ├── utils.ts              ← cn() (clsx + tailwind-merge), shared helpers
+        ├── labels.ts             ← TRANSACTION_TYPE_LABELS, INVESTMENT_TYPE_LABELS,
+        │                           ACCOUNT_TYPE_LABELS, TERM_ACCOUNT_TYPE_LABELS, etc.
+        └── finance.ts            ← calcGainLoss(amountInvested, currentValue)
+                                    → { gain, pct, isPositive }
 ```
 
 ### 2.2 Type System
 
-All types in `src/types/` mirror the backend Pydantic schemas exactly. This is the single source of truth for data shapes.
+All types in `src/types/index.ts` mirror backend Pydantic schemas exactly. This is the single source of truth for data shapes across the frontend.
 
-#### `types/transaction.ts`
+#### Enum types
 
 ```typescript
-export type TransactionType = "inbound" | "outbound";
+export type TransactionType    = 'credit' | 'debit';
+export type InvestmentType     = 'stock' | 'mutual_fund';
+export type AccountType        = 'savings' | 'current' | 'salary' | 'nre' | 'nro';
+export type TermAccountType    = 'fd' | 'ppf';
+```
 
-// TransactionCategory was removed in the schema redesign
+Note: `InvestmentType` is intentionally narrow (`stock | mutual_fund`) — the backend investment model supports more types, but only stocks and mutual funds have active UI support.
 
+#### Transaction types
+
+```typescript
 export interface Transaction {
   id: number;
   user_id: number;
-  amount: string;            // Decimal serialized as string from backend
-  type: TransactionType;
-  account_id: number | null;
-  instrument_id: number | null;
+  amount: string;                    // Decimal serialised as string
+  type: TransactionType;             // 'credit' | 'debit'
+  linked_account_type: 'account' | 'term_account' | null;
+  linked_account_id: number | null;  // polymorphic FK
   description: string | null;
-  date: string;              // ISO 8601 date "YYYY-MM-DD"
-  notes: string | null;
-  created_at: string;        // ISO 8601 datetime
+  date: string;                      // "YYYY-MM-DD"
+  bank_ref: string | null;           // UTR/IMPS — only on credit
+  tags: string[] | null;             // free-form labels
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface TransactionCreate {
   amount: string;
   type: TransactionType;
-  account_id?: number | null;
-  instrument_id?: number | null;
+  linked_account_type?: 'account' | 'term_account' | null;
+  linked_account_id?: number | null;
   description?: string;
   date: string;
-  notes?: string;
+  bank_ref?: string | null;
+  tags?: string[];
 }
 
-export type TransactionUpdate = Partial<TransactionCreate>;
-
-export interface TransactionFilters {
-  page?: number;
-  page_size?: number;
-  type?: TransactionType;
-  start_date?: string;
-  end_date?: string;
-  sort_by?: "date" | "amount" | "created_at";
-  order?: "asc" | "desc";
-}
-
+// Cursor-based list response
 export interface TransactionListResponse {
   items: Transaction[];
-  total: number;
-  page: number;
-  page_size: number;
+  next_cursor: string | null;        // null when no more pages
+  limit: number;
 }
 ```
 
-#### `types/investment.ts`
+#### Account types
 
 ```typescript
-export type InvestmentType =
-  | "stock" | "mutual_fund" | "fixed_deposit"
-  | "gold" | "crypto" | "ppf" | "nps" | "real_estate";
-
-// Base fields common to all investment types
-interface InvestmentBase {
-  type: InvestmentType;
+export interface Bank {
+  id: number;
   name: string;
-  amount_invested: string;
-  current_value?: string;
-  purchase_date: string;
-  notes?: string;
+  short_name: string;                // max 6 chars, display code
 }
 
-// Type-specific create shapes (used in InvestmentForm)
-export interface StockCreate extends InvestmentBase {
-  type: "stock";
-  ticker_symbol: string;
-  quantity: string;
-  avg_buy_price: string;
-  exchange?: string;
-}
-
-export interface MutualFundCreate extends InvestmentBase {
-  type: "mutual_fund";
-  folio_number?: string;
-  units: string;
-  nav_at_purchase: string;
-  fund_house?: string;
-}
-
-export interface FixedDepositCreate extends InvestmentBase {
-  type: "fixed_deposit";
-  bank_name: string;
-  fd_number?: string;
-  interest_rate: string;
-  tenure_months: number;
-  maturity_date?: string;
-  maturity_amount?: string;
-  compounding?: string;
-}
-
-export interface GoldCreate extends InvestmentBase {
-  type: "gold";
-  gold_form: string;
-  weight_grams?: string;
-  purity?: string;
-}
-
-export interface GenericInvestmentCreate extends InvestmentBase {}
-
-export type InvestmentCreate =
-  | StockCreate | MutualFundCreate | FixedDepositCreate
-  | GoldCreate | GenericInvestmentCreate;
-
-// Read shape: all fields present, type-specific ones nullable
-export interface Investment extends InvestmentBase {
+export interface Account {
   id: number;
   user_id: number;
-  platform_account_id: number | null;
-  instrument_id: number | null;
+  bank_id: number;
+  bank: Bank;
+  account_type: AccountType;
+  nickname: string | null;
+  balance: string;
+  closed_date: string | null;
+  closed_amount: string | null;
   created_at: string;
-  // Stock
+}
+
+export interface AccountCreate { bank_id: number; account_type: AccountType; nickname?: string; }
+export interface AccountClose  { closed_date: string; closed_amount: string; }
+export type AccountUpdate = Partial<AccountCreate>;
+
+export interface TermAccount {
+  id: number;
+  user_id: number;
+  account_id: number;                // parent savings account
+  type: TermAccountType;
+  name: string;
+  amount: string;
+  interest_rate: string | null;
+  open_date: string;
+  maturity_date: string | null;
+  maturity_amount: string | null;
+  balance: string;
+  closed_date: string | null;
+  closed_amount: string | null;
+  created_at: string;
+}
+
+export interface TermAccountCreate {
+  account_id: number;
+  type: TermAccountType;
+  name: string;
+  amount: string;
+  interest_rate?: string;
+  open_date: string;
+  maturity_amount?: string;          // required for PPF; auto-calculated for FD
+}
+
+export interface TermAccountClose { closed_date: string; closed_amount: string; }
+```
+
+#### Investment types
+
+```typescript
+export interface Investment {
+  id: number;
+  user_id: number;
+  type: InvestmentType;
+  name: string;
+  instrument_id: number | null;      // links to global instruments catalogue
+  platform_account_id: number | null;
+  amount_invested: string;
+  current_value: string | null;
+  purchase_date: string;
+  notes: string | null;
+  // Stock-specific
   ticker_symbol: string | null;
   quantity: string | null;
   avg_buy_price: string | null;
   exchange: string | null;
-  // Mutual Fund
+  // Mutual Fund-specific
   folio_number: string | null;
   units: string | null;
   nav_at_purchase: string | null;
   fund_house: string | null;
-  // Fixed Deposit
-  bank_name: string | null;
-  fd_number: string | null;
-  interest_rate: string | null;
-  tenure_months: number | null;
-  maturity_date: string | null;
-  maturity_amount: string | null;
-  compounding: string | null;
-  // Gold
-  gold_form: string | null;
-  weight_grams: string | null;
-  purity: string | null;
+  created_at: string;
 }
 
 export interface InvestmentListResponse {
@@ -422,78 +460,81 @@ export interface InvestmentListResponse {
 }
 ```
 
-#### `types/reports.ts`
+#### Instruments, Follios, and Reports
 
 ```typescript
-export interface DashboardSummary {
-  total_inbound: string;
-  total_outbound: string;
+export interface Instrument {
+  id: number;
+  name: string;
+  type: InvestmentType;
+  ticker_symbol: string | null;
+  isin: string | null;
+}
+
+// Instrument the current user has explicitly tracked
+export interface UserInstrument {
+  id: number;
+  user_id: number;
+  instrument_id: number;
+  instrument: Instrument;
+  created_at: string;
+}
+
+export interface Follio {
+  id: number;
+  user_id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+// Reports
+export interface DashboardReport {
+  total_credits: string;
+  total_debits: string;
   net_balance: string;
   total_invested: string;
   current_portfolio_value: string;
   investment_gain_loss: string;
 }
 
-export interface MonthlyTrend {
-  month: string;       // "2026-01"
-  inbound: string;
-  outbound: string;
-}
-
-export interface SpendingTrendsResponse {
+export interface SpendingTrendsReport {
   period_start: string;
   period_end: string;
-  monthly_trends: MonthlyTrend[];
+  monthly_trends: Array<{ month: string; credits: string; debits: string }>;
 }
 
-// CategoryBreakdown and CategoryBreakdownResponse were removed in the schema redesign
-
-export interface InvestmentTypeSummary {
-  type: string;
-  amount_invested: string;
-  current_value: string;
-  gain_loss: string;
-  count: number;
-}
-
-export interface InvestmentSummaryResponse {
+export interface InvestmentSummaryReport {
   total_invested: string;
   total_current_value: string;
   total_gain_loss: string;
   total_gain_loss_pct: number;
-  by_type: InvestmentTypeSummary[];
+  by_type: Array<{ type: string; amount_invested: string; current_value: string; gain_loss: string; count: number }>;
 }
-```
 
-#### `types/index.ts` — Accounts, Platforms, Instruments
-
-```typescript
-export type AccountType = "savings" | "current" | "salary" | "nre" | "nro";
-export type PlatformType = "broker" | "mf_platform" | "direct" | "other";
-
-export interface Bank { id: number; name: string; }
-
-export interface Account {
-  id: number; user_id: number; bank_id: number; bank: Bank;
-  account_type: AccountType; nickname: string | null; created_at: string;
+export interface PortfolioPosition {
+  instrument_id: number;
+  instrument: Instrument;
+  total_invested: string;
+  current_value: string | null;
+  gain_loss: string | null;
+  gain_loss_pct: number | null;
+  quantity: string | null;
 }
-export interface AccountCreate { bank_id: number; account_type: AccountType; nickname?: string; }
-export type AccountUpdate = Partial<AccountCreate>;
 
-export interface Platform { id: number; name: string; type: PlatformType; }
-
-export interface PlatformAccount {
-  id: number; user_id: number; platform_id: number; platform: Platform;
-  account_label: string | null; created_at: string;
+export interface PortfolioReport {
+  positions: PortfolioPosition[];
+  total_invested: string;
+  total_current_value: string | null;
+  total_gain_loss: string | null;
 }
-export interface PlatformAccountCreate { platform_id: number; account_label?: string; }
-export type PlatformAccountUpdate = Partial<PlatformAccountCreate>;
 
-export interface Instrument {
-  id: number; name: string; type: InvestmentType;
-  ticker_symbol: string | null; isin: string | null;
+export interface AuditLog {
+  id: number;
+  action: string;
+  timestamp: string;
+  details: Record<string, unknown> | null;
 }
-export interface InstrumentCreate { name: string; type: InvestmentType; ticker_symbol?: string; isin?: string; }
 ```
 
 ### 2.3 API Client Layer
@@ -532,20 +573,24 @@ client.interceptors.response.use(
 export default client;
 ```
 
-#### `api/transactions.ts` — Domain call functions
+#### `api/transactions.ts` — cursor-based pagination
 
 ```typescript
 import client from "./client";
-import type {
-  TransactionCreate, TransactionUpdate,
-  TransactionListResponse, Transaction, TransactionFilters
-} from "../types/transaction";
+import type { Transaction, TransactionCreate, TransactionListResponse } from "../types";
 
-// Note: category param was removed from TransactionFilters in the schema redesign
+export interface TransactionParams {
+  cursor?: string;
+  limit?: number;
+  type?: 'credit' | 'debit';
+  start_date?: string;
+  end_date?: string;
+}
+
 export const listTransactions = async (
-  filters: TransactionFilters = {}
+  params: TransactionParams = {}
 ): Promise<TransactionListResponse> => {
-  const { data } = await client.get("/transactions", { params: filters });
+  const { data } = await client.get("/transactions", { params });
   return data;
 };
 
@@ -555,20 +600,26 @@ export const createTransaction = async (
   const { data } = await client.post("/transactions", body);
   return data;
 };
+// No update or delete — transactions are immutable from the API.
+// Use the CLI (transactions correct / deactivate) for admin corrections.
+```
 
-export const updateTransaction = async (
-  id: number, body: TransactionUpdate
-): Promise<Transaction> => {
-  const { data } = await client.put(`/transactions/${id}`, body);
+#### `api/investments.ts` — page-based pagination
+
+```typescript
+export const listInvestments = async (
+  types?: InvestmentType[],
+  page = 1,
+  pageSize = 20
+): Promise<InvestmentListResponse> => {
+  const params: Record<string, unknown> = { page, page_size: pageSize };
+  if (types?.length) params.type = types;          // ?type=stock&type=mutual_fund
+  const { data } = await client.get("/investments", { params });
   return data;
-};
-
-export const deleteTransaction = async (id: number): Promise<void> => {
-  await client.delete(`/transactions/${id}`);
 };
 ```
 
-The `api/` layer is **pure async functions** — no React, no hooks, no state. This makes them independently testable with `vitest` and reusable outside React Query if needed.
+The `api/` layer is **pure async functions** — no React, no hooks, no state. Independently testable and reusable outside React Query.
 
 ### 2.4 Authentication Flow
 
@@ -591,7 +642,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const [user, setUser] = useState<User | null>(null);
 
-  // Decode JWT payload to get user_id, fetch /auth/me on mount
+  // On mount (or token change): call /auth/me to populate user profile
+  // user.currency_code + user.currency_locale drive useCurrency()
   useEffect(() => {
     if (!token) { setUser(null); return; }
     getMe().then(setUser).catch(() => {
@@ -618,7 +670,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Convenience hook — throws if used outside AuthProvider
 export const useAuthContext = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuthContext must be inside AuthProvider");
@@ -657,154 +708,190 @@ export function ProtectedRoute() {
 
 `replace` ensures the login redirect doesn't pollute the browser history stack.
 
-### 2.5 React Query Patterns
-
-All server state goes through React Query. Convention: query hooks live in `hooks/`, mutation hooks live alongside them.
-
-#### Query key factory — `hooks/useTransactions.ts`
+#### `hooks/useCurrency.ts`
 
 ```typescript
-// Query key factory — centralised so invalidation is consistent
-export const transactionKeys = {
-  all:    () => ["transactions"]                     as const,
-  list:   (filters: TransactionFilters) =>
-            [...transactionKeys.all(), "list", filters] as const,
-  detail: (id: number) =>
-            [...transactionKeys.all(), "detail", id]  as const,
-};
+export function useCurrency() {
+  const { user } = useAuthContext();
+  const formatCurrency = useCallback(
+    (value: string | number | null | undefined): string => {
+      if (value == null) return "—";
+      return new Intl.NumberFormat(user?.currency_locale ?? "en-IN", {
+        style: "currency",
+        currency: user?.currency_code ?? "INR",
+        minimumFractionDigits: 2,
+      }).format(typeof value === "string" ? parseFloat(value) : value);
+    },
+    [user?.currency_locale, user?.currency_code]
+  );
+  return { formatCurrency };
+}
+```
 
-// List query
-export function useTransactions(filters: TransactionFilters = {}) {
+All monetary display in the app uses `formatCurrency` from this hook — never hardcoded `₹` or `"en-IN"`.
+
+### 2.5 React Query Patterns
+
+All server state goes through React Query. Convention: query + mutation hooks live together in domain files under `hooks/`.
+
+#### Query key registry
+
+| Key | Hook | Notes |
+|-----|------|-------|
+| `['banks']` | `useBanks` | |
+| `['accounts']` | `useAccounts` | invalidated by create/update/close/delete account, and create/close term account |
+| `['term-accounts']` | `useTermAccounts` | invalidated by create/close term account, and close account |
+| `['transactions', params]` | `useTransactions` | params includes cursor, limit, type, date range |
+| `['investments', types, page, pageSize]` | `useInvestments` | page-based; types is sorted string[] for cache stability |
+| `['instruments', ...]` | `useInfiniteInstruments` | infinite scroll; cursor-based |
+| `['instruments/tracked']` | `useTrackedInstruments` | |
+| `['instruments/types']` | `useInstrumentTypes` | |
+| `['instruments/user-instruments']` | `useUserInstruments` | |
+| `['platform-accounts']` | `usePlatformAccounts` | |
+| `['follios']` | `useFollios` | |
+| `['reports/dashboard']` | `useDashboard` | invalidated on transaction or investment mutation |
+| `['reports/spending-trends']` | `useSpendingTrends` | |
+| `['reports/investment-summary']` | `useInvestmentSummary` | |
+| `['reports/portfolio']` | `usePortfolio` | |
+
+#### `hooks/useTransactions.ts` — cursor-based list
+
+```typescript
+export function useTransactions(params: TransactionParams = {}) {
   return useQuery({
-    queryKey: transactionKeys.list(filters),
-    queryFn:  () => listTransactions(filters),
-    staleTime: 30_000,    // data considered fresh for 30s
-    placeholderData: keepPreviousData,   // no flash on filter change
+    queryKey: ['transactions', params],
+    queryFn:  () => listTransactions(params),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,    // no flash when cursor changes
   });
 }
 
-// Create mutation
 export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createTransaction,
     onSuccess: () => {
-      // Invalidate all transaction list queries (any filter combination)
-      qc.invalidateQueries({ queryKey: transactionKeys.all() });
-      // Also invalidate dashboard — totals change
-      qc.invalidateQueries({ queryKey: reportKeys.dashboard() });
-    },
-  });
-}
-
-// Delete mutation
-export function useDeleteTransaction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: deleteTransaction,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: transactionKeys.all() });
-      qc.invalidateQueries({ queryKey: reportKeys.dashboard() });
+      // Invalidate all transaction queries (any cursor/filter combination)
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      // Balance changes — refresh accounts
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+      qc.invalidateQueries({ queryKey: ['term-accounts'] });
+      // Dashboard totals change
+      qc.invalidateQueries({ queryKey: ['reports/dashboard'] });
     },
   });
 }
 ```
 
-**Invalidation strategy**: mutations always invalidate by the `all()` key prefix — this clears every cached filter combination in one call. Dashboard/reports are also invalidated when transactions or investments change, keeping summary cards in sync.
-
-#### `hooks/useReports.ts`
+#### `hooks/useInvestments.ts` — page-based list
 
 ```typescript
-export const reportKeys = {
-  dashboard:         () => ["reports", "dashboard"]            as const,
-  spendingTrends:    (months: number) =>
-                       ["reports", "spending-trends", months]  as const,
-  // categoryBreakdown key removed — endpoint no longer exists
-  investmentSummary: () => ["reports", "investment-summary"]   as const,
-};
-
-export function useDashboard() {
+export function useInvestments(
+  types?: InvestmentType[],
+  page = 1,
+  pageSize = 20
+) {
+  // Sort types for stable cache key regardless of caller order
+  const sortedTypes = types ? [...types].sort() : undefined;
   return useQuery({
-    queryKey: reportKeys.dashboard(),
-    queryFn:  getDashboard,
-    staleTime: 60_000,    // dashboard totals can be 1 min stale
+    queryKey: ['investments', sortedTypes, page, pageSize],
+    queryFn:  () => listInvestments(types, page, pageSize),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
+```
 
-export function useSpendingTrends(months = 6) {
-  return useQuery({
-    queryKey: reportKeys.spendingTrends(months),
-    queryFn:  () => getSpendingTrends(months),
+#### `hooks/useInstruments.ts` — infinite scroll
+
+```typescript
+export function useInfiniteInstruments(search: string, type?: InvestmentType) {
+  return useInfiniteQuery({
+    queryKey: ['instruments', 'browse', search, type],
+    queryFn:  ({ pageParam }) =>
+                listInstruments({ cursor: pageParam, limit: 30, search, type }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     staleTime: 60_000,
   });
 }
-
-// useCategoryBreakdown was removed — category breakdown report no longer exists
 ```
+
+**Invalidation strategy**: mutations always invalidate by the top-level key prefix — this clears every cached page/filter combination in one call. Dashboard is also invalidated when transactions or investments change.
 
 ### 2.6 Form Management
 
-All forms use `react-hook-form` with a `zodResolver`. The Zod schema is the single source of field validation rules.
+All forms use `react-hook-form` with `zodResolver`. The Zod schema is the single source of field validation rules.
 
-#### Transaction form schema (`components/transactions/TransactionForm.tsx`)
+#### `components/transactions/TransactionForm.tsx` — create-only
 
 ```typescript
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
 
 const transactionSchema = z.object({
   amount: z
     .string()
     .min(1, "Amount is required")
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Must be positive"),
-  type: z.enum(["inbound", "outbound"]),
-  // category field removed in schema redesign
-  account_id:    z.number().nullable().optional(),
-  instrument_id: z.number().nullable().optional(),
+  type: z.enum(["credit", "debit"]),
+  // Polymorphic linked account — encoded as "account:<id>" or "term_account:<id>"
+  linked_account_key: z.string().optional(),
   description: z.string().max(500).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
-  notes: z.string().optional(),
+  bank_ref: z.string().max(100).optional().nullable(),  // credit only
+  tags: z.string().optional(),   // comma-separated → string[] on submit
 });
-
-type TransactionFormValues = z.infer<typeof transactionSchema>;
-
-function TransactionForm({ onSuccess, defaultValues }: Props) {
-  const { data: accounts } = useAccounts();          // Bank Account select
-  const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(transactionSchema),
-    defaultValues: defaultValues ?? { type: "outbound", date: today() },
-  });
-
-  const createMutation = useCreateTransaction();
-
-  const onSubmit = (values: TransactionFormValues) => {
-    createMutation.mutate(values, { onSuccess });
-  };
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        {/* shadcn FormField components */}
-      </form>
-    </Form>
-  );
-}
 ```
 
+**Polymorphic account key**: The form combines `accounts` + `term_accounts` into a single select. Each option is keyed as `"account:<id>"` or `"term_account:<id>"`. On submit, the form decodes this key into `linked_account_type` + `linked_account_id` for the API payload.
+
+```typescript
+// Decode polymorphic key before submitting
+const [linked_account_type, rawId] = values.linked_account_key?.split(":") ?? [];
+const payload: TransactionCreate = {
+  ...values,
+  linked_account_type: (linked_account_type as 'account' | 'term_account') ?? null,
+  linked_account_id:   rawId ? parseInt(rawId) : null,
+  bank_ref:            values.type === "credit" ? values.bank_ref : null,
+  tags:                values.tags?.split(",").map((t) => t.trim()).filter(Boolean) ?? [],
+};
+```
+
+**`bank_ref` visibility**: Shown only when `type === "credit"` — `watch("type")` drives conditional rendering.
+
 `react-hook-form` keeps all inputs **uncontrolled** — no `useState` per field, no re-render on every keystroke. The form only re-renders on submit or explicit error state.
+
+Transactions are **immutable from the API** — no edit or delete. `TransactionForm` is create-only. Admin corrections use the CLI.
 
 ### 2.7 Component Design
 
 #### shadcn/ui usage
 
-shadcn components are **copied into `src/components/ui/`** — not imported from a package. This means you own the source and can modify primitives without forking a library.
+shadcn components are **copied into `src/components/ui/`** — not imported from a package. You own the source and can modify primitives without forking a library.
 
 ```
 components/ui/
-  button.tsx      card.tsx      input.tsx     label.tsx
-  select.tsx      table.tsx     dialog.tsx    form.tsx
-  badge.tsx       separator.tsx skeleton.tsx  toast.tsx
+  button.tsx      card.tsx       input.tsx      label.tsx
+  select.tsx      table.tsx      dialog.tsx     form.tsx
+  badge.tsx       separator.tsx  skeleton.tsx   popover.tsx
+  command.tsx     sheet.tsx      tooltip.tsx    tabs.tsx
+```
+
+#### `InstrumentCombobox` — `@base-ui/react` caveat
+
+`InstrumentCombobox` uses `@base-ui/react` Popover (not Radix UI). **`@base-ui/react` does not support the `asChild` prop** on `PopoverTrigger`. Style the trigger element directly — do not wrap it in another component expecting `asChild`:
+
+```typescript
+// CORRECT — style PopoverTrigger directly
+<Popover.Trigger className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm">
+  {selectedInstrument?.name ?? "Search instruments…"}
+</Popover.Trigger>
+
+// WRONG — asChild is silently ignored in @base-ui/react
+<Popover.Trigger asChild>
+  <Button variant="outline">Search instruments…</Button>
+</Popover.Trigger>
 ```
 
 #### `lib/utils.ts` — shared helpers
@@ -812,129 +899,134 @@ components/ui/
 ```typescript
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format } from "date-fns";
 
 // shadcn standard cn() — merges Tailwind classes without conflicts
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+```
 
-// Format Decimal string from backend to display currency
-export function formatCurrency(value: string | null | undefined): string {
-  if (!value) return "₹0.00";
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(parseFloat(value));
-}
+Currency formatting is handled by `useCurrency()` (locale-aware) rather than a utility function — do not add hardcoded `formatCurrency` to `utils.ts`.
 
-// Format ISO date string to display
-export function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  return format(new Date(value), "dd MMM yyyy");
-}
+#### `lib/finance.ts` — gain/loss calculation
 
-// Today's date as YYYY-MM-DD (for form default values)
-export function today(): string {
-  return format(new Date(), "yyyy-MM-dd");
+```typescript
+export function calcGainLoss(
+  amountInvested: string | number,
+  currentValue: string | number | null | undefined
+): { gain: number; pct: number; isPositive: boolean } {
+  const invested = typeof amountInvested === "string" ? parseFloat(amountInvested) : amountInvested;
+  const current  = currentValue != null
+    ? (typeof currentValue === "string" ? parseFloat(currentValue) : currentValue)
+    : invested;
+  const gain = current - invested;
+  const pct  = invested !== 0 ? (gain / invested) * 100 : 0;
+  return { gain, pct, isPositive: gain >= 0 };
 }
 ```
 
 #### `components/layout/Sidebar.tsx`
 
 ```typescript
-import { NavLink } from "react-router-dom";
-
 const navItems = [
   { to: "/",                  label: "Dashboard",       icon: LayoutDashboard },
   { to: "/transactions",      label: "Transactions",    icon: ArrowLeftRight },
   { to: "/investments",       label: "Investments",     icon: TrendingUp },
+  { to: "/portfolio",         label: "Portfolio",       icon: PieChart },
   { to: "/accounts",          label: "Bank Accounts",   icon: Landmark },
   { to: "/platform-accounts", label: "Platforms",       icon: Briefcase },
   { to: "/instruments",       label: "Instruments",     icon: BarChart2 },
+  { to: "/follios",           label: "Follios",         icon: FolderOpen },
+  { to: "/reports",           label: "Reports",         icon: FileBarChart },
 ];
-
-export function Sidebar() {
-  return (
-    <aside className="w-64 border-r h-screen flex flex-col">
-      <div className="p-6 font-bold text-xl">FinTrack</div>
-      <nav className="flex-1 px-3">
-        {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) =>
-              cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm",
-                 isActive ? "bg-accent font-medium" : "hover:bg-muted")
-            }
-          >
-            <Icon size={16} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
-  );
-}
 ```
 
-`end={to === "/"}` on the Dashboard link prevents it from matching as active on `/transactions`.
+`end={to === "/"}` on the Dashboard link prevents it from matching as active on deeper routes.
 
 ### 2.8 Pages
 
-Pages are thin orchestrators — they compose hooks + components, handle local UI state (modal open/close, selected filters), and pass data down. No business logic lives in pages.
+Pages are thin orchestrators — they compose hooks + components, manage local UI state (modal open/close, active page number, filter values), and pass data down. No business logic lives in pages.
 
-#### `pages/TransactionsPage.tsx` — structure
+#### `pages/AccountsPage.tsx` — two-section pattern
+
+AccountsPage displays four tables across two domain objects, each split by open/closed status:
+
+```
+┌─────────────────────────────────────────────┐
+│  Open Accounts                              │
+│  [savings / current / salary / NRE / NRO]  │
+├─────────────────────────────────────────────┤
+│  Closed Accounts                            │
+│  (shown only if any exist)                  │
+├─────────────────────────────────────────────┤
+│  Term Accounts — Active  (FD / PPF)         │
+├─────────────────────────────────────────────┤
+│  Term Accounts — Closed                     │
+│  (shown only if any exist)                  │
+└─────────────────────────────────────────────┘
+```
+
+Closed/inactive records are separated into a **second table below active** — not mixed rows with opacity. The same pattern applies to any page that has a concept of active vs. closed records.
+
+```typescript
+const { data: accounts = [] } = useAccounts();
+const { data: termAccounts = [] } = useTermAccounts();
+
+const openAccounts   = accounts.filter((a) => !a.closed_date);
+const closedAccounts = accounts.filter((a) =>  a.closed_date);
+const activeTerms    = termAccounts.filter((t) => !t.closed_date);
+const closedTerms    = termAccounts.filter((t) =>  t.closed_date);
+```
+
+#### `pages/TransactionsPage.tsx` — cursor navigation
 
 ```typescript
 export function TransactionsPage() {
-  const [filters, setFilters] = useState<TransactionFilters>({});
-  const [editTarget, setEditTarget] = useState<Transaction | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const { filters, setFilters } = useTransactionFilters();
 
-  const { data, isLoading } = useTransactions(filters);
+  const { data, isLoading } = useTransactions({ cursor, limit: 50, ...filters });
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Transactions</h1>
-        <Button onClick={() => { setEditTarget(null); setIsFormOpen(true); }}>
-          + Add Transaction
+    <div className="flex flex-col h-full">
+      <PageHeader title="Transactions">
+        <Button onClick={() => setIsFormOpen(true)}>+ Add Transaction</Button>
+      </PageHeader>
+
+      <TransactionFilters value={filters} onChange={(f) => { setFilters(f); setCursor(undefined); }} />
+
+      <TransactionTable data={data?.items ?? []} isLoading={isLoading} />
+
+      {/* Cursor navigation */}
+      <div className="flex justify-end gap-2 p-4 border-t">
+        <Button variant="outline" disabled={!cursor}
+          onClick={() => setCursor(undefined)}>First</Button>
+        <Button variant="outline" disabled={!data?.next_cursor}
+          onClick={() => data?.next_cursor && setCursor(data.next_cursor)}>
+          Next
         </Button>
       </div>
-
-      <TransactionFilters value={filters} onChange={setFilters} />
-
-      <TransactionTable
-        data={data?.items ?? []}
-        isLoading={isLoading}
-        onEdit={(t) => { setEditTarget(t); setIsFormOpen(true); }}
-      />
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <TransactionForm
-          defaultValues={editTarget ?? undefined}
-          onSuccess={() => setIsFormOpen(false)}
-        />
-      </Dialog>
     </div>
   );
 }
 ```
+
+When filters change, cursor is reset to `undefined` (first page).
 
 ### 2.9 Dashboard & Charts
 
 #### `components/dashboard/SummaryCards.tsx`
 
 ```typescript
-export function SummaryCards({ data }: { data: DashboardSummary }) {
+export function SummaryCards({ data }: { data: DashboardReport }) {
+  const { formatCurrency } = useCurrency();
+  const { gain, pct, isPositive } = calcGainLoss(data.total_invested, data.current_portfolio_value);
+
   const cards = [
-    { label: "Total Inbound",  value: data.total_inbound,           color: "text-green-600" },
-    { label: "Total Outbound", value: data.total_outbound,          color: "text-red-500"   },
-    { label: "Net Balance",    value: data.net_balance,             color: "text-blue-600"  },
-    { label: "Portfolio",      value: data.current_portfolio_value, color: "text-purple-600"},
+    { label: "Total Credits",    value: data.total_credits,           color: "text-green-600" },
+    { label: "Total Debits",     value: data.total_debits,            color: "text-red-500"   },
+    { label: "Net Balance",      value: data.net_balance,             color: "text-blue-600"  },
+    { label: "Portfolio",        value: data.current_portfolio_value, color: isPositive ? "text-green-600" : "text-red-500" },
   ];
 
   return (
@@ -962,77 +1054,49 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
-export function SpendingChart({ data }: { data: MonthlyTrend[] }) {
+export function SpendingChart({ data }: { data: SpendingTrendsReport['monthly_trends'] }) {
+  const { formatCurrency } = useCurrency();
   const chartData = data.map((d) => ({
-    month:    format(new Date(d.month + "-01"), "MMM yy"),
-    inbound:  parseFloat(d.inbound),
-    outbound: parseFloat(d.outbound),
+    month:   format(new Date(d.month + "-01"), "MMM yy"),
+    credits: parseFloat(d.credits),
+    debits:  parseFloat(d.debits),
   }));
 
   return (
-    <Card>
-      <CardHeader><CardTitle>Inbound vs Outbound</CardTitle></CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-            <Tooltip formatter={(v: number) => formatCurrency(String(v))} />
-            <Legend />
-            <Bar   dataKey="outbound" fill="#f87171" name="Outbound" radius={[4,4,0,0]} />
-            <Line  dataKey="inbound"  stroke="#4ade80" name="Inbound" strokeWidth={2} dot={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+    <ResponsiveContainer width="100%" height={300}>
+      <ComposedChart data={chartData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" />
+        <YAxis tickFormatter={(v) => formatCurrency(v)} />
+        <Tooltip formatter={(v: number) => formatCurrency(v)} />
+        <Legend />
+        <Bar  dataKey="debits"  fill="#f87171" name="Debits"  radius={[4,4,0,0]} />
+        <Line dataKey="credits" stroke="#4ade80" name="Credits" strokeWidth={2} dot={false} />
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }
 ```
 
 ### 2.10 Investment Form — Dynamic Fields
 
-The investment form uses `react-hook-form`'s `watch("type")` to render the correct field group. When the type changes, the previous type's fields are unmounted — their values reset automatically.
+`InvestmentForm` uses `react-hook-form`'s `watch("type")` to render type-specific field groups. When the type changes, unmounted fields reset automatically.
 
-Two additional selectors appear at the bottom of the form regardless of investment type:
-- **Instrument combobox** (`InstrumentCombobox`) — searchable, filtered by the currently selected `type` via the `filterType` prop.
-- **Platform Account select** — populated from `usePlatformAccounts()`; links the investment to the user's brokerage/platform account.
+Two selectors appear at the bottom regardless of type:
+- **InstrumentCombobox** — filtered by the selected `type` via the `filterType` prop
+- **Platform Account select** — from `usePlatformAccounts()`; links the investment to a brokerage account
 
 ```typescript
 const investmentBaseSchema = z.object({
-  type:            z.enum(["stock","mutual_fund","fixed_deposit","gold","crypto","ppf","nps","real_estate"]),
+  type:            z.enum(["stock", "mutual_fund"]),
   name:            z.string().min(1),
   amount_invested: z.string().min(1),
   current_value:   z.string().optional(),
   purchase_date:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   notes:           z.string().optional(),
+  instrument_id:       z.number().nullable().optional(),
+  platform_account_id: z.number().nullable().optional(),
 });
-
-// Discriminated schema built at runtime
-function buildSchema(type: InvestmentType) {
-  const base = investmentBaseSchema;
-  switch (type) {
-    case "stock":
-      return base.extend({
-        ticker_symbol: z.string().min(1),
-        quantity:      z.string().min(1),
-        avg_buy_price: z.string().min(1),
-        exchange:      z.string().optional(),
-      });
-    case "fixed_deposit":
-      return base.extend({
-        bank_name:      z.string().min(1),
-        interest_rate:  z.string().min(1),
-        tenure_months:  z.coerce.number().int().positive(),
-        maturity_date:  z.string().optional(),
-        maturity_amount:z.string().optional(),
-        compounding:    z.string().optional(),
-      });
-    // ... other types
-    default:
-      return base;
-  }
-}
 
 export function InvestmentForm({ onSuccess }: Props) {
   const form = useForm({ resolver: zodResolver(investmentBaseSchema) });
@@ -1041,15 +1105,16 @@ export function InvestmentForm({ onSuccess }: Props) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        {/* Base fields always rendered */}
         <TypeSelector />
         <BaseFields />
 
         {/* Type-specific fields — conditionally mounted */}
-        {type === "stock"         && <StockFields />}
-        {type === "mutual_fund"   && <MutualFundFields />}
-        {type === "fixed_deposit" && <FixedDepositFields />}
-        {type === "gold"          && <GoldFields />}
+        {type === "stock"       && <StockFields />}
+        {type === "mutual_fund" && <MutualFundFields />}
+
+        {/* Always-visible bottom selectors */}
+        <InstrumentCombobox filterType={type} ... />
+        <PlatformAccountSelect ... />
 
         <Button type="submit">Save Investment</Button>
       </form>
@@ -1058,44 +1123,162 @@ export function InvestmentForm({ onSuccess }: Props) {
 }
 ```
 
-`StockFields`, `MutualFundFields` etc. are small sub-components that use `useFormContext()` to access the parent form — no prop drilling needed.
+`StockFields` and `MutualFundFields` are sub-components that access the parent form via `useFormContext()` — no prop drilling.
 
-### 2.11 Error Handling & Loading States
+### 2.11 Instruments Page — Two-Table Pattern
+
+`InstrumentsPage` shows two tables driven by the intersection of tracked instruments and actual investments:
+
+```
+┌────────────────────────────────────────────┐
+│  In Portfolio                              │
+│  (tracked instruments that have ≥1 investment) │
+├────────────────────────────────────────────┤
+│  Not Yet Invested                          │
+│  (tracked instruments with no investment)  │
+└────────────────────────────────────────────┘
+```
+
+The split is computed client-side:
+
+```typescript
+// Fetch up to 200 investments (backend max) to cover the full portfolio
+const { data: investmentsData } = useInvestments(undefined, 1, 200);
+const { data: userInstruments  } = useUserInstruments();
+
+const investedInstrumentIds = new Set(
+  (investmentsData?.items ?? [])
+    .map((inv) => inv.instrument_id)
+    .filter(Boolean)
+);
+
+const inPortfolio   = (userInstruments ?? []).filter((ui) =>
+  investedInstrumentIds.has(ui.instrument_id)
+);
+const notYetInvested = (userInstruments ?? []).filter((ui) =>
+  !investedInstrumentIds.has(ui.instrument_id)
+);
+```
+
+**`BrowseSheet`** (inline in `InstrumentsPage.tsx`) is a side-sheet for discovering and tracking new instruments. It uses `useInfiniteInstruments` with an `IntersectionObserver` trigger at the bottom of the list:
+
+```typescript
+const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteInstruments(debouncedSearch, typeFilter);
+
+// Flatten pages
+const instruments = data?.pages.flatMap((p) => p.items) ?? [];
+
+// Sentinel element at bottom of list — triggers fetchNextPage when visible
+<div ref={sentinelRef} className="h-1" />
+{isFetchingNextPage && <Spinner />}
+```
+
+Search input is debounced via `useDebounce` (300ms) before updating the query key.
+
+### 2.12 Pagination Patterns
+
+FinTrack uses **two different pagination strategies** depending on the domain:
+
+#### Cursor-based (Transactions, Instruments infinite scroll)
+
+- API sends `next_cursor: string | null` in the response body.
+- Client sends `cursor` param on subsequent requests.
+- `next_cursor === null` means the last page.
+- TransactionsPage stores cursor in local state; resetting to `undefined` returns to page 1.
+- Filtering changes always reset cursor to `undefined`.
+
+#### Page-based (Investments)
+
+- API sends `total`, `page`, `page_size` in the response body.
+- `InvestmentsPage` has a local `page` state (`useState(1)`).
+- The pagination bar is rendered **outside the scroll container** as a sticky footer:
+
+```typescript
+export function InvestmentsPage() {
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const { data, isLoading } = useInvestments(undefined, page, PAGE_SIZE);
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1;
+
+  return (
+    // Outer flex column fills viewport height
+    <div className="flex flex-col h-full">
+      <PageHeader title="Investments">
+        <Button onClick={() => setIsFormOpen(true)}>+ Add Investment</Button>
+      </PageHeader>
+
+      {/* Scrollable content area — does NOT include pagination bar */}
+      <div className="flex-1 overflow-auto p-6">
+        <InvestmentTable data={data?.items ?? []} isLoading={isLoading} />
+      </div>
+
+      {/* Pagination bar is a sticky footer OUTSIDE the scroll area */}
+      <div className="border-t px-6 py-3 flex items-center justify-between shrink-0">
+        <span className="text-sm text-muted-foreground">
+          Page {page} of {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm"
+            disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <Button variant="outline" size="sm"
+            disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 2.13 Error Handling & Loading States
 
 #### Loading states
 
 React Query provides `isLoading`, `isFetching`, `isError` on every query. Convention:
 - `isLoading` (no cached data yet) → render `<Skeleton />` components in the table/card shape
-- `isFetching` (background refetch) → subtle spinner in top-right of component
+- `isFetching` (background refetch with existing data) → subtle spinner in the component header
 - `isError` → inline error message with a retry button
 
 ```typescript
-function TransactionTable({ data, isLoading }: Props) {
-  if (isLoading) return <TableSkeleton rows={5} />;
-  if (data.length === 0) return <EmptyState message="No transactions yet." />;
-  // ... render table
+function InvestmentTable({ data, isLoading }: Props) {
+  if (isLoading) return <TableSkeleton rows={8} cols={6} />;
+  if (data.length === 0) return <EmptyState message="No investments yet. Add one to get started." />;
+  // ... render table rows
 }
 ```
 
-#### Mutation error handling
+#### Mutation error handling with sonner toasts
 
 ```typescript
+import { toast } from "sonner";
+
 const mutation = useCreateTransaction();
 
-const onSubmit = (values) => {
-  mutation.mutate(values, {
+const onSubmit = (values: TransactionFormValues) => {
+  mutation.mutate(buildPayload(values), {
+    onSuccess: () => {
+      toast.success("Transaction recorded");
+      onClose();
+    },
     onError: (error) => {
-      // Axios error — extract FastAPI detail message
-      const detail = error.response?.data?.detail ?? "Something went wrong";
+      // Axios error — extract FastAPI validation detail
+      const detail = (error as AxiosError<{ detail: string }>)
+        .response?.data?.detail ?? "Something went wrong";
       toast.error(detail);
     },
   });
 };
 ```
 
-#### `ErrorBoundary` (React 19)
+sonner renders toast notifications without requiring a `<Toaster>` wrapped around the entire provider tree — mount `<Toaster />` once in `App.tsx`.
 
-Wrap `AppShell`'s `<Outlet />` in a React error boundary to catch unexpected render errors without crashing the entire app (sidebar/header remain visible):
+#### React 19 Error Boundary
+
+Wrap `AppShell`'s `<Outlet />` in a React error boundary to catch unexpected render errors without crashing the entire app:
 
 ```typescript
 <ErrorBoundary fallback={<FullPageError />}>
@@ -1103,7 +1286,9 @@ Wrap `AppShell`'s `<Outlet />` in a React error boundary to catch unexpected ren
 </ErrorBoundary>
 ```
 
-### 2.12 Build Configuration
+The sidebar and header remain visible — the user can navigate away from the broken page.
+
+### 2.14 Build Configuration
 
 #### `vite.config.ts`
 
@@ -1128,14 +1313,14 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: false,            // disable in prod for smaller output
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor:   ["react", "react-dom", "react-router-dom"],
-          query:    ["@tanstack/react-query"],
-          charts:   ["recharts"],
-          ui:       ["lucide-react"],
+          vendor:  ["react", "react-dom", "react-router-dom"],
+          query:   ["@tanstack/react-query"],
+          charts:  ["recharts"],
+          ui:      ["lucide-react"],
         },
       },
     },
@@ -1143,7 +1328,7 @@ export default defineConfig({
 });
 ```
 
-`manualChunks` splits the bundle so the vendor chunks are cached separately from app code — users only re-download the app chunk on updates.
+`manualChunks` splits the bundle so vendor chunks are cached separately from app code — users only re-download the app chunk on updates.
 
 #### `tsconfig.json` (strict mode)
 
@@ -1164,41 +1349,72 @@ export default defineConfig({
 }
 ```
 
-`strict: true` enables `noImplicitAny`, `strictNullChecks`, `strictFunctionTypes` and others. Combined with `noUnusedLocals` / `noUnusedParameters`, it keeps the codebase clean at compile time.
+`strict: true` enables `noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`, and others. Combined with `noUnusedLocals` / `noUnusedParameters`, it keeps the codebase clean at compile time.
 
-### 2.13 Styling System
+### 2.15 Styling System
 
-#### Tailwind v4 + shadcn/ui
+#### Tailwind v4 — CSS-first configuration
 
-Tailwind v4 uses a CSS-first config (`@theme` block in a `.css` file) instead of `tailwind.config.js`. Design tokens are CSS custom properties:
+Tailwind v4 replaces `tailwind.config.js` with a CSS-first `@theme` block. All design tokens are CSS custom properties:
 
 ```css
 /* src/index.css */
 @import "tailwindcss";
 
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(222.2 84% 4.9%);
-  --color-primary: hsl(221.2 83.2% 53.3%);
-  --color-primary-foreground: hsl(210 40% 98%);
-  --color-muted: hsl(210 40% 96.1%);
-  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
-  --color-accent: hsl(210 40% 96.1%);
-  --color-border: hsl(214.3 31.8% 91.4%);
-  --radius: 0.5rem;
+  --color-background:        hsl(0 0% 100%);
+  --color-foreground:        hsl(222.2 84% 4.9%);
+  --color-primary:           hsl(221.2 83.2% 53.3%);
+  --color-primary-foreground:hsl(210 40% 98%);
+  --color-muted:             hsl(210 40% 96.1%);
+  --color-muted-foreground:  hsl(215.4 16.3% 46.9%);
+  --color-accent:            hsl(210 40% 96.1%);
+  --color-border:            hsl(214.3 31.8% 91.4%);
+  --radius:                  0.5rem;
 }
 ```
 
-shadcn components reference these tokens via `bg-background`, `text-foreground`, `bg-primary`, etc. — swapping the theme is one CSS file change.
+There is **no `tailwind.config.js`** (or `.ts`) — Tailwind v4 reads the `@theme` block at build time. Attempting to extend the theme via a config file has no effect in v4.
+
+shadcn components reference these tokens via utility classes (`bg-background`, `text-foreground`, `bg-primary`, etc.). Swapping the entire theme is a single CSS file change.
 
 #### Class merging
 
 All dynamic class names go through `cn()` from `lib/utils.ts`:
 
 ```typescript
-// Correct — twMerge resolves conflicts (e.g. p-4 wins over p-2)
+// Correct — twMerge resolves conflicts (p-4 wins over p-2)
 <div className={cn("p-2 text-sm", isActive && "bg-accent p-4")} />
 
 // Wrong — Tailwind classes conflict silently without twMerge
 <div className={`p-2 text-sm ${isActive ? "bg-accent p-4" : ""}`} />
 ```
+
+#### `lib/labels.ts` — display label maps
+
+```typescript
+export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
+  credit: "Credit",
+  debit:  "Debit",
+};
+
+export const INVESTMENT_TYPE_LABELS: Record<InvestmentType, string> = {
+  stock:       "Stock",
+  mutual_fund: "Mutual Fund",
+};
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  savings: "Savings",
+  current: "Current",
+  salary:  "Salary",
+  nre:     "NRE",
+  nro:     "NRO",
+};
+
+export const TERM_ACCOUNT_TYPE_LABELS: Record<TermAccountType, string> = {
+  fd:  "Fixed Deposit",
+  ppf: "PPF",
+};
+```
+
+Use these maps for table cells and badge labels — never hardcode display strings inline.

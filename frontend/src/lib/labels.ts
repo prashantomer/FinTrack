@@ -8,12 +8,6 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
 export const INVESTMENT_TYPE_LABELS: Record<InvestmentType, string> = {
   stock: 'Stock',
   mutual_fund: 'Mutual Fund',
-  fixed_deposit: 'Fixed Deposit',
-  gold: 'Gold',
-  crypto: 'Crypto',
-  ppf: 'PPF',
-  nps: 'NPS',
-  real_estate: 'Real Estate',
 }
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {

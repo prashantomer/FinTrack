@@ -1,26 +1,28 @@
 import type {
+  ApiResponse,
   DashboardCacheStatus,
   DashboardReport,
   InvestmentSummaryReport,
+  PortfolioReport,
   SpendingTrendsReport,
 } from '@/types'
 import client from './client'
 
 export async function getDashboard() {
-  const res = await client.get<DashboardReport>('/reports/dashboard')
-  return res.data
+  const res = await client.get<ApiResponse<DashboardReport>>('/reports/dashboard')
+  return res.data.data
 }
 
 export async function getSpendingTrends(months = 6) {
-  const res = await client.get<SpendingTrendsReport>('/reports/spending-trends', {
+  const res = await client.get<ApiResponse<SpendingTrendsReport>>('/reports/spending-trends', {
     params: { months },
   })
-  return res.data
+  return res.data.data
 }
 
 export async function getInvestmentSummary() {
-  const res = await client.get<InvestmentSummaryReport>('/reports/investment-summary')
-  return res.data
+  const res = await client.get<ApiResponse<InvestmentSummaryReport>>('/reports/investment-summary')
+  return res.data.data
 }
 
 export async function refreshDashboard() {
@@ -28,6 +30,11 @@ export async function refreshDashboard() {
 }
 
 export async function getDashboardCacheStatus() {
-  const res = await client.get<DashboardCacheStatus>('/reports/dashboard/cache-status')
-  return res.data
+  const res = await client.get<ApiResponse<DashboardCacheStatus>>('/reports/dashboard/cache-status')
+  return res.data.data
+}
+
+export async function getPortfolio() {
+  const res = await client.get<ApiResponse<PortfolioReport>>('/reports/portfolio')
+  return res.data.data
 }

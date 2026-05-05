@@ -1,0 +1,253 @@
+# This file is auto-generated from the current state of the database. Instead
+# of editing this file, please use the migrations feature of Active Record to
+# incrementally modify your database, and then regenerate this schema definition.
+#
+# This file is the source Rails uses to define your schema when running `bin/rails
+# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
+# be faster and is potentially less error prone than running all of your
+# migrations from scratch. Old migrations may fail to apply correctly if those
+# migrations use external dependencies or application code.
+#
+# It's strongly recommended that you check this file into your version control system.
+
+ActiveRecord::Schema[8.1].define(version: 2026_05_05_192323) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+  enable_extension "pgcrypto"
+
+  create_table "accounts", force: :cascade do |t|
+    t.string "account_number", limit: 50
+    t.string "account_type", default: "savings", null: false
+    t.decimal "balance", precision: 14, scale: 2, default: "0.0", null: false
+    t.bigint "bank_id", null: false
+    t.decimal "closed_amount", precision: 14, scale: 2
+    t.date "closed_date"
+    t.datetime "created_at", null: false
+    t.string "nickname", limit: 100, null: false
+    t.date "open_date"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["bank_id"], name: "index_accounts_on_bank_id"
+    t.index ["user_id"], name: "index_accounts_on_user_id"
+  end
+
+  create_table "audits", force: :cascade do |t|
+    t.string "action"
+    t.integer "associated_id"
+    t.string "associated_type"
+    t.integer "auditable_id"
+    t.string "auditable_type"
+    t.text "audited_changes"
+    t.string "comment"
+    t.datetime "created_at"
+    t.string "remote_address"
+    t.string "request_uuid"
+    t.integer "user_id"
+    t.string "user_type"
+    t.string "username"
+    t.integer "version", default: 0
+    t.index ["associated_type", "associated_id"], name: "associated_index"
+    t.index ["auditable_type", "auditable_id", "version"], name: "auditable_index"
+    t.index ["created_at"], name: "index_audits_on_created_at"
+    t.index ["request_uuid"], name: "index_audits_on_request_uuid"
+    t.index ["user_id", "user_type"], name: "user_index"
+  end
+
+  create_table "banks", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "is_system", default: false, null: false
+    t.string "name", limit: 100, null: false
+    t.string "short_name", limit: 6, null: false
+    t.datetime "updated_at", null: false
+    t.index ["short_name"], name: "index_banks_on_short_name", unique: true
+  end
+
+  create_table "follios", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "folio_number", limit: 50, null: false
+    t.text "notes"
+    t.bigint "platform_account_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.bigint "user_instrument_id", null: false
+    t.index ["platform_account_id"], name: "index_follios_on_platform_account_id"
+    t.index ["user_id"], name: "index_follios_on_user_id"
+    t.index ["user_instrument_id", "platform_account_id"], name: "uq_follio_user_instrument_account", unique: true
+    t.index ["user_instrument_id"], name: "index_follios_on_user_instrument_id"
+  end
+
+  create_table "import_batches", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "failed_rows", default: 0, null: false
+    t.string "file_name", null: false
+    t.string "import_type", null: false
+    t.integer "import_version", default: 1, null: false
+    t.integer "processed_rows", default: 0, null: false
+    t.text "raw_csv", null: false
+    t.string "sidekiq_job_id"
+    t.string "status", default: "pending", null: false
+    t.integer "total_rows", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "import_type", "import_version"], name: "idx_import_batches_version", unique: true
+    t.index ["user_id"], name: "index_import_batches_on_user_id"
+  end
+
+  create_table "import_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "import_batch_id", null: false
+    t.bigint "importable_id"
+    t.string "importable_type"
+    t.text "notes"
+    t.integer "row_index", null: false
+    t.string "status", default: "ok", null: false
+    t.index ["import_batch_id"], name: "index_import_records_on_import_batch_id"
+    t.index ["importable_type", "importable_id"], name: "idx_import_records_importable"
+  end
+
+  create_table "instruments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "exchange", limit: 20
+    t.string "fund_house", limit: 100
+    t.string "investment_type", null: false
+    t.string "isin", limit: 20
+    t.string "name", limit: 255, null: false
+    t.string "ticker_symbol", limit: 20
+    t.datetime "updated_at", null: false
+    t.index ["investment_type"], name: "index_instruments_on_investment_type"
+    t.index ["name"], name: "index_instruments_on_name"
+  end
+
+  create_table "investments", force: :cascade do |t|
+    t.decimal "amount_invested", precision: 14, scale: 2, null: false
+    t.decimal "buy_price", precision: 12, scale: 2
+    t.datetime "created_at", null: false
+    t.decimal "current_value", precision: 14, scale: 2
+    t.string "folio_number", limit: 50
+    t.string "investment_type", null: false
+    t.string "name", limit: 255, null: false
+    t.decimal "nav_at_purchase", precision: 12, scale: 4
+    t.text "notes"
+    t.bigint "platform_account_id"
+    t.date "purchase_date", null: false
+    t.decimal "quantity", precision: 12, scale: 4
+    t.uuid "transaction_public_id"
+    t.decimal "units", precision: 12, scale: 4
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.bigint "user_instrument_id"
+    t.index ["investment_type"], name: "index_investments_on_investment_type"
+    t.index ["platform_account_id"], name: "index_investments_on_platform_account_id"
+    t.index ["transaction_public_id"], name: "index_investments_on_transaction_public_id"
+    t.index ["user_id"], name: "index_investments_on_user_id"
+    t.index ["user_instrument_id"], name: "index_investments_on_user_instrument_id"
+  end
+
+  create_table "platform_accounts", force: :cascade do |t|
+    t.string "account_id", limit: 50
+    t.datetime "created_at", null: false
+    t.string "nickname", limit: 100, null: false
+    t.bigint "platform_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["platform_id"], name: "index_platform_accounts_on_platform_id"
+    t.index ["user_id"], name: "index_platform_accounts_on_user_id"
+  end
+
+  create_table "platforms", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "is_system", default: false, null: false
+    t.string "name", limit: 100, null: false
+    t.string "platform_type", null: false
+    t.string "short_name", limit: 20, null: false
+    t.datetime "updated_at", null: false
+    t.index ["short_name"], name: "index_platforms_on_short_name", unique: true
+  end
+
+  create_table "term_accounts", force: :cascade do |t|
+    t.string "account_number", limit: 100
+    t.string "account_type", null: false
+    t.decimal "amount", precision: 14, scale: 2, null: false
+    t.decimal "balance", precision: 14, scale: 2, default: "0.0", null: false
+    t.decimal "closed_amount", precision: 14, scale: 2
+    t.date "closed_date"
+    t.datetime "created_at", null: false
+    t.decimal "interest_rate", precision: 5, scale: 2, null: false
+    t.boolean "is_active", default: true, null: false
+    t.decimal "maturity_amount", precision: 14, scale: 2, null: false
+    t.date "maturity_date", null: false
+    t.text "notes"
+    t.date "open_date", null: false
+    t.bigint "parent_account_id", null: false
+    t.integer "tenure_days"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["parent_account_id"], name: "index_term_accounts_on_parent_account_id"
+    t.index ["user_id"], name: "index_term_accounts_on_user_id"
+  end
+
+  create_table "transactions", force: :cascade do |t|
+    t.decimal "amount", precision: 12, scale: 2, null: false
+    t.string "bank_ref", limit: 100
+    t.datetime "created_at", null: false
+    t.date "date", null: false
+    t.string "description", limit: 500
+    t.bigint "instrument_id"
+    t.boolean "is_active", default: true, null: false
+    t.integer "linked_account_id"
+    t.string "linked_account_type"
+    t.uuid "public_id", default: -> { "gen_random_uuid()" }
+    t.string "tags", array: true
+    t.string "transaction_type", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["date", "id"], name: "index_transactions_on_date_and_id"
+    t.index ["instrument_id"], name: "index_transactions_on_instrument_id"
+    t.index ["linked_account_id"], name: "index_transactions_on_linked_account_id"
+    t.index ["linked_account_type"], name: "index_transactions_on_linked_account_type"
+    t.index ["public_id"], name: "index_transactions_on_public_id", unique: true
+    t.index ["user_id"], name: "index_transactions_on_user_id"
+  end
+
+  create_table "user_instruments", force: :cascade do |t|
+    t.datetime "added_at", default: -> { "now()" }, null: false
+    t.bigint "instrument_id", null: false
+    t.bigint "user_id", null: false
+    t.index ["instrument_id"], name: "index_user_instruments_on_instrument_id"
+    t.index ["user_id", "instrument_id"], name: "index_user_instruments_on_user_id_and_instrument_id", unique: true
+    t.index ["user_id"], name: "index_user_instruments_on_user_id"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "currency_code", default: "INR", null: false
+    t.string "currency_locale", default: "en-IN", null: false
+    t.string "email", null: false
+    t.string "first_name", null: false
+    t.boolean "is_active", default: true, null: false
+    t.boolean "is_superuser", default: false, null: false
+    t.string "last_name", null: false
+    t.string "password_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
+  end
+
+  add_foreign_key "accounts", "banks", on_delete: :restrict
+  add_foreign_key "accounts", "users", on_delete: :cascade
+  add_foreign_key "follios", "platform_accounts", on_delete: :cascade
+  add_foreign_key "follios", "user_instruments", on_delete: :cascade
+  add_foreign_key "follios", "users", on_delete: :cascade
+  add_foreign_key "import_batches", "users", on_delete: :cascade
+  add_foreign_key "import_records", "import_batches", on_delete: :cascade
+  add_foreign_key "investments", "platform_accounts", on_delete: :nullify
+  add_foreign_key "investments", "user_instruments", on_delete: :nullify
+  add_foreign_key "investments", "users", on_delete: :cascade
+  add_foreign_key "platform_accounts", "platforms", on_delete: :restrict
+  add_foreign_key "platform_accounts", "users", on_delete: :cascade
+  add_foreign_key "term_accounts", "accounts", column: "parent_account_id", on_delete: :restrict
+  add_foreign_key "term_accounts", "users", on_delete: :cascade
+  add_foreign_key "transactions", "instruments", on_delete: :nullify
+  add_foreign_key "transactions", "users", on_delete: :cascade
+  add_foreign_key "user_instruments", "instruments", on_delete: :cascade
+  add_foreign_key "user_instruments", "users", on_delete: :cascade
+end
