@@ -1,5 +1,6 @@
 module JsonWebToken
-  SECRET = Rails.application.credentials.secret_key_base
+  SECRET = Rails.application.credentials.secret_key_base ||
+           ENV.fetch("SECRET_KEY_BASE", "fallback-secret-for-test-env-#{"x" * 32}")
   EXPIRY = 7.days
 
   def self.encode(payload)

@@ -18,8 +18,8 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: fintrack_user
-          POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: fintrack_db_test
         ports: ["5432:5432"]
         options: >-
@@ -39,16 +39,16 @@ jobs:
 
     env:
       RAILS_ENV: test
-      DATABASE_URL: postgresql://fintrack_user:password@localhost:5432/fintrack_db_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fintrack_db_test
       REDIS_URL: redis://localhost:6379/0
-      SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE || 'test-secret-key-base-at-least-32-chars-long' }}
+      SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE || 'ci-test-secret-key-base-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: backend/.ruby-version
           bundler-cache: true
           working-directory: backend
 
@@ -67,7 +67,7 @@ jobs:
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: backend/.ruby-version
           bundler-cache: true
           working-directory: backend
 
@@ -83,7 +83,7 @@ jobs:
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: backend/.ruby-version
           bundler-cache: true
           working-directory: backend
 
