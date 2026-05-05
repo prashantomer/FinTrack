@@ -1,8 +1,8 @@
-# FinTrack 💰
+# FinTrack
 
 > Take control of your finances — track every rupee, every account, every investment, in one place.
 
-FinTrack is a self-hosted personal finance tracker built as a **single-origin monolith**: one FastAPI process serves both the REST API and the production-built React SPA. No cloud dependencies, no subscriptions — just your data, on your machine.
+FinTrack is a self-hosted personal finance tracker built as a **single-origin monolith**: one Rails process serves both the REST API and (in production) the compiled React SPA. No cloud dependencies, no subscriptions — just your data, on your machine.
 
 ---
 
@@ -10,32 +10,32 @@ FinTrack is a self-hosted personal finance tracker built as a **single-origin mo
 
 | Domain | Details |
 |--------|---------|
-| 🏦 **Bank Accounts** | Savings, current, salary, NRE/NRO — with full transaction history |
-| 📈 **Investments** | Stocks, mutual funds, gold, crypto, NPS, real estate |
-| 🔒 **Fixed Deposits** | Linked to parent accounts, auto-calculates maturity date & amount |
-| 🌿 **PPF** | 15-year tenure, deposit tracking, balance driven by transactions |
-| 📊 **Dashboard** | Net worth, spending trends, investment breakdown — Redis-cached for instant loads |
-| 🧾 **Audit Log** | Every balance change is traceable back to the transaction that caused it |
+| **Bank Accounts** | Savings, current, salary, NRE/NRO — with full transaction history and balance audit log |
+| **Investments** | Stocks, mutual funds — linked to instruments and platform accounts |
+| **Fixed Deposits** | Linked to parent savings accounts, auto-calculates maturity date & amount (quarterly compounding) |
+| **PPF** | 15-year tenure, deposit tracking, balance driven by transactions |
+| **Portfolio** | Position-level view with lots, avg buy price, unrealized gain/loss |
+| **Portfolio** | Position-level view with lots, avg buy price, unrealized gain/loss |
+| **Reports** | Net worth, spending trends, investment summary — Redis-cached for instant loads |
+| **CSV Import** | Bulk-import investments, bank transactions, and term accounts from CSV; async Sidekiq processing with live progress, import versioning, and per-row error reporting |
+| **Audit Log** | Every balance change on accounts and term accounts is traceable to the transaction that caused it |
 
 ---
 
 ## Tech Stack
 
-**Backend** — Python 3.13 · FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL · Redis · `uv`
+**Backend** — Ruby 3.x · Rails 8.1 · PostgreSQL · Redis · Sidekiq · Puma · `jwt` + `bcrypt` · `audited`
 
-**Frontend** — React 19 · TypeScript · Vite · TanStack Query · shadcn/ui · Recharts · Tailwind CSS v4
+**Frontend** — React 19 · TypeScript · Vite 8 · TanStack Query v5 · shadcn/ui · Recharts · Tailwind CSS v4
 
 ---
 
 ## Prerequisites
 
-Make sure the following are installed before you begin:
-
-- [pyenv](https://github.com/pyenv/pyenv) — Python version manager
+- [rbenv](https://github.com/rbenv/rbenv) or [asdf](https://asdf-vm.com/) — Ruby version manager
 - [nvm](https://github.com/nvm-sh/nvm) — Node version manager
-- [uv](https://docs.astral.sh/uv/) — Python package manager (`pip install uv` or `brew install uv`)
 - **PostgreSQL** running locally
-- **Redis** running locally (optional — the app falls back to direct DB queries without it)
+- **Redis** running locally — required for Sidekiq (CSV imports); dashboard caching also uses it but falls back to direct DB queries without it
 
 ---
 
@@ -51,9 +51,6 @@ cd FinTrack
 ### 2. Set up runtimes
 
 ```bash
-# Python 3.13.5
-pyenv install 3.13.5
-
 # Node 24 LTS (reads .nvmrc automatically)
 source ~/.nvm/nvm.sh && nvm install
 ```
@@ -61,34 +58,27 @@ source ~/.nvm/nvm.sh && nvm install
 ### 3. Set up the database
 
 ```bash
-createdb fintrack_db
+createdb fintrack_development
 createuser fintrack_user --pwprompt
-psql -c "GRANT ALL ON DATABASE fintrack_db TO fintrack_user;"
+psql -c "GRANT ALL ON DATABASE fintrack_development TO fintrack_user;"
 ```
 
 ### 4. Configure the backend
 
-```bash
-cp backend/.env.example backend/.env   # if example exists, otherwise create it
-```
-
-Edit `backend/.env`:
+Edit `backend/config/database.yml` or set `DATABASE_URL` in `backend/.env`:
 
 ```env
-DATABASE_URL=postgresql+psycopg://fintrack_user:your_password@localhost:5432/fintrack_db
-SECRET_KEY=your_32_byte_hex_secret        # generate: python -c "import secrets; print(secrets.token_hex(32))"
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=10080         # 7 days
-ENVIRONMENT=development
-REDIS_URL=redis://localhost:6379/0        # optional — remove to disable caching
+DATABASE_URL=postgresql://fintrack_user:your_password@localhost:5432/fintrack_development
+SECRET_KEY_BASE=<output of: bundle exec rails secret>
+REDIS_URL=redis://localhost:6379/0   # optional — remove to disable caching
 ```
 
 ### 5. Install backend dependencies & run migrations
 
 ```bash
 cd backend
-uv sync                        # installs all dependencies into .venv
-uv run alembic upgrade head    # creates all tables
+bundle install
+bundle exec rails db:migrate
 ```
 
 ### 6. Seed reference data
@@ -96,27 +86,23 @@ uv run alembic upgrade head    # creates all tables
 Banks and investment platforms are admin-managed — seed them once:
 
 ```bash
-uv run python -m app.cli banks seed       # seeds banks from seeds/banks.csv
-uv run python -m app.cli platforms seed   # seeds 11 investment platforms
+bundle exec rails db:seed
 ```
 
 ### 7. Create your user
 
-There is no public registration. Users are created from the terminal only:
+There is no public registration. Create a user from the Rails console:
 
 ```bash
-uv run python -m app.cli users create
-# → prompts for email, full name, and password
-
-# Or let it generate a random password for you:
-uv run python -m app.cli users create --generate
+bundle exec rails console
+User.create!(email: "you@example.com", first_name: "First", last_name: "Last", password: "yourpassword")
 ```
 
 ### 8. Install frontend dependencies
 
 ```bash
 cd ../frontend
-source ~/.nvm/nvm.sh && nvm use   # ensure correct Node version
+source ~/.nvm/nvm.sh && nvm use
 npm install
 ```
 
@@ -124,16 +110,30 @@ npm install
 
 ## Running in Development
 
-You'll need two terminals:
+Use `make dev` from the project root (requires [foreman](https://github.com/ddollar/foreman)):
 
-**Terminal 1 — Backend** (hot-reload, API docs at `/docs`):
 ```bash
-cd backend
-uv run fastapi dev main.py
-# → http://localhost:8000
+make dev
+# Starts Rails on :8000, Vite on :5173, and Sidekiq — all via foreman
 ```
 
-**Terminal 2 — Frontend** (HMR, proxies `/api` → `:8000`):
+Or start each process manually:
+
+**Terminal 1 — Backend** (Rails on port 8000):
+```bash
+cd backend
+bundle exec rails server -p 8000
+# → API at http://localhost:8000/api/v1
+# → Swagger UI at http://localhost:8000/api-docs
+```
+
+**Terminal 2 — Sidekiq** (background job processor — required for CSV imports):
+```bash
+cd backend
+bundle exec sidekiq -C config/sidekiq.yml
+```
+
+**Terminal 3 — Frontend** (HMR, proxies `/api` → `:8000`):
 ```bash
 cd frontend
 npm run dev
@@ -146,14 +146,13 @@ Open `http://localhost:5173` and log in with the credentials you created above.
 
 ## Running in Production
 
-Build the frontend once, then serve everything from a single FastAPI process:
+Build the frontend once, then serve everything from a single Rails process:
 
 ```bash
 cd frontend && npm run build
 
 cd ../backend
-uv run fastapi run main.py --host 0.0.0.0 --port 8000 --workers 4
-# → http://localhost:8000 serves both the API and the React SPA
+RAILS_ENV=production bundle exec rails server -p 8000
 ```
 
 ---
@@ -162,23 +161,22 @@ uv run fastapi run main.py --host 0.0.0.0 --port 8000 --workers 4
 
 ```
 FinTrack/
-├── backend/
+├── backend/                    # Rails 8.1 API
 │   ├── app/
-│   │   ├── models/        # SQLAlchemy ORM models
-│   │   ├── schemas/       # Pydantic v2 request/response schemas
-│   │   ├── routers/       # Route handlers (thin — delegate to services)
-│   │   ├── services/      # Business logic and DB queries
-│   │   └── cli/           # Admin CLI commands (users, banks, transactions)
-│   ├── alembic/           # Database migrations
-│   ├── seeds/             # CSV seed files for reference data
-│   └── tests/             # pytest suite
+│   │   ├── controllers/api/v1/ # Route handlers (thin — delegate to services)
+│   │   ├── models/             # ActiveRecord models with validations & enums
+│   │   ├── services/           # Business logic (QueryService, CreateService, etc.)
+│   │   └── serializers/        # JSON serialization
+│   ├── config/routes.rb        # All API routes under /api/v1
+│   ├── db/schema.rb            # Canonical DB schema
+│   └── spec/                   # RSpec test suite
 └── frontend/
     └── src/
         ├── api/           # Axios call functions per domain
         ├── components/    # UI components (shadcn/ui + custom)
         ├── hooks/         # TanStack Query hooks
         ├── pages/         # One file per route
-        └── types/         # TypeScript interfaces matching backend schemas
+        └── types/         # TypeScript interfaces matching backend serializers
 ```
 
 ---
@@ -186,21 +184,38 @@ FinTrack/
 ## Useful Commands
 
 ```bash
-# Run all backend tests
-cd backend && uv run pytest
+# Run backend tests (RSpec)
+cd backend && bundle exec rspec
 
 # Type-check the frontend
 cd frontend && npx tsc --noEmit
 
 # Generate a new DB migration
-cd backend && uv run alembic revision --autogenerate -m "your description"
+cd backend && bundle exec rails generate migration DescribeYourChange
 
-# Correct a transaction (admin CLI)
-cd backend && uv run python -m app.cli transactions correct <id>
+# Run migrations
+cd backend && bundle exec rails db:migrate
 
-# Deactivate a transaction and reverse its balance impact
-cd backend && uv run python -m app.cli transactions deactivate <id>
+# Open Rails console
+cd backend && bundle exec rails console
+
+# Rebuild Swagger docs from RSpec specs
+cd backend && bundle exec rails rswag:specs:swaggerize
 ```
+
+---
+
+## API Documentation
+
+Interactive Swagger UI is available at `http://localhost:8000/api-docs` when the backend is running.
+
+---
+
+## Design Documentation
+
+Detailed architecture lives in `docs/`:
+- [docs/backend-architecture.md](docs/backend-architecture.md) — full DB schema, request lifecycle, service patterns, auth flow, test strategy
+- [docs/frontend-architecture.md](docs/frontend-architecture.md) — routing, state management, Axios interceptors, form patterns, chart setup
 
 ---
 
