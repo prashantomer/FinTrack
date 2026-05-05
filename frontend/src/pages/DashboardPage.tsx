@@ -325,8 +325,7 @@ export function DashboardPage() {
           {/* Cache status */}
           {cacheStatus && (
             <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <PopoverTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <span className={`w-1.5 h-1.5 rounded-full ${
                     !cacheStatus.redis_connected ? 'bg-zinc-400' :
                     cacheStatus.cache_warm ? 'bg-green-500' : 'bg-yellow-400'
@@ -335,7 +334,6 @@ export function DashboardPage() {
                    cacheStatus.cache_warm
                      ? `Cached · ${cacheStatus.cache_ttl_seconds != null ? `${Math.ceil(cacheStatus.cache_ttl_seconds / 60)}m left` : ''}`
                      : 'Cache cold'}
-                </button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-52 text-xs space-y-2 p-4">
                 <p className="font-medium text-sm">Cache Status</p>
