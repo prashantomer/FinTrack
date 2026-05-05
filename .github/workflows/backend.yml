@@ -91,4 +91,4 @@ jobs:
         run: bin/brakeman --no-pager --ignore-config config/brakeman.ignore
 
       - name: Bundler Audit
-        run: bin/bundler-audit
+        run: bundle exec bundler-audit update && bundle exec bundler-audit check
