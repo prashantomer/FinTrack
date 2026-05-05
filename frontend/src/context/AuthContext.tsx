@@ -7,20 +7,18 @@ interface AuthContextValue {
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  updateUser: (updated: User) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => !!localStorage.getItem('token'))
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (!token) {
-      setIsLoading(false)
-      return
-    }
+    if (!token) return
     getMe()
       .then(setUser)
       .catch(() => localStorage.removeItem('token'))
@@ -28,26 +26,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    const { access_token, refresh_token } = await apiLogin(email, password)
+    const { access_token } = await apiLogin(email, password)
     localStorage.setItem('token', access_token)
-    localStorage.setItem('refresh_token', refresh_token)
     const me = await getMe()
     setUser(me)
   }, [])
 
   const logout = useCallback(() => {
     localStorage.removeItem('token')
-    localStorage.removeItem('refresh_token')
     setUser(null)
   }, [])
 
+  const updateUser = useCallback((updated: User) => {
+    setUser(updated)
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

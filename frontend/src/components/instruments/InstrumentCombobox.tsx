@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown } from 'lucide-react'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useInstruments } from '@/hooks/useInstruments'
+import { useDebounce } from '@/hooks/useDebounce'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import type { InvestmentType } from '@/types'
 import { cn } from '@/lib/utils'
@@ -15,7 +16,14 @@ interface Props {
 
 export function InstrumentCombobox({ value, onChange, filterType }: Props) {
   const [open, setOpen] = useState(false)
-  const { data: instruments = [] } = useInstruments({ type: filterType })
+  const [inputValue, setInputValue] = useState('')
+  const debouncedSearch = useDebounce(inputValue, 300)
+
+  const { data: instruments = [] } = useInstruments({
+    type: filterType,
+    search: debouncedSearch || undefined,
+    limit: 50,
+  })
 
   const selected = instruments.find(i => i.id === value)
 
@@ -29,33 +37,23 @@ export function InstrumentCombobox({ value, onChange, filterType }: Props) {
         )}
       >
         <span className="truncate">
-          {selected
-            ? `${selected.name} (${INVESTMENT_TYPE_LABELS[selected.type]})`
-            : 'Select instrument…'}
+          {selected ? `${selected.name} (${INVESTMENT_TYPE_LABELS[selected.type]})` : 'Select instrument…'}
         </span>
         <ChevronsUpDown size={14} className="ml-2 shrink-0 opacity-50" />
       </PopoverTrigger>
       <PopoverContent className="w-[var(--available-width)] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search instruments…" />
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Search instruments…" value={inputValue} onValueChange={setInputValue} />
           <CommandList>
             <CommandEmpty>No instruments found.</CommandEmpty>
             <CommandGroup>
               {value && (
-                <CommandItem
-                  value="__clear__"
-                  onSelect={() => { onChange(null); setOpen(false) }}
-                  className="text-muted-foreground italic"
-                >
+                <CommandItem value="__clear__" onSelect={() => { onChange(null); setOpen(false) }} className="text-muted-foreground italic">
                   Clear selection
                 </CommandItem>
               )}
               {instruments.map(inst => (
-                <CommandItem
-                  key={inst.id}
-                  value={`${inst.name} ${inst.ticker_symbol ?? ''} ${inst.type}`}
-                  onSelect={() => { onChange(inst.id); setOpen(false) }}
-                >
+                <CommandItem key={inst.id} value={String(inst.id)} onSelect={() => { onChange(inst.id); setOpen(false) }}>
                   <Check size={14} className={cn('mr-2', value === inst.id ? 'opacity-100' : 'opacity-0')} />
                   <span className="flex-1">{inst.name}</span>
                   <span className="text-xs text-muted-foreground ml-2">

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   createPlatformAccount,
   deletePlatformAccount,
@@ -20,7 +21,10 @@ export function useCreatePlatformAccount() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: PlatformAccountCreate) => createPlatformAccount(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-accounts'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform-accounts'] })
+      toast.success('Platform account added')
+    },
   })
 }
 
@@ -29,7 +33,10 @@ export function useUpdatePlatformAccount() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: PlatformAccountUpdate }) =>
       updatePlatformAccount(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-accounts'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform-accounts'] })
+      toast.success('Platform account updated')
+    },
   })
 }
 
@@ -37,6 +44,9 @@ export function useDeletePlatformAccount() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => deletePlatformAccount(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-accounts'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['platform-accounts'] })
+      toast.success('Platform account deleted')
+    },
   })
 }

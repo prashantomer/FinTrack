@@ -1,10 +1,10 @@
 import { useForm } from 'react-hook-form'
-import { InstrumentCombobox } from '@/components/instruments/InstrumentCombobox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useUserInstruments } from '@/hooks/useInstruments'
 import { usePlatformAccounts } from '@/hooks/usePlatforms'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -12,13 +12,20 @@ import type { Investment, InvestmentType } from '@/types'
 
 const INVESTMENT_TYPES = Object.keys(INVESTMENT_TYPE_LABELS) as InvestmentType[]
 
-type FormValues = Partial<Investment> & {
+type FormValues = {
   type: InvestmentType
   name: string
   amount_invested: number
+  current_value?: number
   purchase_date: string
+  notes?: string
   platform_account_id: number | null
-  instrument_id: number | null
+  user_instrument_id: number | null
+  quantity?: number
+  buy_price?: number
+  folio_number?: string
+  units?: number
+  nav_at_purchase?: number
 }
 
 interface Props {
@@ -30,6 +37,7 @@ interface Props {
 export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
   const { symbol: CURRENCY_SYMBOL } = useCurrency()
   const { data: platformAccounts = [] } = usePlatformAccounts()
+  const { data: userInstruments = [] } = useUserInstruments()
   const { register, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {
       type: initial?.type ?? 'stock',
@@ -39,37 +47,27 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
       purchase_date: initial?.purchase_date ?? new Date().toISOString().split('T')[0],
       notes: initial?.notes ?? '',
       platform_account_id: initial?.platform_account_id ?? null,
-      instrument_id: initial?.instrument_id ?? null,
-      ticker_symbol: initial?.ticker_symbol ?? '',
+      user_instrument_id: initial?.user_instrument_id ?? null,
       quantity: initial?.quantity ?? undefined,
-      avg_buy_price: initial?.avg_buy_price ?? undefined,
-      exchange: initial?.exchange ?? '',
+      buy_price: initial?.buy_price ?? undefined,
       folio_number: initial?.folio_number ?? '',
       units: initial?.units ?? undefined,
       nav_at_purchase: initial?.nav_at_purchase ?? undefined,
-      fund_house: initial?.fund_house ?? '',
-      bank_name: initial?.bank_name ?? '',
-      interest_rate: initial?.interest_rate ?? undefined,
-      tenure_months: initial?.tenure_months ?? undefined,
-      maturity_date: initial?.maturity_date ?? '',
-      maturity_amount: initial?.maturity_amount ?? undefined,
-      compounding: initial?.compounding ?? '',
-      gold_form: initial?.gold_form ?? '',
-      weight_grams: initial?.weight_grams ?? undefined,
-      purity: initial?.purity ?? '',
     },
   })
 
   const type = watch('type')
   const platformAccountId = watch('platform_account_id')
-  const instrumentId = watch('instrument_id')
+  const userInstrumentId = watch('user_instrument_id')
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label>Type</Label>
         <Select value={type} onValueChange={(v) => setValue('type', v as InvestmentType)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger>
+            <span className="flex flex-1 text-left text-sm">{INVESTMENT_TYPE_LABELS[type]}</span>
+          </SelectTrigger>
           <SelectContent>
             {INVESTMENT_TYPES.map(t => (
               <SelectItem key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</SelectItem>
@@ -79,12 +77,33 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Instrument <span className="text-muted-foreground text-xs">(optional)</span></Label>
-        <InstrumentCombobox
-          value={instrumentId}
-          onChange={(id) => setValue('instrument_id', id)}
-          filterType={type}
-        />
+        <Label>
+          Instrument
+          {(type === 'stock' || type === 'mutual_fund') && (
+            <span className="text-destructive ml-1">*</span>
+          )}
+          {type !== 'stock' && type !== 'mutual_fund' && (
+            <span className="text-muted-foreground text-xs ml-1">(optional — tracked only)</span>
+          )}
+        </Label>
+        <Select
+          value={userInstrumentId?.toString() ?? '__none__'}
+          onValueChange={(v) => setValue('user_instrument_id', v === '__none__' ? null : Number(v))}
+        >
+          <SelectTrigger><SelectValue placeholder="Select tracked instrument…" /></SelectTrigger>
+          <SelectContent>
+            {type !== 'stock' && type !== 'mutual_fund' && (
+              <SelectItem value="__none__">None</SelectItem>
+            )}
+            {userInstruments
+              .filter(ui => ui.instrument.type === type)
+              .map(ui => (
+                <SelectItem key={ui.id} value={ui.id.toString()}>
+                  {ui.instrument.name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -124,23 +143,15 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
         </div>
       </div>
 
-      {(type === 'stock' || type === 'crypto') && (
+      {type === 'stock' && (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label>Ticker Symbol</Label>
-            <Input {...register('ticker_symbol')} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Exchange</Label>
-            <Input {...register('exchange')} placeholder="NSE / BSE" />
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label>Quantity</Label>
-            <Input type="number" step="0.0001" {...register('quantity', { valueAsNumber: true })} />
+            <Input type="number" step="0.0001" {...register('quantity', { valueAsNumber: true })} required />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Avg Buy Price ({CURRENCY_SYMBOL})</Label>
-            <Input type="number" step="0.01" {...register('avg_buy_price', { valueAsNumber: true })} />
+            <Label>Buy Price ({CURRENCY_SYMBOL})</Label>
+            <Input type="number" step="0.01" {...register('buy_price', { valueAsNumber: true })} required />
           </div>
         </div>
       )}
@@ -148,70 +159,16 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
       {type === 'mutual_fund' && (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label>Fund House</Label>
-            <Input {...register('fund_house')} />
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label>Folio Number</Label>
             <Input {...register('folio_number')} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Units</Label>
-            <Input type="number" step="0.0001" {...register('units', { valueAsNumber: true })} />
+            <Input type="number" step="0.0001" {...register('units', { valueAsNumber: true })} required />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>NAV at Purchase</Label>
-            <Input type="number" step="0.0001" {...register('nav_at_purchase', { valueAsNumber: true })} />
-          </div>
-        </div>
-      )}
-
-      {type === 'fixed_deposit' && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Bank Name</Label>
-            <Input {...register('bank_name')} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>FD Number</Label>
-            <Input {...register('fd_number')} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Interest Rate (%)</Label>
-            <Input type="number" step="0.01" {...register('interest_rate', { valueAsNumber: true })} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Tenure (months)</Label>
-            <Input type="number" {...register('tenure_months', { valueAsNumber: true })} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Maturity Date</Label>
-            <Input type="date" {...register('maturity_date')} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Maturity Amount ({CURRENCY_SYMBOL})</Label>
-            <Input type="number" step="0.01" {...register('maturity_amount', { valueAsNumber: true })} />
-          </div>
-          <div className="flex flex-col gap-1.5 col-span-2">
-            <Label>Compounding</Label>
-            <Input {...register('compounding')} placeholder="quarterly / monthly / annual" />
-          </div>
-        </div>
-      )}
-
-      {type === 'gold' && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Form</Label>
-            <Input {...register('gold_form')} placeholder="coin / bar / ETF / SGB" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Weight (grams)</Label>
-            <Input type="number" step="0.001" {...register('weight_grams', { valueAsNumber: true })} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Purity</Label>
-            <Input {...register('purity')} placeholder="24K / 22K" />
+            <Label>NAV at Purchase ({CURRENCY_SYMBOL})</Label>
+            <Input type="number" step="0.0001" {...register('nav_at_purchase', { valueAsNumber: true })} required />
           </div>
         </div>
       )}

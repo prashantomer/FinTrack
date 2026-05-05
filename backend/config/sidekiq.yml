@@ -1,0 +1,4 @@
+:concurrency: 5
+:queues:
+  - [imports, 2]
+  - [default, 1]

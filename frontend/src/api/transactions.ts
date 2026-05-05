@@ -1,4 +1,4 @@
-import type { Transaction, TransactionCreate, TransactionListResponse, TransactionType } from '@/types'
+import type { ApiResponse, Transaction, TransactionCreate, TransactionListResponse, TransactionType } from '@/types'
 import client from './client'
 
 interface ListParams {
@@ -11,12 +11,18 @@ interface ListParams {
   cursor?: string
 }
 
-export async function listTransactions(params: ListParams = {}) {
-  const res = await client.get<TransactionListResponse>('/transactions/', { params })
-  return res.data
+export async function listTransactions(params: ListParams = {}): Promise<TransactionListResponse> {
+  const res = await client.get<ApiResponse<Transaction[]>>('/transactions', { params })
+  return {
+    items:      res.data.data,
+    total:      (res.data.meta_data.total as number) ?? 0,
+    page:       1,
+    page_size:  params.page_size ?? 50,
+    next_cursor: (res.data.meta_data.next_cursor as string | null) ?? null,
+  }
 }
 
 export async function createTransaction(data: TransactionCreate) {
-  const res = await client.post<Transaction>('/transactions/', data)
-  return res.data
+  const res = await client.post<ApiResponse<Transaction>>('/transactions', data)
+  return res.data.data
 }

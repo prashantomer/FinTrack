@@ -3,6 +3,7 @@ import {
   getDashboard,
   getDashboardCacheStatus,
   getInvestmentSummary,
+  getPortfolio,
   getSpendingTrends,
   refreshDashboard,
 } from '@/api/reports'
@@ -46,5 +47,12 @@ export function useInvestmentSummary() {
   return useQuery({
     queryKey: ['reports', 'investment-summary'],
     queryFn: getInvestmentSummary,
+  })
+}
+
+export function usePortfolio() {
+  return useQuery({
+    queryKey: ['reports', 'portfolio'],
+    queryFn: getPortfolio,
   })
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { createTransaction, listTransactions } from '@/api/transactions'
 import type { TransactionCreate, TransactionType } from '@/types'
 
@@ -25,6 +26,7 @@ export function useCreateTransaction() {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['accounts'] })
       qc.invalidateQueries({ queryKey: ['term-accounts'] })
+      toast.success('Transaction added')
     },
   })
 }

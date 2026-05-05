@@ -78,7 +78,9 @@ export function TransactionForm({ onSubmit, onCancel }: Props) {
       <div className="flex flex-col gap-1.5">
         <Label>Type</Label>
         <Select value={type} onValueChange={(v) => setValue('type', v as TransactionType)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger>
+            <span className="flex flex-1 text-left text-sm">{TRANSACTION_TYPE_LABELS[type]}</span>
+          </SelectTrigger>
           <SelectContent>
             {(Object.keys(TRANSACTION_TYPE_LABELS) as TransactionType[]).map((t) => (
               <SelectItem key={t} value={t}>{TRANSACTION_TYPE_LABELS[t]}</SelectItem>

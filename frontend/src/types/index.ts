@@ -1,3 +1,21 @@
+export interface ApiMeta {
+  total?: number
+  next_cursor?: string | number | null
+  has_more?: boolean
+  limit?: number
+  [key: string]: unknown
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  code: number
+  request_id: string
+  data: T
+  meta_data: ApiMeta
+  error?: string
+  errors?: Record<string, string[]>
+}
+
 export type TransactionType = 'credit' | 'debit'
 export type LinkedAccountType = 'account' | 'term_account'
 export type TermAccountType = 'fd' | 'ppf'
@@ -5,12 +23,6 @@ export type TermAccountType = 'fd' | 'ppf'
 export type InvestmentType =
   | 'stock'
   | 'mutual_fund'
-  | 'fixed_deposit'
-  | 'gold'
-  | 'crypto'
-  | 'ppf'
-  | 'nps'
-  | 'real_estate'
 
 export type AccountType = 'savings' | 'current' | 'salary' | 'nre' | 'nro'
 
@@ -178,6 +190,12 @@ export interface Instrument {
   created_at: string
 }
 
+export interface InstrumentPage {
+  items: Instrument[]
+  next_cursor: number | null
+  has_more: boolean
+}
+
 export interface InstrumentCreate {
   name: string
   type: InvestmentType
@@ -187,23 +205,33 @@ export interface InstrumentCreate {
   fund_house?: string
 }
 
+// ── User Instruments ─────────────────────────────────────────────────────────
+
+export interface UserInstrument {
+  id: number
+  user_id: number
+  instrument_id: number
+  added_at: string
+  instrument: Instrument
+}
+
 // ── Follios ──────────────────────────────────────────────────────────────────
 
 export interface Follio {
   id: number
   follio_id: string
   user_id: number
-  platform_id: number
-  instrument_id: number
+  user_instrument_id: number
+  platform_account_id: number
   created_at: string
-  platform: Platform
-  instrument: Instrument
+  user_instrument: UserInstrument
+  platform_account: PlatformAccount
 }
 
 export interface FollioCreate {
   follio_id: string
-  platform_id: number
-  instrument_id: number
+  user_instrument_id: number
+  platform_account_id: number
 }
 
 export interface FollioUpdate {
@@ -261,29 +289,61 @@ export interface Investment {
   purchase_date: string
   notes: string | null
   platform_account_id: number | null
+  user_instrument_id: number | null
   instrument_id: number | null
   created_at: string
   quantity: number | null
-  avg_buy_price: number | null
+  buy_price: number | null
   folio_number: string | null
   units: number | null
   nav_at_purchase: number | null
-  bank_name: string | null
-  fd_number: string | null
-  interest_rate: number | null
-  tenure_months: number | null
-  maturity_date: string | null
-  maturity_amount: number | null
-  compounding: string | null
-  gold_form: string | null
-  weight_grams: number | null
-  purity: string | null
   transaction_public_id: string | null
 }
 
 export interface InvestmentListResponse {
   items: Investment[]
   total: number
+  page: number
+  page_size: number
+}
+
+export interface FollioListResponse {
+  items: Follio[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ── Imports ───────────────────────────────────────────────────────────────────
+
+export type ImportType   = 'investments' | 'transactions' | 'term_accounts'
+export type ImportStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+export interface ImportRowResult {
+  row_index: number
+  status:    'ok' | 'error' | 'skipped'
+  notes:     string | null
+}
+
+export interface ImportBatch {
+  id:             number
+  import_type:    ImportType
+  status:         ImportStatus
+  file_name:      string
+  total_rows:     number
+  processed_rows: number
+  failed_rows:    number
+  import_version: number
+  progress_pct:   number
+  import_records: ImportRowResult[]
+  created_at:     string
+}
+
+export interface ImportListResponse {
+  items:     ImportBatch[]
+  total:     number
+  page:      number
+  page_size: number
 }
 
 // ── Audit Logs ───────────────────────────────────────────────────────────────
@@ -323,6 +383,7 @@ export interface TermAccountSummary {
   id: number
   account_number: string | null
   type: string
+  account_type?: string
   bank_short_name: string
   balance: number
   maturity_date: string
@@ -334,6 +395,7 @@ export interface RecentTransaction {
   id: number
   date: string
   type: string
+  transaction_type?: string
   amount: number
   description: string | null
   tags: string[]
@@ -373,6 +435,7 @@ export interface SpendingTrendsReport {
 
 export interface InvestmentTypeBreakdown {
   type: InvestmentType
+  investment_type?: InvestmentType
   total_invested: number
   current_value: number
   unrealized_gain: number
@@ -390,4 +453,53 @@ export interface InvestmentSummaryReport {
   total_invested: number
   total_current_value: number
   total_unrealized_gain: number
+}
+
+// ── Portfolio ─────────────────────────────────────────────────────────────────
+
+export interface LotRead {
+  id: number
+  purchase_date: string
+  amount_invested: number
+  current_value: number | null
+  quantity: number | null
+  buy_price: number | null
+  folio_number: string | null
+  units: number | null
+  nav_at_purchase: number | null
+  platform_account_nickname: string | null
+  notes: string | null
+}
+
+export interface PortfolioPosition {
+  user_instrument_id: number
+  instrument_name: string
+  instrument_ticker: string | null
+  instrument_exchange: string | null
+  type: InvestmentType
+  platform_accounts: string[]
+  total_lots: number
+  total_units: number | null
+  total_invested: number
+  avg_buy_price: number | null
+  current_value: number
+  unrealized_gain: number
+  unrealized_gain_pct: number
+  lots: LotRead[]
+}
+
+export interface PortfolioPlatformBreakdown {
+  platform_name: string
+  total_invested: number
+  current_value: number
+}
+
+export interface PortfolioReport {
+  total_invested: number
+  current_value: number
+  unrealized_gain: number
+  unrealized_gain_pct: number
+  by_type: InvestmentTypeBreakdown[]
+  by_platform: PortfolioPlatformBreakdown[]
+  positions: PortfolioPosition[]
 }
