@@ -12,10 +12,8 @@ import { useAccounts, useAdjustAccountBalance, useBanks, useCloseAccount, useCre
 import { useAdjustTermAccountBalance, useCloseTermAccount, useCreateTermAccount, useDepositPPF, useTermAccounts, useUpdateTermAccount } from '@/hooks/useTermAccounts'
 import type { AuditTarget } from '@/hooks/useAuditLogs'
 import { ACCOUNT_TYPE_LABELS, TERM_ACCOUNT_TYPE_LABELS } from '@/lib/labels'
-import { formatCurrency, CURRENCY_SYMBOL } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Account, AccountType, TermAccount, TermAccountType, TermAccountUpdate } from '@/types'
-
-const fmt = { format: formatCurrency }
 
 
 // ── Account form ─────────────────────────────────────────────────────────────
@@ -135,6 +133,9 @@ function SidebarShell({
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function AccountsPage() {
+  const { formatCurrency, symbol } = useCurrency()
+  const fmt = { format: formatCurrency }
+  const CURRENCY_SYMBOL = symbol
   const { data: accounts = [], isLoading } = useAccounts()
   const { data: banks = [] } = useBanks()
   const { data: termAccountsAll = [] } = useTermAccounts()

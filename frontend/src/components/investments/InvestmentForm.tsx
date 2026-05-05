@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { usePlatformAccounts } from '@/hooks/usePlatforms'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import { CURRENCY_SYMBOL } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Investment, InvestmentType } from '@/types'
 
 const INVESTMENT_TYPES = Object.keys(INVESTMENT_TYPE_LABELS) as InvestmentType[]
@@ -28,6 +28,7 @@ interface Props {
 }
 
 export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
+  const { symbol: CURRENCY_SYMBOL } = useCurrency()
   const { data: platformAccounts = [] } = usePlatformAccounts()
   const { register, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {

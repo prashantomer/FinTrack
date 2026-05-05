@@ -1,14 +1,13 @@
 import { PlusCircle, TrendingDown, TrendingUp } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { type AuditTarget, useAuditLogs } from '@/hooks/useAuditLogs'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface Props {
   target: AuditTarget
   onClose: () => void
 }
 
-import { formatCurrency } from '@/lib/currency'
-const fmtCurrency = { format: formatCurrency }
 const fmtDate = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 const fmtTime = new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
 
@@ -22,6 +21,8 @@ function fmtTxnDate(iso: string) {
 }
 
 export function AuditLogSidebar({ target, onClose }: Props) {
+  const { formatCurrency } = useCurrency()
+  const fmtCurrency = { format: formatCurrency }
   const { data: logs = [], isLoading } = useAuditLogs(target)
 
   return (

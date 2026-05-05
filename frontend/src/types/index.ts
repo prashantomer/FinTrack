@@ -24,6 +24,8 @@ export interface User {
   full_name: string
   is_active: boolean
   is_superuser: boolean
+  currency_code: string
+  currency_locale: string
   created_at: string
 }
 

@@ -12,12 +12,12 @@ import {
   useUpdateInvestment,
 } from '@/hooks/useInvestments'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import { formatCurrency } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Investment, InvestmentType } from '@/types'
 
-const fmt = { format: formatCurrency }
-
 export function InvestmentsPage() {
+  const { formatCurrency } = useCurrency()
+  const fmt = { format: formatCurrency }
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Investment | null>(null)
 

@@ -6,11 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useInvestmentSummary, useSpendingTrends } from '@/hooks/useReports'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import { formatCurrency, formatCurrencyCompact } from '@/lib/currency'
-
-const tooltipFormatter = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
+import { useCurrency } from '@/hooks/useCurrency'
 
 export function ReportsPage() {
+  const { formatCurrency, formatCurrencyCompact } = useCurrency()
+  const tooltipFormatter = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
   const [trendMonths, setTrendMonths] = useState('6')
   const { data: trends } = useSpendingTrends(Number(trendMonths))
   const { data: invSummary } = useInvestmentSummary()

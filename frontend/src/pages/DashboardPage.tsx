@@ -13,13 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useDashboard, useDashboardCacheStatus, useRefreshDashboard, useSpendingTrends } from '@/hooks/useReports'
 import { ACCOUNT_TYPE_LABELS, INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import { formatCurrency, formatCurrencyCompact } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { AccountSummary, InvestmentTypeBreakdown, RecentTransaction, TermAccountSummary } from '@/types'
 
-const fmt = { format: formatCurrency }
-const fmtCompact = formatCurrencyCompact
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-const tooltipFmt = (v: ValueType | undefined) => typeof v === 'number' ? fmt.format(v) : String(v ?? '')
 
 function relativeTime(ts: number): string {
   const secs = Math.floor((Date.now() - ts) / 1000)
@@ -288,6 +285,10 @@ function UpcomingMaturitiesCard({ maturities }: { maturities: TermAccountSummary
 
 export function DashboardPage() {
   const [, forceRender] = useState(0)
+  const { formatCurrency, formatCurrencyCompact } = useCurrency()
+  const fmt = { format: formatCurrency }
+  const fmtCompact = formatCurrencyCompact
+  const tooltipFmt = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
 
   const { data: dash, dataUpdatedAt, isFetching } = useDashboard()
   const { mutate: refreshCache, isPending: isRefreshing } = useRefreshDashboard()

@@ -11,14 +11,14 @@ import { useAccounts } from '@/hooks/useBanks'
 import { useTermAccounts } from '@/hooks/useTermAccounts'
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/labels'
-import { formatCurrency } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { LinkedAccountType, TransactionCreate, TransactionType } from '@/types'
-
-const fmt = { format: formatCurrency }
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 
 export function TransactionsPage() {
+  const { formatCurrency } = useCurrency()
+  const fmt = { format: formatCurrency }
   const [page, setPage] = useState(1)
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')

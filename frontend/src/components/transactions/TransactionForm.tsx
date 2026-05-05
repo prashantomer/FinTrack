@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAccounts } from '@/hooks/useBanks'
 import { ACCOUNT_TYPE_LABELS, TRANSACTION_TYPE_LABELS } from '@/lib/labels'
-import { CURRENCY_SYMBOL } from '@/lib/currency'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { LinkedAccountType, TransactionType } from '@/types'
 
 interface FormValues {
@@ -26,6 +26,7 @@ interface Props {
 }
 
 export function TransactionForm({ onSubmit, onCancel }: Props) {
+  const { symbol: CURRENCY_SYMBOL } = useCurrency()
   const { data: accounts = [] } = useAccounts()
 
   const { register, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({

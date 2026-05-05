@@ -68,6 +68,10 @@ def update_me(
         current_user.last_name = body.last_name
     if body.password is not None:
         current_user.hashed_password = pwd_context.hash(body.password)
+    if body.currency_code is not None:
+        current_user.currency_code = body.currency_code
+    if body.currency_locale is not None:
+        current_user.currency_locale = body.currency_locale
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
