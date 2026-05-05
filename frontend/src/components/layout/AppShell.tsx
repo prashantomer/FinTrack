@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, LayoutDashboard, LogOut, TrendingUp } from 'lucide-react'
+import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, LayoutDashboard, LogOut, PieChart, Settings, TrendingUp, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/context/AuthContext'
+import { SettingsSheet } from './SettingsSheet'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -12,13 +14,16 @@ const navItems = [
   { to: '/instruments', label: 'Instruments', icon: BarChart3 },
   { to: '/follios', label: 'Follios', icon: FolderOpen },
   { to: '/investments', label: 'Investments', icon: TrendingUp },
+  { to: '/portfolio', label: 'Portfolio', icon: PieChart },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/imports', label: 'Imports', icon: Upload },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -59,13 +64,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="truncate text-xs font-medium text-sidebar-foreground">{displayName}</p>
             <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
           </div>
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Settings">
+            <Settings size={16} />
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
             <LogOut size={16} />
           </Button>
         </div>
       </aside>
-      <main className="flex flex-1 flex-col overflow-auto">
-        <div className="p-6">{children}</div>
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <main className="flex flex-1 flex-col overflow-hidden">
+        {children}
       </main>
     </div>
   )

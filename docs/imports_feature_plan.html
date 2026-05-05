@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — CSV Import Feature Plan</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 15px; line-height: 1.7; color: #1a1a1a; background: #f6f8fa; padding: 2rem 1rem;
+      }
+      .page { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 2.5rem 3rem; }
+      h1 { font-size: 1.75rem; font-weight: 700; border-bottom: 2px solid #e1e4e8; padding-bottom: .75rem; margin-bottom: 1.5rem; }
+      h2 { font-size: 1.2rem; font-weight: 700; color: #0969da; margin: 2.5rem 0 .75rem; padding-left: .5rem; border-left: 3px solid #0969da; }
+      h3 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 .5rem; color: #24292f; }
+      p  { margin-bottom: .75rem; }
+      ul, ol { padding-left: 1.4rem; margin-bottom: .75rem; }
+      li { margin-bottom: .25rem; }
+      code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .85rem; background: #f0f3f6; border: 1px solid #d0d7de; border-radius: 3px; padding: .1em .35em; }
+      pre  { font-family: "SFMono-Regular", Consolas, monospace; font-size: .82rem; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 1rem 1.25rem; overflow-x: auto; margin-bottom: 1rem; line-height: 1.55; }
+      pre code { background: none; border: none; padding: 0; font-size: inherit; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: .88rem; }
+      th { background: #f6f8fa; font-weight: 600; text-align: left; }
+      th, td { border: 1px solid #d0d7de; padding: .45rem .75rem; vertical-align: top; }
+      tr:nth-child(even) td { background: #fafbfc; }
+      .badge { display: inline-block; font-size: .72rem; font-weight: 600; padding: .15em .55em; border-radius: 20px; }
+      .badge-green  { background: #d1fae5; color: #065f46; }
+      .badge-blue   { background: #dbeafe; color: #1e40af; }
+      .badge-gray   { background: #f1f5f9; color: #475569; }
+      .badge-orange { background: #ffedd5; color: #9a3412; }
+      .badge-purple { background: #ede9fe; color: #5b21b6; }
+      .callout { background: #fff8c5; border: 1px solid #d4a72c; border-radius: 6px; padding: .75rem 1rem; margin-bottom: 1rem; font-size: .9rem; }
+      .callout.info { background: #dbeafe; border-color: #93c5fd; }
+      .callout.warn { background: #fff8c5; border-color: #d4a72c; }
+
+      /* ── Mockup styles ── */
+      .mockup-wrap { margin: 1.5rem 0 2rem; }
+      .mockup-label { font-size: .75rem; font-weight: 600; color: #6e7781; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; }
+      .mockup {
+        background: #fff; border: 1.5px solid #d0d7de; border-radius: 8px;
+        font-family: "SFMono-Regular", Consolas, monospace; font-size: .78rem; line-height: 1.5;
+        overflow: hidden;
+      }
+      .mockup-titlebar { background: #f6f8fa; border-bottom: 1px solid #d0d7de; padding: .4rem .75rem; font-size: .72rem; color: #57606a; display: flex; gap: .5rem; align-items: center; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+      .dot-r { background: #ff5f57; } .dot-y { background: #febc2e; } .dot-g { background: #28c840; }
+      .mockup-body { padding: .75rem 1rem; white-space: pre; color: #24292f; }
+      .m-sel   { background: #0969da; color: #fff; border-radius: 3px; padding: 0 2px; }
+      .m-dim   { color: #8c959f; }
+      .m-grn   { color: #1a7f37; }
+      .m-red   { color: #cf222e; }
+      .m-blu   { color: #0969da; }
+      .m-orn   { color: #953800; }
+      .m-head  { font-weight: bold; }
+
+      .wizard-steps { display: flex; gap: 0; margin: 1rem 0 1.5rem; }
+      .step-node { display: flex; flex-direction: column; align-items: center; flex: 1; }
+      .step-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; }
+      .step-active  .step-circle { background: #0969da; color: #fff; }
+      .step-done    .step-circle { background: #1a7f37; color: #fff; }
+      .step-future  .step-circle { background: #f1f5f9; color: #8c959f; border: 1.5px solid #d0d7de; }
+      .step-label { font-size: .7rem; margin-top: .3rem; text-align: center; color: #57606a; }
+      .step-active .step-label { color: #0969da; font-weight: 600; }
+      .step-line { flex: 1; height: 2px; background: #d0d7de; align-self: center; margin: 0 -4px; margin-top: -18px; }
+      .step-line.done { background: #1a7f37; }
+
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+      @media(max-width:680px) { .grid2 { grid-template-columns: 1fr; } .page { padding: 1.5rem; } }
+
+      .phase-block { border: 1px solid #d0d7de; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+      .phase-block h3 { margin-top: 0; }
+      .phase-num { display: inline-block; background: #0969da; color: #fff; font-size: .72rem; font-weight: 700; padding: .1em .5em; border-radius: 4px; margin-right: .4rem; }
+
+      .file-list { list-style: none; padding: 0; }
+      .file-list li { padding: .2rem 0; display: flex; gap: .5rem; align-items: baseline; }
+      .file-list .fl-new  { color: #1a7f37; font-weight: 700; font-size: .8rem; }
+      .file-list .fl-mod  { color: #953800; font-weight: 700; font-size: .8rem; }
+      .toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 1rem 1.5rem; margin-bottom: 2rem; }
+      .toc a { color: #0969da; text-decoration: none; }
+      .toc a:hover { text-decoration: underline; }
+      .toc ol { margin: 0; }
+      .toc li { margin: .2rem 0; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+
+      <!-- ── HEADER ── -->
+      <h1>FinTrack — CSV Import Feature Plan</h1>
+      <p><strong>Scope:</strong> Phase 1 — Investments import &nbsp;|&nbsp;
+         <strong>Status:</strong> <span class="badge badge-blue">Planning</span> &nbsp;|&nbsp;
+         <strong>Date:</strong> 2026-05-06</p>
+
+      <!-- ── TOC ── -->
+      <div class="toc">
+        <strong>Contents</strong>
+        <ol>
+          <li><a href="#overview">Feature Overview</a></li>
+          <li><a href="#arch">Architecture &amp; Data Model</a></li>
+          <li><a href="#csv">CSV Format &amp; Smart Resolution</a></li>
+          <li><a href="#wizard">UI Wizard — Step-by-Step Mockups</a></li>
+          <li><a href="#history">Import History Page Mockup</a></li>
+          <li><a href="#backend">Backend Implementation Plan</a></li>
+          <li><a href="#frontend">Frontend Implementation Plan</a></li>
+          <li><a href="#files">File Manifest</a></li>
+          <li><a href="#verification">Verification Steps</a></li>
+        </ol>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="overview">1 — Feature Overview</h2>
+
+      <p>A guided import wizard lets users bulk-upload historical investment data from a CSV file. The system processes the file asynchronously via <strong>Sidekiq</strong>, auto-resolves or creates related records (Instruments, Follios, Platform Accounts), optionally matches existing bank transactions, and maintains a full audit trail of every import run via a dedicated bridge table.</p>
+
+      <table>
+        <thead><tr><th>Capability</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Import types (Phase 1)</td><td>Investments <span class="badge badge-green">active</span> — Transactions, Term Accounts <span class="badge badge-gray">coming soon</span></td></tr>
+          <tr><td>Async processing</td><td>Sidekiq job on dedicated <code>imports</code> queue; Redis already available</td></tr>
+          <tr><td>Progress tracking</td><td>Frontend polls <code>GET /imports/:id</code> every 1.5 s while status = processing</td></tr>
+          <tr><td>Import versioning</td><td>Each upload increments <code>import_version</code> per user+type; starts at v1</td></tr>
+          <tr><td>Bridge table</td><td><code>import_records</code> — polymorphic link from batch → any created record</td></tr>
+          <tr><td>Smart resolution</td><td>Instrument (ISIN → ticker → name fuzzy), Platform Account (nickname / platform name), Follio (find_or_create), Transaction matching (amount ± ≤1 + date ± 3 days)</td></tr>
+          <tr><td>Back-dated dates</td><td>Any date accepted; no minimum-date validation on import path</td></tr>
+          <tr><td>Sample CSV</td><td>Dynamic endpoint <code>GET /imports/template/investments</code> — downloads pre-filled example</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="arch">2 — Architecture &amp; Data Model</h2>
+
+      <h3>New Tables</h3>
+
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+        <caption style="caption-side:top;font-weight:600;text-align:left;padding:.5rem 0 .25rem">import_batches</caption>
+        <tbody>
+          <tr><td>id</td><td>bigint PK</td><td></td></tr>
+          <tr><td>user_id</td><td>bigint FK</td><td>cascade delete</td></tr>
+          <tr><td>import_type</td><td>string</td><td><code>investments</code> (enum)</td></tr>
+          <tr><td>status</td><td>string</td><td><code>pending | processing | completed | failed</code></td></tr>
+          <tr><td>file_name</td><td>string</td><td>original filename for display</td></tr>
+          <tr><td>raw_csv</td><td>text</td><td>full CSV content stored server-side (max 5 MB)</td></tr>
+          <tr><td>total_rows</td><td>integer</td><td>set after parsing</td></tr>
+          <tr><td>processed_rows</td><td>integer</td><td>incremented after each row</td></tr>
+          <tr><td>failed_rows</td><td>integer</td><td>incremented on row error</td></tr>
+          <tr><td>import_version</td><td>integer</td><td>auto-increment per user+type; unique index on (user_id, import_type, import_version)</td></tr>
+          <tr><td>sidekiq_job_id</td><td>string</td><td>for reference / manual retry</td></tr>
+          <tr><td>created_at / updated_at</td><td>datetime</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <br>
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+        <caption style="caption-side:top;font-weight:600;text-align:left;padding:.5rem 0 .25rem">import_records (bridge)</caption>
+        <tbody>
+          <tr><td>id</td><td>bigint PK</td><td></td></tr>
+          <tr><td>import_batch_id</td><td>bigint FK</td><td>cascade delete</td></tr>
+          <tr><td>importable_type</td><td>string</td><td>e.g. <code>"Investment"</code> — polymorphic</td></tr>
+          <tr><td>importable_id</td><td>bigint</td><td>ID of the created record</td></tr>
+          <tr><td>row_index</td><td>integer</td><td>0-based CSV row number</td></tr>
+          <tr><td>status</td><td>string</td><td><code>ok | error | skipped</code></td></tr>
+          <tr><td>notes</td><td>text</td><td>error message or "Linked to txn #N"</td></tr>
+          <tr><td>created_at</td><td>datetime</td><td></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Entity Relationships</h3>
+      <pre>
+User ──has_many──► ImportBatch ──has_many──► ImportRecord ──belongs_to (poly)──► Investment
+                                                                               └──► (future) Transaction
+                                                                               └──► (future) TermAccount
+ImportBatch has: import_type, status, import_version, raw_csv, progress counters
+ImportRecord has: row_index, status (ok/error/skipped), notes
+Investment  has: has_one import_record (as :importable) for easy reverse lookup
+      </pre>
+
+      <h3>Sidekiq Queue Architecture</h3>
+      <pre>
+Procfile.dev:
+  backend:  rails s -p 8000
+  frontend: npm run dev
+  sidekiq:  bundle exec sidekiq -C config/sidekiq.yml   ← NEW
+
+config/sidekiq.yml:
+  :concurrency: 5
+  :queues: [imports(2), default(1)]
+
+Job: Imports::ProcessInvestmentCsvJob
+  queue_as :imports
+  perform(import_batch_id) → parse CSV → row loop → ProcessInvestmentRowService
+      </pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="csv">3 — CSV Format &amp; Smart Resolution Logic</h2>
+
+      <h3>Column Reference</h3>
+      <table>
+        <thead><tr><th>Column</th><th>Required?</th><th>Type</th><th>Example</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>investment_type</code></td><td><span class="badge badge-orange">required</span></td><td>string</td><td><code>stock</code></td><td><code>stock</code> or <code>mutual_fund</code></td></tr>
+          <tr><td><code>name</code></td><td><span class="badge badge-orange">required</span></td><td>string</td><td><code>Reliance Industries</code></td><td>Used for fuzzy instrument lookup if ISIN/ticker missing</td></tr>
+          <tr><td><code>isin</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>INE002A01018</code></td><td>Highest-priority instrument match key</td></tr>
+          <tr><td><code>ticker_symbol</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>RELIANCE</code></td><td>Second lookup key</td></tr>
+          <tr><td><code>exchange</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>NSE</code></td><td>Stored if new instrument created</td></tr>
+          <tr><td><code>fund_house</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>HDFC AMC</code></td><td>For mutual funds</td></tr>
+          <tr><td><code>amount_invested</code></td><td><span class="badge badge-orange">required</span></td><td>decimal</td><td><code>15000.00</code></td><td>Original cost basis</td></tr>
+          <tr><td><code>current_value</code></td><td><span class="badge badge-gray">optional</span></td><td>decimal</td><td><code>18500.00</code></td><td>Leave blank if unknown at time of import</td></tr>
+          <tr><td><code>purchase_date</code></td><td><span class="badge badge-orange">required</span></td><td>date</td><td><code>2024-01-15</code></td><td>Accepts <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code>; back-dates allowed</td></tr>
+          <tr><td><code>quantity</code></td><td><span class="badge badge-gray">optional</span></td><td>decimal</td><td><code>10</code></td><td>Stocks only</td></tr>
+          <tr><td><code>buy_price</code></td><td><span class="badge badge-gray">optional</span></td><td>decimal</td><td><code>1500.00</code></td><td>Stocks only</td></tr>
+          <tr><td><code>units</code></td><td><span class="badge badge-gray">optional</span></td><td>decimal</td><td><code>100.00</code></td><td>Mutual funds only</td></tr>
+          <tr><td><code>nav_at_purchase</code></td><td><span class="badge badge-gray">optional</span></td><td>decimal</td><td><code>500.00</code></td><td>Mutual funds only</td></tr>
+          <tr><td><code>folio_number</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>12345678</code></td><td>Mutual funds — triggers Follio find_or_create</td></tr>
+          <tr><td><code>platform_name</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>Zerodha</code></td><td>Matched against PlatformAccount nicknames and Platform names; auto-created if missing</td></tr>
+          <tr><td><code>notes</code></td><td><span class="badge badge-gray">optional</span></td><td>string</td><td><code>Long-term hold</code></td><td>Free-text stored on the Investment</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Smart Resolution Decision Tree</h3>
+      <pre>
+For each CSV row:
+─────────────────────────────────────────────────────────────────────────
+INSTRUMENT
+  1. ISIN present?     → Instrument.find_by(isin: isin)
+  2. ticker present?   → Instrument.find_by("LOWER(ticker_symbol) = ?", ticker)
+  3. name fallback     → Instrument.where("LOWER(name) LIKE ?", "%name%").first
+  4. none found        → Instrument.create!(all columns from row)
+  Then: Instruments::TrackService.track(user, instrument) → UserInstrument find_or_create
+
+PLATFORM ACCOUNT  (only if platform_name present in row, else nil)
+  1. Match user's PlatformAccounts: nickname (case-insensitive) OR platform.name
+  2. Not matched     → find Platform by name (global table)
+                         found  → PlatformAccount.create!(user, platform, nickname=platform_name)
+                         not found → Platform.find_by(platform_type: :direct) fallback
+                                      → PlatformAccount.create!(user, fallback_platform, nickname)
+
+FOLLIO  (only if folio_number present AND user_instrument AND platform_account both resolved)
+  → Follio.find_or_create_by(user, user_instrument, platform_account) { f.folio_number = ... }
+
+INVESTMENT
+  → Investment.create!(all fields + user_instrument, platform_account)
+
+TRANSACTION MATCH  (best-effort, never blocks row success)
+  → user.transactions.active.debit
+      .where("ABS(amount - ?) &lt; 1.0", amount_invested)
+      .where(date: purchase_date ± 3 days)
+      .first
+  If found → update_column(:instrument_id, instrument.id)
+
+IMPORT RECORD (bridge)
+  → ImportRecord.create!(batch, importable: investment, row_index, status: ok/error, notes)
+─────────────────────────────────────────────────────────────────────────
+      </pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="wizard">4 — UI Wizard — Step-by-Step Mockups</h2>
+
+      <p>The wizard is a right-side <strong>Sheet</strong> (640 px wide) with 5 steps. Step state is managed internally; the footer shows Back/Next contextually.</p>
+
+      <!-- STEP INDICATOR -->
+      <div class="wizard-steps">
+        <div class="step-node step-done"><div class="step-circle">✓</div><div class="step-label">Select Type</div></div>
+        <div class="step-line done"></div>
+        <div class="step-node step-active"><div class="step-circle">2</div><div class="step-label">Context</div></div>
+        <div class="step-line"></div>
+        <div class="step-node step-future"><div class="step-circle">3</div><div class="step-label">Template</div></div>
+        <div class="step-line"></div>
+        <div class="step-node step-future"><div class="step-circle">4</div><div class="step-label">Upload</div></div>
+        <div class="step-line"></div>
+        <div class="step-node step-future"><div class="step-circle">5</div><div class="step-label">Processing</div></div>
+      </div>
+
+      <div class="grid2">
+        <!-- STEP 1 -->
+        <div>
+          <div class="mockup-wrap">
+            <div class="mockup-label">Step 1 — Select Import Type</div>
+            <div class="mockup">
+              <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; New Import</div>
+              <div class="mockup-body"><span class="m-head">What would you like to import?</span>
+
+<span class="m-sel">┌─────────────────────────────────────────┐
+│  📈  Investments                         │
+│      Stocks, mutual funds, historical    │
+│      lots with full metadata             │
+└─────────────────────────────────────────┘</span>
+
+<span class="m-dim">┌─────────────────────────────────────────┐
+│  💳  Transactions           Coming soon  │
+│      Bank account history                │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  🏦  Term Accounts          Coming soon  │
+│      FDs and PPF records                 │
+└─────────────────────────────────────────┘</span>
+
+───────────────────────────────────────────
+          <span class="m-dim">[Cancel]</span>                   <span class="m-blu">[Next →]</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div>
+          <div class="mockup-wrap">
+            <div class="mockup-label">Step 2 — Context Setup</div>
+            <div class="mockup">
+              <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; New Import — Investments</div>
+              <div class="mockup-body"><span class="m-head">Configure import settings</span>
+
+Default Platform Account  <span class="m-dim">(optional)</span>
+┌──────────────────────────────────────────┐
+│  — Use platform_name column in CSV ▾     │
+└──────────────────────────────────────────┘
+<span class="m-dim">  If set, overrides the platform_name column
+  for every row in this upload.</span>
+
+<span class="m-grn">☑</span> Auto-create missing platform accounts
+<span class="m-dim">   Unmatched platform names will create a new
+   PlatformAccount linked to the closest
+   matching Platform (or "Direct").</span>
+
+<span class="m-grn">☑</span> Match existing bank transactions
+<span class="m-dim">   Links found debit transactions to the
+   imported instrument (amount ± ≤1, date ± 3d).</span>
+
+───────────────────────────────────────────
+        <span class="m-dim">[← Back]</span>                   <span class="m-blu">[Next →]</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div>
+          <div class="mockup-wrap">
+            <div class="mockup-label">Step 3 — Download Template</div>
+            <div class="mockup">
+              <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; New Import — Investments</div>
+              <div class="mockup-body"><span class="m-head">Download &amp; fill the CSV template</span>
+
+<span class="m-blu">[⬇ investments_import_template.csv]</span>
+
+Column reference:
+┌──────────────────┬──────┬─────────────┐
+│ Column           │ Req? │ Example     │
+├──────────────────┼──────┼─────────────┤
+│ investment_type  │ <span class="m-orn">Yes</span>  │ stock       │
+│ name             │ <span class="m-orn">Yes</span>  │ Reliance    │
+│ isin             │ No   │ INE002A0..  │
+│ ticker_symbol    │ No   │ RELIANCE    │
+│ amount_invested  │ <span class="m-orn">Yes</span>  │ 15000.00    │
+│ purchase_date    │ <span class="m-orn">Yes</span>  │ 2024-01-15  │
+│ quantity         │ No   │ 10          │
+│ buy_price        │ No   │ 1500.00     │
+│ units            │ No   │ 100.00      │
+│ folio_number     │ No   │ 12345678    │
+│ platform_name    │ No   │ Zerodha     │
+│ notes            │ No   │ SIP         │
+└──────────────────┴──────┴─────────────┘
+
+───────────────────────────────────────────
+        <span class="m-dim">[← Back]</span>                   <span class="m-blu">[Next →]</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div>
+          <div class="mockup-wrap">
+            <div class="mockup-label">Step 4 — Upload CSV</div>
+            <div class="mockup">
+              <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; New Import — Investments</div>
+              <div class="mockup-body"><span class="m-head">Upload your CSV file</span>
+
+┌───────────────────────────────────────────┐
+│                                           │
+│    ⬆  Drag &amp; drop CSV here               │
+│       or click to browse                  │
+│                                           │
+│       Max 5 MB · CSV only                 │
+│                                           │
+└───────────────────────────────────────────┘
+
+<span class="m-grn">✓ investments_history.csv  (42 rows, 3.1 KB)</span>
+
+Preview (first 5 rows):
+┌────────────┬──────────┬──────────┬──────────┐
+│ type       │ name     │ amount   │ date     │
+├────────────┼──────────┼──────────┼──────────┤
+│ stock      │ Reliance │ 15000    │ 2024-01  │
+│ mutual_fun │ HDFC Top │ 50000    │ 2024-02  │
+│ stock      │ Infosys  │ 22000    │ 2023-11  │
+│ mutual_fun │ Axis MF  │ 10000    │ 2023-09  │
+│ stock      │ TCS      │ 35000    │ 2023-07  │
+└────────────┴──────────┴──────────┴──────────┘
+
+───────────────────────────────────────────
+        <span class="m-dim">[← Back]</span>              <span class="m-blu">[Import Now →]</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 5 full width -->
+      <div class="mockup-wrap">
+        <div class="mockup-label">Step 5 — Processing &amp; Results</div>
+        <div class="mockup">
+          <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; New Import — Investments — Processing</div>
+          <div class="mockup-body"><span class="m-head">Importing investments_history.csv  (v2)</span>
+
+Status: <span class="m-grn">Completed</span>              <span class="m-dim">42 rows · ~3 s</span>
+
+Progress: <span class="m-grn">████████████████████████████████████</span> 100%
+
+Summary:
+  <span class="m-grn">✓  39  rows imported successfully</span>
+  <span class="m-red">✗   3  rows failed</span>
+     Instruments auto-created:  7
+     Platform accounts created: 2
+     Follios created:          12
+     Bank transactions linked: 11
+
+Errors:
+  Row 8  — <span class="m-red">Invalid purchase_date: "15-99-2024"</span>
+  Row 21 — <span class="m-red">amount_invested is required</span>
+  Row 35 — <span class="m-red">investment_type "etf" is not valid (stock/mutual_fund)</span>
+
+──────────────────────────────────────────────────────────────────
+                                                       <span class="m-blu">[Done ✓]</span></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="history">5 — Import History Page Mockup</h2>
+
+      <div class="mockup-wrap">
+        <div class="mockup-label">ImportsPage — /imports</div>
+        <div class="mockup">
+          <div class="mockup-titlebar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>&nbsp; FinTrack</div>
+          <div class="mockup-body"><span class="m-dim">≡  Dashboard  |  Accounts  |  Transactions  |  Investments  |  <span class="m-sel">Imports</span>  |  Portfolio</span>
+
+─────────────────────────────────────────────────────────────────────────
+<span class="m-head">Imports</span>                                              <span class="m-blu">[⬆ New Import]</span>   ↺
+─────────────────────────────────────────────────────────────────────────
+
+┌────────┬─────────────┬────────────────────────┬───────────────┬──────────┬────────────────┐
+│ Version│ Type        │ File                   │ Status        │ Progress │ Date           │
+├────────┼─────────────┼────────────────────────┼───────────────┼──────────┼────────────────┤
+│ v2     │ Investments │ investments_history.csv │ <span class="m-grn">● Completed</span>  │ 39 / 42  │ 2026-05-06     │
+│ v1     │ Investments │ portfolio_2023.csv      │ <span class="m-grn">● Completed</span>  │ 88 / 88  │ 2026-04-28     │
+└────────┴─────────────┴────────────────────────┴───────────────┴──────────┴────────────────┘
+
+<span class="m-dim">▼ Expand row to see per-row results</span>
+
+── v2 detail ──────────────────────────────────────────────────────────
+  Row  1   <span class="m-grn">ok</span>      Linked to txn #1042
+  Row  2   <span class="m-grn">ok</span>      Instrument auto-created (HDFC Top 100 Fund)
+  ...
+  Row  8   <span class="m-red">error</span>   Invalid purchase_date: "15-99-2024"
+───────────────────────────────────────────────────────────────────────
+
+<span class="m-dim">── In-progress example ──</span>
+│ v3     │ Investments │ new_batch.csv           │ <span class="m-orn">⟳ Processing</span> │  12 / 55 │ 2026-05-06     │
+<span class="m-dim">  Progress bar live-updates every 1.5 s via polling GET /imports/3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="backend">6 — Backend Implementation Plan</h2>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P0</span>Sidekiq Setup</h3>
+        <ul>
+          <li>Add <code>gem "sidekiq", "~> 7.0"</code> and <code>gem "csv"</code> to Gemfile</li>
+          <li>Create <code>config/initializers/sidekiq.rb</code> — connect to Redis using <code>credentials.redis_url</code></li>
+          <li>Create <code>config/sidekiq.yml</code> — queues: <code>imports(2)</code>, <code>default(1)</code></li>
+          <li>Set <code>config.active_job.queue_adapter = :sidekiq</code> in <code>application.rb</code></li>
+          <li>Add sidekiq process to <code>Procfile.dev</code></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P1</span>Migrations</h3>
+        <ul>
+          <li>Migration 1: <code>create_import_batches</code> — all fields listed in §2</li>
+          <li>Migration 2: <code>create_import_records</code> — polymorphic bridge table</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P2</span>Models</h3>
+        <ul>
+          <li><code>ImportBatch</code> — enum status/type, <code>before_create :set_import_version</code>, <code>progress_pct</code> helper</li>
+          <li><code>ImportRecord</code> — polymorphic <code>belongs_to :importable</code>, enum status</li>
+          <li><code>User</code> — add <code>has_many :import_batches</code></li>
+          <li><code>Investment</code> — add <code>has_one :import_record, as: :importable</code></li>
+          <li><code>ImportBatchSerializer</code> — includes nested import_records array</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P3</span>Sidekiq Job — <code>Imports::ProcessInvestmentCsvJob</code></h3>
+        <ul>
+          <li>Receives <code>import_batch_id</code>, sets status → <code>processing</code></li>
+          <li>Parses raw_csv with Ruby stdlib <code>CSV</code> (<code>headers: true, header_converters: :symbol</code>)</li>
+          <li>Sets <code>total_rows</code>, then iterates; rescues per-row to avoid aborting the whole batch</li>
+          <li>Calls <code>Imports::ProcessInvestmentRowService</code> per row, then <code>increment!(:processed_rows)</code></li>
+          <li>Sets status → <code>completed</code> or <code>failed</code> at end</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P4</span>Row Service — <code>Imports::ProcessInvestmentRowService</code></h3>
+        <p>Runs all smart resolution steps in order: Instrument → UserInstrument → PlatformAccount → Follio → Investment → Transaction match → ImportRecord. Each step is isolated — a failure in transaction matching does not fail the row.</p>
+        <ul>
+          <li>Date parser accepts <code>YYYY-MM-DD</code>, <code>DD/MM/YYYY</code>, <code>DD-MM-YYYY</code></li>
+          <li>Reuses <code>Instruments::TrackService</code> for UserInstrument find_or_create</li>
+          <li>Platform fallback: <code>Platform.find_by(platform_type: :direct)</code></li>
+          <li>Transaction match tolerance: amount difference &lt; 1.0, date range ± 3 days</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P5</span>Template Service — <code>Imports::CsvTemplateService</code></h3>
+        <p>Returns a CSV string with a header row + two example rows (one stock, one mutual fund). Endpoint: <code>GET /api/v1/imports/template/:import_type</code> responds with <code>Content-Type: text/csv</code> and triggers a file download.</p>
+      </div>
+
+      <div class="phase-block">
+        <h3><span class="phase-num">P6</span>Controller — <code>Api::V1::ImportsController</code></h3>
+        <table>
+          <thead><tr><th>Action</th><th>Route</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>index</code></td><td>GET /imports</td><td>Paginated batch history for current user</td></tr>
+            <tr><td><code>create</code></td><td>POST /imports</td><td>Multipart: <code>import_type</code> + <code>file</code>; validates CSV type + size; stores raw_csv; enqueues job; returns 201</td></tr>
+            <tr><td><code>show</code></td><td>GET /imports/:id</td><td>Single batch — used for progress polling</td></tr>
+            <tr><td><code>template</code></td><td>GET /imports/template/:import_type</td><td>Returns CSV file download</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="frontend">7 — Frontend Implementation Plan</h2>
+
+      <div class="phase-block">
+        <h3>New Types (<code>types/index.ts</code>)</h3>
+        <pre><code>ImportType   = 'investments'
+ImportStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+ImportRowResult { row_index, status: 'ok'|'error'|'skipped', notes }
+ImportBatch     { id, import_type, status, file_name, total_rows,
+                  processed_rows, failed_rows, import_version,
+                  progress_pct, import_records: ImportRowResult[], created_at }
+ImportListResponse { items, total, page, page_size }</code></pre>
+      </div>
+
+      <div class="phase-block">
+        <h3>API Layer (<code>api/imports.ts</code>)</h3>
+        <ul>
+          <li><code>listImports(page, pageSize)</code> — paginated GET</li>
+          <li><code>createImport(importType, file)</code> — multipart FormData POST</li>
+          <li><code>getImport(id)</code> — single batch GET (for polling)</li>
+          <li><code>downloadTemplate(importType)</code> — fires <code>window.location.href</code> to trigger browser download</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3>Hook Layer (<code>hooks/useImports.ts</code>)</h3>
+        <ul>
+          <li><code>useImports(page)</code> — paginated history</li>
+          <li><code>useImport(id)</code> — single batch with <code>refetchInterval: data?.status === 'processing' ? 1500 : false</code></li>
+          <li><code>useCreateImport()</code> — mutation, invalidates <code>['imports']</code> on success</li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <h3>ImportWizard Component (<code>components/imports/ImportWizard.tsx</code>)</h3>
+        <p>A single Sheet (640 px) with internal <code>step</code> state. Sub-components handle each step's content. The context options (platform account override, auto-create flags) are stored in a <code>config</code> state object threaded through the steps. The file is stored in local state until Step 5 triggers <code>createImport</code>.</p>
+      </div>
+
+      <div class="phase-block">
+        <h3>ImportsPage (<code>pages/ImportsPage.tsx</code>)</h3>
+        <p>Standard page shell — PageHeader with "New Import" button + paginated history table. Completed rows are expandable to show import_records. In-progress rows show a live progress bar (via the batch's progress_pct from the list query, which also refetches every 3 s when any row has status=processing).</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="files">8 — File Manifest</h2>
+
+      <div class="grid2">
+        <div>
+          <h3>Backend — New</h3>
+          <ul class="file-list">
+            <li><span class="fl-new">NEW</span><code>config/initializers/sidekiq.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>config/sidekiq.yml</code></li>
+            <li><span class="fl-new">NEW</span><code>db/migrate/*_create_import_batches.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>db/migrate/*_create_import_records.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/models/import_batch.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/models/import_record.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/jobs/imports/process_investment_csv_job.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/services/imports/process_investment_row_service.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/services/imports/csv_template_service.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/serializers/import_batch_serializer.rb</code></li>
+            <li><span class="fl-new">NEW</span><code>app/controllers/api/v1/imports_controller.rb</code></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Backend — Modified</h3>
+          <ul class="file-list">
+            <li><span class="fl-mod">MOD</span><code>Gemfile</code> — sidekiq + csv</li>
+            <li><span class="fl-mod">MOD</span><code>config/application.rb</code> — job adapter</li>
+            <li><span class="fl-mod">MOD</span><code>config/routes.rb</code> — imports routes</li>
+            <li><span class="fl-mod">MOD</span><code>app/models/user.rb</code> — has_many</li>
+            <li><span class="fl-mod">MOD</span><code>app/models/investment.rb</code> — has_one import_record</li>
+          </ul>
+          <h3 style="margin-top:1rem">Frontend — New</h3>
+          <ul class="file-list">
+            <li><span class="fl-new">NEW</span><code>src/api/imports.ts</code></li>
+            <li><span class="fl-new">NEW</span><code>src/hooks/useImports.ts</code></li>
+            <li><span class="fl-new">NEW</span><code>src/pages/ImportsPage.tsx</code></li>
+            <li><span class="fl-new">NEW</span><code>src/components/imports/ImportWizard.tsx</code></li>
+          </ul>
+          <h3 style="margin-top:1rem">Frontend — Modified</h3>
+          <ul class="file-list">
+            <li><span class="fl-mod">MOD</span><code>src/types/index.ts</code></li>
+            <li><span class="fl-mod">MOD</span><code>src/components/layout/AppShell.tsx</code></li>
+            <li><span class="fl-mod">MOD</span><code>src/App.tsx</code></li>
+          </ul>
+          <h3 style="margin-top:1rem">Project Root — Modified</h3>
+          <ul class="file-list">
+            <li><span class="fl-mod">MOD</span><code>Procfile.dev</code> — sidekiq process</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="verification">9 — Verification Steps</h2>
+      <ol>
+        <li><code>cd backend && bundle install</code> — Sidekiq gem installs without conflict</li>
+        <li><code>bundle exec rails db:migrate</code> — both new tables created; <code>schema.rb</code> shows import_batches + import_records</li>
+        <li><code>make dev</code> — backend + frontend + sidekiq all start; <code>logs/sidekiq.log</code> shows "Sidekiq X.Y.Z"</li>
+        <li>Login → sidebar shows "Imports" link; navigate to <code>/imports</code> — empty history table renders correctly</li>
+        <li>Click "New Import" → wizard opens, Step 1 shows 3 cards; only Investments is clickable</li>
+        <li>Step 3 → "Download sample CSV" triggers file download with correct headers and 2 example rows</li>
+        <li>Fill sample CSV: row 1 = stock (with ISIN), row 2 = mutual fund (with folio), row 3 = bad date</li>
+        <li>Step 4 → upload file → preview table shows 3 rows</li>
+        <li>Step 5 → progress bar animates from 0 → 100 → status turns "Completed"; summary shows 2 ok, 1 failed</li>
+        <li>Rails console: <code>ImportBatch.last.import_records.pluck(:status)</code> → <code>["ok", "ok", "error"]</code></li>
+        <li>Rails console: <code>Investment.last.import_record.import_batch.import_version</code> → <code>1</code></li>
+        <li>Second upload → <code>import_version</code> auto-increments to 2</li>
+        <li>History table shows both batches with version numbers and expandable row details</li>
+      </ol>
+
+    </div><!-- .page -->
+  </body>
+</html>
