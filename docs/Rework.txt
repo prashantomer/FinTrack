@@ -1,0 +1,54 @@
+CSV Seeds:
+- All seed for features should be in one place, and should be referred to when creating or updating the seeds in DB. This will ensure consistency and avoid duplication of data.
+- CSV format should be used for the seeds, and should include all necessary fields for the feature being seeded. This will make it easier to manage and update the seeds as needed.
+- Data rows in CSV files can not be removed once added, but can be updated except for the critical identity data. mark it inactive if not required.
+- The CSV seeds should be stored in a dedicated folder within the project, and should be organized by feature or module for easy access and maintenance. This will help keep the project organized and make it easier for developers to find and update the seeds when necessary.
+- When running seed for feature, table must be truncated and then re-seeded with the data from the CSV file. This will ensure that the data in the database is always up-to-date and consistent with the latest seed data. It will also help prevent any issues that may arise from duplicate or outdated data in the database.
+
+Bank Feature Rework:
+- There should be bank model (table) that has id, name and code(3/4 chars unique)
+- bank is common Entity
+- Banks can only be created using command line tool  using seed data from CSV file.
+- Services in bank:
+    - Savings/Current Account
+    - FD Account
+    - PPF Account
+    - Extendable for other types of accounts in future
+- Savings/Current Account:
+    - Savings has many transactions (credit and debit)
+FD Accounts:
+    - Savings account must be present in same bank
+    - FD can have one credit and one debit
+    - Amount (no change), Open date, maturity date (auto calculated from tenure), interest rate, tenure (converted in days), and maturity amount should be tracked
+    - Can be renewed (feature to be added in future) with some manual entries like new amount, new open date, new tenure, new interest rate, etc. and maturity date and maturity amount should be auto calculated based on the new entries.
+
+PPF Accounts:
+    - Saving account must be present in same bank
+    - it can have details like current/initial amount, open date, maturity date (15 years from open date), interest rate, and maturity amount (auto calculated based on the initial amount and interest rate).
+    - PPF will have only credit transactions (investments)
+
+- Transactions:
+    - account_id (FK to account)
+    - user_id (FK to user)
+    - type (credit/debit)
+    - amount
+    - description
+    - tags (for categorization)
+    - public_id (external reference ID for traceability, self generated if debit, provided for credit)
+
+Hooks:
+- When a transaction is created, the account balance should be updated accordingly (credit increases balance, debit decreases balance).
+- Transactions should not be allowed for update from UI. but can be updated from backend command line tool for correction of data. In such cases, the account balance should be recalculated based on the updated transaction amount and type.
+- Transaction can not be deleted from UI, but can be marked as inactive from backend command line tool. In such cases, the account balance should be recalculated based on the transaction amount and type, and the transaction should not be considered in any future calculations or reports.
+- If a new account is created for FD:
+    - Deductible Amount in savings account must be present
+    - Then a new savings debit transaction should be created to wards the FD account with the amount equal to the FD amount, and the savings account balance should be updated accordingly.
+    - New FD credit transaction must be created with the same amount, but the FD account balance should not be updated accordingly.
+    - Vice-versa for Debit transactions
+
+- If a new account is created for PPF:
+    - It must ask details like current/initial amount, open date, interest rate, etc. and maturity date and maturity amount should be auto calculated based on the initial amount and interest rate.
+    - if a new PPF transaction is created for investment:
+        - A new savings debit transaction should be created with the amount equal to the PPF investment amount, and the savings account balance should be updated accordingly.
+        - New PPF credit transaction must be created with the same amount, and the PPF account balance should be updated accordingly.
+    - Vice-versa for Debit transactions

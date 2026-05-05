@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "code-review-graph@code-review-graph": true
+  }
+}

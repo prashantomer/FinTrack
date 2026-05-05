@@ -1,0 +1,34 @@
+[project]
+name = "fintrack-backend"
+version = "0.1.0"
+description = "FinTrack personal finance tracker — API backend"
+readme = "README.md"
+requires-python = ">=3.13.5"
+dependencies = [
+    "alembic==1.18.4",
+    "bcrypt==4.0.1",
+    "fastapi[standard]==0.136.1",
+    "ipython>=9.13.0",
+    "passlib[bcrypt]==1.7.4",
+    "psycopg[binary]==3.3.3",
+    "pydantic-settings==2.14.0",
+    "pydantic[email]==2.13.3",
+    "python-jose[cryptography]==3.5.0",
+    "python-multipart==0.0.20",
+    "redis>=5.0",
+    "sqlalchemy==2.0.49",
+]
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pandas>=3.0.2",
+    "pytest==8.4.0",
+    "pytest-asyncio==0.26.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.scripts]
+fintrack = "app.cli:app"

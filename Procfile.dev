@@ -1,0 +1,2 @@
+backend: cd backend && uv run uvicorn app.main:app --reload --port 8000
+frontend: cd frontend && /Users/prashanto/.nvm/versions/node/v24.15.0/bin/npm run dev

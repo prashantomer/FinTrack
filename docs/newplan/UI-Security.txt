@@ -1,0 +1,175 @@
+UI Security: httpOnly Cookie Auth + Inactivity Session Expiry
+================================================================
+
+PROBLEM
+-------
+- Access and refresh tokens stored in localStorage are readable by any JavaScript
+  on the page. An XSS vulnerability anywhere in the app can silently exfiltrate
+  both tokens, giving an attacker a full 3-hour session with no way to detect it.
+- localStorage has no native expiry — tokens persist indefinitely unless explicitly
+  cleared, even across browser restarts.
+
+
+SOLUTION OVERVIEW
+-----------------
+1. Move tokens to httpOnly cookies          → JS cannot read or steal them
+2. Client-side inactivity timer             → auto-logout after 3h idle
+3. Server-side refresh token rotation       → already in place (3h sliding window)
+
+
+PART 1: httpOnly COOKIES (backend)
+-----------------------------------
+File: backend/app/routers/auth.py
+
+Add a helper that sets both cookies on the FastAPI Response object:
+
+    def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):
+        is_prod = settings.environment == "production"
+        response.set_cookie(
+            "access_token", access_token,
+            httponly=True,
+            samesite="strict",
+            secure=is_prod,                          # HTTPS-only in production
+            max_age=60 * settings.access_token_expire_minutes,
+            path="/"
+        )
+        response.set_cookie(
+            "refresh_token", refresh_token,
+            httponly=True,
+            samesite="strict",
+            secure=is_prod,
+            max_age=60 * settings.refresh_token_expire_minutes,
+            path="/api/v1/auth/refresh"              # restricted — only sent to refresh endpoint
+        )
+
+Update POST /login:
+    - Inject Response parameter
+    - Call _set_auth_cookies(response, access_token, refresh_token)
+    - Still return Token body (keeps Swagger UI working)
+
+Update POST /refresh:
+    - Read refresh token from cookie first, fall back to request body
+      (body kept for API/Swagger clients)
+    - Make body optional: body: RefreshRequest | None = None
+    - Call _set_auth_cookies on success (new rotation tokens go into new cookies)
+
+Add POST /logout:
+    - response.delete_cookie("access_token")
+    - response.delete_cookie("refresh_token", path="/api/v1/auth/refresh")
+    - Returns 200
+
+File: backend/app/dependencies.py  [ALREADY DONE]
+    - get_current_user reads from cookie first, then Authorization header
+    - Uses OAuth2PasswordBearer(auto_error=False) so Swagger Bearer still works
+
+
+PART 2: FRONTEND — REMOVE localStorage (frontend)
+---------------------------------------------------
+File: frontend/src/api/client.ts
+
+Remove the request interceptor that manually attaches Authorization header.
+Cookies are sent automatically by the browser — no manual work needed.
+
+Update the 401 response interceptor:
+    - Call refreshTokens() with no body (refresh cookie sent automatically)
+    - Server responds with new cookies — no localStorage writes needed
+    - Retry the original request (new access cookie already set in browser)
+    - On refresh failure (401): call apiLogout() → redirect to /login
+
+File: frontend/src/api/auth.ts
+
+    export async function refreshTokens(): Promise<void> {
+        // No body needed — browser sends refresh_token cookie automatically
+        await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
+    }
+
+    export async function logout(): Promise<void> {
+        await client.post('/auth/logout')
+    }
+
+File: frontend/src/context/AuthContext.tsx
+
+    login():
+        await apiLogin(email, password)    // server sets cookies
+        const me = await getMe()
+        setUser(me)
+        // NO localStorage.setItem — tokens are in httpOnly cookies
+
+    logout():
+        await apiLogout()                  // server clears cookies
+        setUser(null)
+        // NO localStorage.removeItem
+
+
+PART 3: INACTIVITY TIMER (frontend)
+-------------------------------------
+File: frontend/src/context/AuthContext.tsx
+
+Add inside AuthProvider (only active when user is logged in):
+
+    const lastActivityRef = useRef(Date.now())
+    const IDLE_LIMIT = 3 * 60 * 60 * 1000   // 3 hours in ms
+
+    useEffect(() => {
+        if (!user) return
+
+        const updateActivity = () => { lastActivityRef.current = Date.now() }
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
+        events.forEach(e => window.addEventListener(e, updateActivity))
+
+        const timer = setInterval(() => {
+            if (Date.now() - lastActivityRef.current > IDLE_LIMIT) {
+                logout()
+            }
+        }, 60_000)   // check every 60 seconds
+
+        return () => {
+            events.forEach(e => window.removeEventListener(e, updateActivity))
+            clearInterval(timer)
+        }
+    }, [user, logout])
+
+How the 3-hour expiry works end-to-end:
+  - User goes idle for 1h → access token expires
+  - First API call after idle: 401 → interceptor calls /auth/refresh (cookie sent)
+  - Refresh succeeds (under 3h idle) → new tokens in cookies → request retried
+  - User goes idle for 3h → client-side timer fires → logout() called → cookies cleared
+  - Even if timer is late: refresh token is also expired → /auth/refresh returns 401
+    → interceptor calls logout() + redirects to /login
+
+
+SECURITY PROPERTIES AFTER THIS CHANGE
+---------------------------------------
+  XSS token theft:      NOT POSSIBLE — httpOnly cookies invisible to JS
+  CSRF:                 SameSite=Strict blocks cross-site requests
+  Token in localStorage: NONE — completely removed
+  Session inactivity:   Dual enforcement (client timer + server refresh expiry)
+  Refresh token scope:  Cookie path="/api/v1/auth/refresh" — not sent to other endpoints
+  Production HTTPS:     Secure flag set when ENVIRONMENT=production
+
+
+FILES TO CHANGE
+---------------
+  backend/app/routers/auth.py          add cookie setting, logout endpoint
+  frontend/src/api/auth.ts             refreshTokens (no body), add logout()
+  frontend/src/api/client.ts           remove Authorization interceptor, cookies auto-sent
+  frontend/src/context/AuthContext.tsx remove localStorage, add inactivity timer
+
+Already done:
+  backend/app/dependencies.py          cookie-first token extraction
+  backend/app/config.py                1h access / 3h refresh expiry
+  backend/app/schemas/token.py         RefreshRequest, refresh_token on Token
+  backend/app/services/auth_service.py create_refresh_token, decode_token(type)
+  backend/app/routers/auth.py          refresh endpoint (body-based, needs cookie path added)
+
+
+VERIFICATION CHECKLIST
+------------------------
+  [ ] Login → DevTools > Application > Cookies: access_token and refresh_token
+      both show HttpOnly flag checked
+  [ ] DevTools > Application > Local Storage: no 'token' or 'refresh_token' keys
+  [ ] document.cookie in browser console: tokens NOT visible
+  [ ] Set ACCESS_TOKEN_EXPIRE_MINUTES=1 in .env, wait 70s, make API call → silently refreshes
+  [ ] Set REFRESH_TOKEN_EXPIRE_MINUTES=1 in .env, wait 70s, make API call → redirects to /login
+  [ ] Set lastActivityRef.current = Date.now() - IDLE_LIMIT - 1 in DevTools → logout fires
+      within next 60s interval

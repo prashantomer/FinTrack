@@ -1,0 +1,137 @@
+Tables:
+    - User
+        - id (UUID)
+        - email (String)
+        - first_name (String)
+        - last_name (String)
+        - hashed_password (String)
+        - is_active (Boolean) default false
+        - is_superuser (Boolean) default false
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+    - Bank
+        - id (UUID)
+        - name (String)
+        - code (String)
+
+    - Account
+        - id (UUID)
+        - user_id (UUID) FK → User
+        - bank_id (UUID) FK → Bank
+        - account_number (String)
+        - account_type (AccountType) # savings | salary | current | credit
+        - balance (Decimal)
+
+    - Transaction
+        - id (UUID)
+        - account_id (UUID) FK → Account
+        - user_id (UUID) FK → User
+        - type (TransactionType) # inbound | outbound
+        - amount (Decimal)
+        - description (String)
+        - category (TransactionCategory) # salary | rent | groceries | utilities | dining | leisure | investment | dividend | other
+        - public_id (UUID) # external reference ID for traceability
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+    - Instrument # global catalogue of investable securities
+        - id (UUID)
+        - name (String)
+        - symbol (String)
+        - type (InstrumentType) # stock | mutual_fund | etf | bond | crypto
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+    - UserInstrument # bridge table — instruments a user tracks
+        - id (UUID)
+        - user_id (UUID) FK → User
+        - instrument_id (UUID) FK → Instrument
+
+    - Platform
+        - id (UUID)
+        - name (String)
+        - code (String)
+
+    - PlatformAccount
+        - id (UUID)
+        - user_id (UUID) FK → User
+        - platform_id (UUID) FK → Platform
+        - account_identifier (String) # username or account number on the platform
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+    - Follio # user's position account for a specific instrument on a specific platform
+        - id (UUID)
+        - follio_id (String) # unique folio reference string (e.g. MF folio number, demat holding ref)
+        - user_id (UUID) FK → User
+        - platform_id (UUID) FK → Platform
+        - instrument_id (UUID) FK → Instrument # must already exist in UserInstrument
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+    - InvestmentTransaction # individual buy/sell events; single-table with type-specific nullable columns
+        - id (UUID) PK
+        - user_id (UUID) FK → User
+        - platform_account_id (UUID) FK → PlatformAccount (nullable)
+        - instrument_id (UUID) FK → Instrument (nullable)
+        - type (InvestmentType) # stock | mutual_fund | fixed_deposit | gold | crypto | ppf | nps | real_estate
+        - name (String)
+        - amount_invested (Decimal)
+        - current_value (Decimal)
+        - purchase_date (Date)
+        - notes (Text)
+        # stock-specific
+        - quantity (Decimal)
+        - avg_buy_price (Decimal)
+        # mutual fund-specific
+        - folio_number (String)
+        - units (Decimal)
+        - nav_at_purchase (Decimal)
+        # fixed deposit-specific
+        - bank_name (String)
+        - fd_number (String)
+        - interest_rate (Decimal)
+        - tenure_months (Integer)
+        - maturity_date (Date)
+        - maturity_amount (Decimal)
+        - compounding (String) # monthly | quarterly | half-yearly | annually
+        # gold-specific
+        - gold_form (String) # SGB | coin | bar | jewellery
+        - weight_grams (Decimal)
+        - purity (String) # 24K | 22K | etc.
+        # traceability
+        - transaction_public_id (UUID) FK → Transaction.public_id (nullable)
+        - created_at (DateTime)
+        - updated_at (DateTime)
+
+
+Enums:
+    - AccountType:       savings | salary | current | credit
+    - TransactionType:   inbound | outbound
+    - TransactionCategory: salary | rent | groceries | utilities | dining | leisure | investment | dividend | other
+    - InstrumentType:    stock | mutual_fund | etf | bond | crypto
+    - InvestmentType:    stock | mutual_fund | fixed_deposit | gold | crypto | ppf | nps | real_estate
+
+
+Relationships:
+    User            ||--o{  Account                 : "has"
+    User            ||--o{  Transaction             : "owns"
+    User            ||--o{  UserInstrument          : "tracks"
+    User            ||--o{  PlatformAccount         : "has"
+    User            ||--o{  Follio                  : "holds"
+    User            ||--o{  InvestmentTransaction   : "makes"
+
+    Bank            ||--o{  Account                 : "provides"
+    Account         ||--o{  Transaction             : "source of"
+
+    Instrument      ||--o{  UserInstrument          : "tracked via"
+    Instrument      ||--o{  Follio                  : "held in"
+    Instrument      |o--o{  InvestmentTransaction   : "linked to"
+
+    Platform        ||--o{  PlatformAccount         : "provides"
+    Platform        ||--o{  Follio                  : "hosts"
+
+    PlatformAccount |o--o{  InvestmentTransaction   : "held in"
+    Follio          ||--o{  InvestmentTransaction   : "involved in"
+    Transaction     |o--o{  InvestmentTransaction   : "traced via public_id"
