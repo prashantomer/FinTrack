@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, ChevronRight, CreditCard, Download, FileText, TrendingUp, Upload, XCircle } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -407,12 +406,12 @@ function StepProcessing({
 }) {
   const createMutation = useCreateImport()
   const [batchId, setBatchId] = useState<number | null>(null)
-  const [started, setStarted] = useState(false)
+  const startedRef = useRef(false)
   const { data: batch } = useImport(batchId)
 
   useEffect(() => {
-    if (started) return
-    setStarted(true)
+    if (startedRef.current) return
+    startedRef.current = true
     createMutation.mutateAsync({ importType, file })
       .then(b => setBatchId(b.id))
       .catch(() => {})

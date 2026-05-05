@@ -40,6 +40,7 @@ function Select({
   )
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (valueProp !== undefined) setCurrentValue(valueProp as string)
   }, [valueProp])
 
