@@ -1,0 +1,19 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "ee587c276a281c711c370e3a8ca8f440983f1dd9bd1bdd20a1fb65347cd22fd4",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/platform_accounts_controller.rb",
+      "line": 44,
+      "code": "params.permit(:nickname, :platform_id, :account_id)",
+      "user_input": ":account_id",
+      "confidence": "High",
+      "note": "account_id is a string column (the user's account/demat number at a platform), not a foreign key — safe to mass-assign"
+    }
+  ],
+  "updated": "2026-05-06 00:00:00 +0000",
+  "brakeman_version": "7.0.0"
+}

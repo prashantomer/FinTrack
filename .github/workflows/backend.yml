@@ -88,7 +88,7 @@ jobs:
           working-directory: backend
 
       - name: Brakeman
-        run: bin/brakeman --no-pager
+        run: bin/brakeman --no-pager --ignore-config config/brakeman.ignore
 
       - name: Bundler Audit
         run: bin/bundler-audit
