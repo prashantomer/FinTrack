@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { usePlatformAccounts } from '@/hooks/usePlatforms'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
+import { CURRENCY_SYMBOL } from '@/lib/currency'
 import type { Investment, InvestmentType } from '@/types'
 
 const INVESTMENT_TYPES = Object.keys(INVESTMENT_TYPE_LABELS) as InvestmentType[]
@@ -109,11 +110,11 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
           <Input {...register('name')} required />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Amount Invested (₹)</Label>
+          <Label>Amount Invested ({CURRENCY_SYMBOL})</Label>
           <Input type="number" step="0.01" min="0.01" {...register('amount_invested', { valueAsNumber: true })} required />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Current Value (₹)</Label>
+          <Label>Current Value ({CURRENCY_SYMBOL})</Label>
           <Input type="number" step="0.01" min="0" {...register('current_value', { valueAsNumber: true })} />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -137,7 +138,7 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
             <Input type="number" step="0.0001" {...register('quantity', { valueAsNumber: true })} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Avg Buy Price (₹)</Label>
+            <Label>Avg Buy Price ({CURRENCY_SYMBOL})</Label>
             <Input type="number" step="0.01" {...register('avg_buy_price', { valueAsNumber: true })} />
           </div>
         </div>
@@ -187,7 +188,7 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
             <Input type="date" {...register('maturity_date')} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Maturity Amount (₹)</Label>
+            <Label>Maturity Amount ({CURRENCY_SYMBOL})</Label>
             <Input type="number" step="0.01" {...register('maturity_amount', { valueAsNumber: true })} />
           </div>
           <div className="flex flex-col gap-1.5 col-span-2">

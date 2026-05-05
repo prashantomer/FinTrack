@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useInvestmentSummary, useSpendingTrends } from '@/hooks/useReports'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/currency'
 
-const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
-const tooltipFormatter = (v: ValueType | undefined) => typeof v === 'number' ? fmt.format(v) : String(v ?? '')
+const tooltipFormatter = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
 
 export function ReportsPage() {
   const [trendMonths, setTrendMonths] = useState('6')
@@ -34,7 +34,7 @@ export function ReportsPage() {
             <BarChart data={trends?.months ?? []}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `₹${(Number(v)/1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => formatCurrencyCompact(Number(v))} />
               <Tooltip formatter={tooltipFormatter} />
               <Bar dataKey="inbound" name="Inbound" fill="#10b981" radius={[3,3,0,0]} />
               <Bar dataKey="outbound" name="Outbound" fill="#ef4444" radius={[3,3,0,0]} />
@@ -59,20 +59,20 @@ export function ReportsPage() {
               {invSummary?.holdings.map(h => (
                 <TableRow key={h.type}>
                   <TableCell>{INVESTMENT_TYPE_LABELS[h.type]}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmt.format(h.total_invested)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmt.format(h.current_value)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatCurrency(h.total_invested)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{formatCurrency(h.current_value)}</TableCell>
                   <TableCell className={`text-right font-mono text-sm font-medium ${h.unrealized_gain >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {h.unrealized_gain >= 0 ? '+' : ''}{fmt.format(h.unrealized_gain)}
+                    {h.unrealized_gain >= 0 ? '+' : ''}{formatCurrency(h.unrealized_gain)}
                   </TableCell>
                 </TableRow>
               ))}
               {invSummary && (
                 <TableRow className="font-semibold border-t-2">
                   <TableCell>Total</TableCell>
-                  <TableCell className="text-right font-mono">{fmt.format(invSummary.total_invested)}</TableCell>
-                  <TableCell className="text-right font-mono">{fmt.format(invSummary.total_current_value)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(invSummary.total_invested)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(invSummary.total_current_value)}</TableCell>
                   <TableCell className={`text-right font-mono ${invSummary.total_unrealized_gain >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {invSummary.total_unrealized_gain >= 0 ? '+' : ''}{fmt.format(invSummary.total_unrealized_gain)}
+                    {invSummary.total_unrealized_gain >= 0 ? '+' : ''}{formatCurrency(invSummary.total_unrealized_gain)}
                   </TableCell>
                 </TableRow>
               )}

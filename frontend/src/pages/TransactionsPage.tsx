@@ -11,9 +11,10 @@ import { useAccounts } from '@/hooks/useBanks'
 import { useTermAccounts } from '@/hooks/useTermAccounts'
 import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/labels'
+import { formatCurrency } from '@/lib/currency'
 import type { LinkedAccountType, TransactionCreate, TransactionType } from '@/types'
 
-const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+const fmt = { format: formatCurrency }
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 

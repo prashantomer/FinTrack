@@ -12,9 +12,10 @@ import {
   useUpdateInvestment,
 } from '@/hooks/useInvestments'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
+import { formatCurrency } from '@/lib/currency'
 import type { Investment, InvestmentType } from '@/types'
 
-const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+const fmt = { format: formatCurrency }
 
 export function InvestmentsPage() {
   const [open, setOpen] = useState(false)

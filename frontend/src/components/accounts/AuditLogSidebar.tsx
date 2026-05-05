@@ -7,7 +7,8 @@ interface Props {
   onClose: () => void
 }
 
-const fmtCurrency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+import { formatCurrency } from '@/lib/currency'
+const fmtCurrency = { format: formatCurrency }
 const fmtDate = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 const fmtTime = new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
 

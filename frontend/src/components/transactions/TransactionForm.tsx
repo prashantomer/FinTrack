@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAccounts } from '@/hooks/useBanks'
 import { ACCOUNT_TYPE_LABELS, TRANSACTION_TYPE_LABELS } from '@/lib/labels'
+import { CURRENCY_SYMBOL } from '@/lib/currency'
 import type { LinkedAccountType, TransactionType } from '@/types'
 
 interface FormValues {
@@ -64,7 +65,7 @@ export function TransactionForm({ onSubmit, onCancel }: Props) {
     <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label>Amount (₹)</Label>
+          <Label>Amount ({CURRENCY_SYMBOL})</Label>
           <Input type="number" step="0.01" min="0.01" {...register('amount', { valueAsNumber: true })} required />
         </div>
         <div className="flex flex-col gap-1.5">

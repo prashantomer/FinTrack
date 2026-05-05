@@ -13,12 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useDashboard, useDashboardCacheStatus, useRefreshDashboard, useSpendingTrends } from '@/hooks/useReports'
 import { ACCOUNT_TYPE_LABELS, INVESTMENT_TYPE_LABELS } from '@/lib/labels'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/currency'
 import type { AccountSummary, InvestmentTypeBreakdown, RecentTransaction, TermAccountSummary } from '@/types'
 
-const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
-const fmtCompact = (v: number) => v >= 1_00_000
-  ? `₹${(v / 1_00_000).toFixed(1)}L`
-  : `₹${(v / 1_000).toFixed(0)}k`
+const fmt = { format: formatCurrency }
+const fmtCompact = formatCurrencyCompact
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 const tooltipFmt = (v: ValueType | undefined) => typeof v === 'number' ? fmt.format(v) : String(v ?? '')
 

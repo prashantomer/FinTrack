@@ -12,9 +12,10 @@ import { useAccounts, useAdjustAccountBalance, useBanks, useCloseAccount, useCre
 import { useAdjustTermAccountBalance, useCloseTermAccount, useCreateTermAccount, useDepositPPF, useTermAccounts, useUpdateTermAccount } from '@/hooks/useTermAccounts'
 import type { AuditTarget } from '@/hooks/useAuditLogs'
 import { ACCOUNT_TYPE_LABELS, TERM_ACCOUNT_TYPE_LABELS } from '@/lib/labels'
+import { formatCurrency, CURRENCY_SYMBOL } from '@/lib/currency'
 import type { Account, AccountType, TermAccount, TermAccountType, TermAccountUpdate } from '@/types'
 
-const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+const fmt = { format: formatCurrency }
 
 
 // ── Account form ─────────────────────────────────────────────────────────────
@@ -625,7 +626,7 @@ export function AccountsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <Label>Balance (₹)</Label>
+              <Label>Balance ({CURRENCY_SYMBOL})</Label>
               <span className="text-xs text-muted-foreground">optional</span>
             </div>
             <Input
@@ -670,7 +671,7 @@ export function AccountsPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Final Balance at Closure (₹)</Label>
+          <Label>Final Balance at Closure ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -723,7 +724,7 @@ export function AccountsPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label>Opening Balance (₹)</Label>
+            <Label>Opening Balance ({CURRENCY_SYMBOL})</Label>
             <Input
               type="number"
               step="0.01"
@@ -770,7 +771,7 @@ export function AccountsPage() {
         {termForm.type === 'fd' && (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <Label>Maturity Amount (₹)</Label>
+              <Label>Maturity Amount ({CURRENCY_SYMBOL})</Label>
               <span className="text-xs text-muted-foreground">auto-calculated</span>
             </div>
             <Input
@@ -796,7 +797,7 @@ export function AccountsPage() {
           {termForm.type === 'ppf' && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <Label>Balance (₹)</Label>
+                <Label>Balance ({CURRENCY_SYMBOL})</Label>
                 <span className="text-xs text-muted-foreground">optional</span>
               </div>
               <Input
@@ -821,7 +822,7 @@ export function AccountsPage() {
         submitLabel="Save"
       >
         <div className="flex flex-col gap-1.5">
-          <Label>New Balance (₹)</Label>
+          <Label>New Balance ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -842,7 +843,7 @@ export function AccountsPage() {
         submitLabel="Save"
       >
         <div className="flex flex-col gap-1.5">
-          <Label>New Balance (₹)</Label>
+          <Label>New Balance ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -863,7 +864,7 @@ export function AccountsPage() {
         submitLabel="Deposit"
       >
         <div className="flex flex-col gap-1.5">
-          <Label>Amount (₹)</Label>
+          <Label>Amount ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -903,7 +904,7 @@ export function AccountsPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Amount (₹)</Label>
+          <Label>Amount ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -941,7 +942,7 @@ export function AccountsPage() {
           </div>
           {editingTermAccount?.type === 'fd' && (
             <div className="flex flex-col gap-1.5">
-              <Label>Maturity Amt (₹)</Label>
+              <Label>Maturity Amt ({CURRENCY_SYMBOL})</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -952,7 +953,7 @@ export function AccountsPage() {
           )}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Current Balance (₹)</Label>
+          <Label>Current Balance ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
@@ -982,7 +983,7 @@ export function AccountsPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label>Proceeds Received (₹)</Label>
+          <Label>Proceeds Received ({CURRENCY_SYMBOL})</Label>
           <Input
             type="number"
             step="0.01"
