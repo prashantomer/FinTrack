@@ -26,7 +26,7 @@ RSpec.describe Imports::ProcessInvestmentRowService, type: :service do
     }.merge(overrides)
   end
 
-  def call_service(row_overrides = {}, idx: 0)
+  def call_service(idx: 0, **row_overrides)
     described_class.new(batch, build_row(row_overrides), idx).call
   end
 
@@ -158,7 +158,7 @@ RSpec.describe Imports::ProcessInvestmentRowService, type: :service do
       end
 
       it "sets the correct row_index" do
-        call_service({}, idx: 3)
+        call_service(idx: 3)
         expect(ImportRecord.last.row_index).to eq(3)
       end
 

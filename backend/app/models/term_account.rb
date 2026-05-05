@@ -45,7 +45,7 @@ class TermAccount < ApplicationRecord
       Time.current.strftime("PPF#%Y%m%d%H%M")
     end
 
-    if maturity_date.nil?
+    if maturity_date.nil? && open_date
       self.maturity_date = if fd? && tenure_days
         open_date + tenure_days.days
       elsif ppf?

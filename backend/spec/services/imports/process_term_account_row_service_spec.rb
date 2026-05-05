@@ -36,12 +36,12 @@ RSpec.describe Imports::ProcessTermAccountRowService, type: :service do
     }.merge(overrides)
   end
 
-  def call_fd_service(overrides = {}, idx: 0)
+  def call_fd_service(idx: 0, **overrides)
     account  # ensure parent account exists
     described_class.new(batch, build_fd_row(overrides), idx).call
   end
 
-  def call_ppf_service(overrides = {}, idx: 0)
+  def call_ppf_service(idx: 0, **overrides)
     account  # ensure parent account exists
     described_class.new(batch, build_ppf_row(overrides), idx).call
   end
@@ -157,7 +157,7 @@ RSpec.describe Imports::ProcessTermAccountRowService, type: :service do
     end
 
     it "sets the correct row_index" do
-      call_fd_service({}, idx: 2)
+      call_fd_service(idx: 2)
       expect(ImportRecord.last.row_index).to eq(2)
     end
 

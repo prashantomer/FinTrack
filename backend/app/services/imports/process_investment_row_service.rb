@@ -138,7 +138,8 @@ module Imports
       raise "purchase_date is required" if raw.blank?
 
       DATE_FORMATS.each do |fmt|
-        return Date.strptime(raw, fmt)
+        parsed = Date.strptime(raw, fmt)
+        return parsed if parsed.strftime(fmt) == raw
       rescue ArgumentError
         next
       end
