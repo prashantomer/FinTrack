@@ -15,30 +15,79 @@ from app.services.auth_service import create_user, get_user_by_email
 
 app = typer.Typer(help="User management commands")
 
+# Common currencies: (display label, currency_code, currency_locale)
+_CURRENCIES = [
+    ("INR  – Indian Rupee       ₹  (e.g. ₹1,23,456)",  "INR",  "en-IN"),
+    ("USD  – US Dollar          $  (e.g. $1,234)",      "USD",  "en-US"),
+    ("EUR  – Euro               €  (e.g. €1.234)",      "EUR",  "de-DE"),
+    ("GBP  – British Pound      £  (e.g. £1,234)",      "GBP",  "en-GB"),
+    ("JPY  – Japanese Yen       ¥  (e.g. ¥123,456)",    "JPY",  "ja-JP"),
+    ("AUD  – Australian Dollar  A$ (e.g. A$1,234)",     "AUD",  "en-AU"),
+    ("CAD  – Canadian Dollar    C$ (e.g. C$1,234)",     "CAD",  "en-CA"),
+    ("SGD  – Singapore Dollar   S$ (e.g. S$1,234)",     "SGD",  "en-SG"),
+    ("AED  – UAE Dirham         د.إ (e.g. AED 1,234)",  "AED",  "ar-AE"),
+    ("Other – enter manually",                           None,   None),
+]
+
+
+def _pick_currency() -> tuple[str, str]:
+    """Interactive currency selector. Returns (currency_code, currency_locale)."""
+    typer.echo("\nCurrency:")
+    for i, (label, _, _) in enumerate(_CURRENCIES, 1):
+        typer.echo(f"  {i:>2}.  {label}")
+
+    while True:
+        raw = typer.prompt(f"\nSelect [1-{len(_CURRENCIES)}]", default="1")
+        try:
+            choice = int(raw)
+        except ValueError:
+            typer.echo("  Please enter a number.")
+            continue
+        if not 1 <= choice <= len(_CURRENCIES):
+            typer.echo(f"  Please enter a number between 1 and {len(_CURRENCIES)}.")
+            continue
+
+        _, code, locale = _CURRENCIES[choice - 1]
+        if code is None:
+            code   = typer.prompt("  Currency code   (e.g. CHF, MXN, BRL)")
+            locale = typer.prompt("  Locale          (e.g. de-CH, es-MX, pt-BR)")
+        return code, locale
+
 
 @app.command("create")
 def create_user_cmd(
     generate: bool = typer.Option(False, "--generate", help="Auto-generate a random password"),
 ):
-    """Create a new user. Prompts for email, first name, last name, and password."""
-    email = typer.prompt("Email")
+    """Create a new user. Prompts for email, first name, last name, password, and currency."""
+    email      = typer.prompt("Email")
     first_name = typer.prompt("First name")
-    last_name = typer.prompt("Last name")
+    last_name  = typer.prompt("Last name")
 
     if generate:
         password = secrets.token_urlsafe(16)
     else:
         password = typer.prompt("Password", hide_input=True, confirmation_prompt=True)
 
+    currency_code, currency_locale = _pick_currency()
+
     db = SessionLocal()
     try:
         if get_user_by_email(db, email):
             typer.echo(f"Error: a user with email '{email}' already exists.", err=True)
             raise typer.Exit(code=1)
-        create_user(db, email=email, first_name=first_name, last_name=last_name, password=password)
+        create_user(
+            db,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            password=password,
+            currency_code=currency_code,
+            currency_locale=currency_locale,
+        )
         typer.echo("\nUser created successfully")
         typer.echo(f"  Email:    {email}")
         typer.echo(f"  Name:     {first_name} {last_name}")
+        typer.echo(f"  Currency: {currency_code}  ({currency_locale})")
         typer.echo(f"  Password: {password}")
     except IntegrityError:
         db.rollback()

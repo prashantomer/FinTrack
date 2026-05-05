@@ -21,6 +21,8 @@ def create_user(
     last_name: str,
     password: str,
     is_superuser: bool = False,
+    currency_code: str = "INR",
+    currency_locale: str = "en-IN",
 ) -> User:
     user = User(
         email=email,
@@ -28,6 +30,8 @@ def create_user(
         last_name=last_name,
         hashed_password=pwd_context.hash(password),
         is_superuser=is_superuser,
+        currency_code=currency_code,
+        currency_locale=currency_locale,
     )
     db.add(user)
     db.commit()
