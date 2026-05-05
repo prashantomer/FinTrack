@@ -1,11 +1,11 @@
 module Api
   module V1
     class ImportsController < ApplicationController
-      before_action :set_batch, only: [:show]
+      before_action :set_batch, only: [ :show ]
 
       def index
         page_size = 20
-        page      = [(params[:page] || 1).to_i, 1].max
+        page      = [ (params[:page] || 1).to_i, 1 ].max
         offset    = (page - 1) * page_size
 
         scope = current_user.import_batches.order(created_at: :desc)

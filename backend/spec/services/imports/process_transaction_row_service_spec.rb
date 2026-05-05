@@ -112,7 +112,7 @@ RSpec.describe Imports::ProcessTransactionRowService, type: :service do
 
       it "handles a single tag" do
         call_service(tags: "groceries")
-        expect(Transaction.last.tags).to eq(["groceries"])
+        expect(Transaction.last.tags).to eq([ "groceries" ])
       end
     end
 

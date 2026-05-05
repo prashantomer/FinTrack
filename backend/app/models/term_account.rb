@@ -1,7 +1,7 @@
 class TermAccount < ApplicationRecord
   class Error < StandardError; end
 
-  audited only: [:balance]
+  audited only: [ :balance ]
 
   has_one :import_record, as: :importable, dependent: :nullify
 

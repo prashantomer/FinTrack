@@ -22,14 +22,14 @@ module Reports
         gain_pct        = total_invested > 0 ? (unrealized_gain / total_invested) * 100 : 0
         platform_names  = lots.map { |i| i.platform_account&.nickname }.compact.uniq
 
-        total_units, avg_buy = if investment_type == 'stock'
+        total_units, avg_buy = if investment_type == "stock"
           qty = lots.sum { |i| i.quantity.to_f }
           avg = qty > 0 ? lots.sum { |i| i.quantity.to_f * i.buy_price.to_f } / qty : nil
-          [qty > 0 ? qty : nil, avg]
+          [ qty > 0 ? qty : nil, avg ]
         else
           u = lots.sum { |i| i.units.to_f }
           avg = u > 0 ? lots.sum { |i| i.units.to_f * i.nav_at_purchase.to_f } / u : nil
-          [u > 0 ? u : nil, avg]
+          [ u > 0 ? u : nil, avg ]
         end
 
         {

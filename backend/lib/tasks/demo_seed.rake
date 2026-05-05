@@ -88,103 +88,103 @@ namespace :db do
 
       # ── Opening balance transactions (Apr 2024 — start of history) ────────
       # Represents accumulated savings before tracking begins
-      txn(user, hdfc_primary, "credit", 1_400_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: ["opening"])
-      txn(user, sbi_salary,   "credit",   100_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: ["opening"])
-      txn(user, icici_nre,    "credit",   200_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: ["opening"])
-      txn(user, axis_current, "credit",    40_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: ["opening"])
-      txn(user, indus_nro,    "credit",    55_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: ["opening"])
+      txn(user, hdfc_primary, "credit", 1_400_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: [ "opening" ])
+      txn(user, sbi_salary,   "credit",   100_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: [ "opening" ])
+      txn(user, icici_nre,    "credit",   200_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: [ "opening" ])
+      txn(user, axis_current, "credit",    40_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: [ "opening" ])
+      txn(user, indus_nro,    "credit",    55_000.00, "Opening Balance",          Date.new(2024, 4, 30), tags: [ "opening" ])
 
       # ── Monthly recurring: May 2024 – Apr 2025 (₹92K salary) ─────────────
       (0..11).each do |i|
         m = Date.new(2024, 5, 1) >> i
-        txn(user, sbi_salary,   "credit",  92_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: ["salary"], ref: "NEFT#{m.strftime('%Y%m')}01")
-        txn(user, sbi_salary,   "debit",   68_000.00, "Transfer to HDFC Primary",         m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "credit",  68_000.00, "Transfer from SBI Salary",          m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "debit",   24_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: ["housing", "rent"])
-        txn(user, hdfc_primary, "debit",    9_100.00, "Groceries & Household",             m + 8,  tags: ["groceries"])
-        txn(user, hdfc_primary, "debit",    3_800.00, "Electricity & Internet",            m + 5,  tags: ["utilities"])
-        txn(user, hdfc_primary, "debit",    4_500.00, "Dining & Restaurants",              m + 12, tags: ["dining"])
-        txn(user, hdfc_primary, "debit",    2_900.00, "Fuel & Transport",                  m + 9,  tags: ["transport"])
-        txn(user, hdfc_primary, "debit",    1_299.00, "OTT & Subscriptions",               m + 10, tags: ["subscriptions"])
+        txn(user, sbi_salary,   "credit",  92_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: [ "salary" ], ref: "NEFT#{m.strftime('%Y%m')}01")
+        txn(user, sbi_salary,   "debit",   68_000.00, "Transfer to HDFC Primary",         m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "credit",  68_000.00, "Transfer from SBI Salary",          m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "debit",   24_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: [ "housing", "rent" ])
+        txn(user, hdfc_primary, "debit",    9_100.00, "Groceries & Household",             m + 8,  tags: [ "groceries" ])
+        txn(user, hdfc_primary, "debit",    3_800.00, "Electricity & Internet",            m + 5,  tags: [ "utilities" ])
+        txn(user, hdfc_primary, "debit",    4_500.00, "Dining & Restaurants",              m + 12, tags: [ "dining" ])
+        txn(user, hdfc_primary, "debit",    2_900.00, "Fuel & Transport",                  m + 9,  tags: [ "transport" ])
+        txn(user, hdfc_primary, "debit",    1_299.00, "OTT & Subscriptions",               m + 10, tags: [ "subscriptions" ])
       end
 
       # ── Monthly recurring: May – Sep 2025 (₹98K salary) ──────────────────
       (0..4).each do |i|
         m = Date.new(2025, 5, 1) >> i
-        txn(user, sbi_salary,   "credit",  98_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: ["salary"], ref: "NEFT#{m.strftime('%Y%m')}01")
-        txn(user, sbi_salary,   "debit",   70_000.00, "Transfer to HDFC Primary",         m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "credit",  70_000.00, "Transfer from SBI Salary",          m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "debit",   24_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: ["housing", "rent"])
-        txn(user, hdfc_primary, "debit",    9_100.00, "Groceries & Household",             m + 8,  tags: ["groceries"])
-        txn(user, hdfc_primary, "debit",    3_800.00, "Electricity & Internet",            m + 5,  tags: ["utilities"])
-        txn(user, hdfc_primary, "debit",    4_500.00, "Dining & Restaurants",              m + 12, tags: ["dining"])
-        txn(user, hdfc_primary, "debit",    2_900.00, "Fuel & Transport",                  m + 9,  tags: ["transport"])
-        txn(user, hdfc_primary, "debit",    1_299.00, "OTT & Subscriptions",               m + 10, tags: ["subscriptions"])
+        txn(user, sbi_salary,   "credit",  98_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: [ "salary" ], ref: "NEFT#{m.strftime('%Y%m')}01")
+        txn(user, sbi_salary,   "debit",   70_000.00, "Transfer to HDFC Primary",         m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "credit",  70_000.00, "Transfer from SBI Salary",          m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "debit",   24_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: [ "housing", "rent" ])
+        txn(user, hdfc_primary, "debit",    9_100.00, "Groceries & Household",             m + 8,  tags: [ "groceries" ])
+        txn(user, hdfc_primary, "debit",    3_800.00, "Electricity & Internet",            m + 5,  tags: [ "utilities" ])
+        txn(user, hdfc_primary, "debit",    4_500.00, "Dining & Restaurants",              m + 12, tags: [ "dining" ])
+        txn(user, hdfc_primary, "debit",    2_900.00, "Fuel & Transport",                  m + 9,  tags: [ "transport" ])
+        txn(user, hdfc_primary, "debit",    1_299.00, "OTT & Subscriptions",               m + 10, tags: [ "subscriptions" ])
       end
 
       # ── Monthly recurring: Oct 2025 – May 2026 (₹1.15L post-raise) ───────
       (0..7).each do |i|
         m = Date.new(2025, 10, 1) >> i
-        txn(user, sbi_salary,   "credit", 115_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: ["salary"], ref: "NEFT#{m.strftime('%Y%m')}01")
-        txn(user, sbi_salary,   "debit",   82_000.00, "Transfer to HDFC Primary",         m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "credit",  82_000.00, "Transfer from SBI Salary",          m + 1,  tags: ["transfer"])
-        txn(user, hdfc_primary, "debit",   26_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: ["housing", "rent"])
-        txn(user, hdfc_primary, "debit",   10_200.00, "Groceries & Household",             m + 8,  tags: ["groceries"])
-        txn(user, hdfc_primary, "debit",    4_200.00, "Electricity & Internet",            m + 5,  tags: ["utilities"])
-        txn(user, hdfc_primary, "debit",    5_100.00, "Dining & Restaurants",              m + 12, tags: ["dining"])
-        txn(user, hdfc_primary, "debit",    3_100.00, "Fuel & Transport",                  m + 9,  tags: ["transport"])
-        txn(user, hdfc_primary, "debit",    1_499.00, "OTT & Subscriptions",               m + 10, tags: ["subscriptions"])
+        txn(user, sbi_salary,   "credit", 115_000.00, "Salary - #{m.strftime('%b %Y')}", m,       tags: [ "salary" ], ref: "NEFT#{m.strftime('%Y%m')}01")
+        txn(user, sbi_salary,   "debit",   82_000.00, "Transfer to HDFC Primary",         m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "credit",  82_000.00, "Transfer from SBI Salary",          m + 1,  tags: [ "transfer" ])
+        txn(user, hdfc_primary, "debit",   26_000.00, "Rent - #{m.strftime('%b %Y')}",     m + 4,  tags: [ "housing", "rent" ])
+        txn(user, hdfc_primary, "debit",   10_200.00, "Groceries & Household",             m + 8,  tags: [ "groceries" ])
+        txn(user, hdfc_primary, "debit",    4_200.00, "Electricity & Internet",            m + 5,  tags: [ "utilities" ])
+        txn(user, hdfc_primary, "debit",    5_100.00, "Dining & Restaurants",              m + 12, tags: [ "dining" ])
+        txn(user, hdfc_primary, "debit",    3_100.00, "Fuel & Transport",                  m + 9,  tags: [ "transport" ])
+        txn(user, hdfc_primary, "debit",    1_499.00, "OTT & Subscriptions",               m + 10, tags: [ "subscriptions" ])
       end
 
       # ── Irregular / one-off transactions ──────────────────────────────────
       # 2024
-      txn(user, hdfc_primary, "debit",   18_500.00, "Laptop - Lenovo ThinkPad",        Date.new(2024,  6, 15), tags: ["electronics"])
-      txn(user, hdfc_primary, "debit",    8_200.00, "Flight - Mumbai-Delhi RT",        Date.new(2024,  7, 22), tags: ["travel"])
-      txn(user, hdfc_primary, "debit",    6_800.00, "Hotel - Delhi 3N",                Date.new(2024,  7, 23), tags: ["travel"])
-      txn(user, sbi_salary,   "credit",  42_000.00, "Consulting Invoice #2024-07",     Date.new(2024,  7, 31), tags: ["freelance"])
-      txn(user, hdfc_primary, "debit",   12_000.00, "Annual Health Insurance",         Date.new(2024,  8,  5), tags: ["insurance", "health"])
-      txn(user, icici_nre,    "credit", 180_000.00, "Foreign Remittance - Aug 2024",   Date.new(2024,  8, 12), tags: ["remittance"], ref: "SWFT2408A1")
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q2 FY25",             Date.new(2024,  9, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "debit",   22_000.00, "Flight + Hotel - Goa",            Date.new(2024, 10,  3), tags: ["travel"])
-      txn(user, hdfc_primary, "credit",   7_500.00, "Cashback - Credit Card Oct",      Date.new(2024, 10, 18), tags: ["cashback"])
-      txn(user, sbi_salary,   "credit",  65_000.00, "Year-end Bonus Q2",               Date.new(2024, 10, 28), tags: ["salary", "bonus"])
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q3 FY25",             Date.new(2024, 12, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "debit",   45_000.00, "iPhone 16 Pro",                   Date.new(2024, 12, 20), tags: ["electronics"])
-      txn(user, hdfc_primary, "debit",    6_500.00, "Christmas Gifts",                 Date.new(2024, 12, 24), tags: ["shopping"])
-      txn(user, sbi_salary,   "credit",  80_000.00, "Annual Performance Bonus",        Date.new(2024, 12, 30), tags: ["salary", "bonus"])
+      txn(user, hdfc_primary, "debit",   18_500.00, "Laptop - Lenovo ThinkPad",        Date.new(2024,  6, 15), tags: [ "electronics" ])
+      txn(user, hdfc_primary, "debit",    8_200.00, "Flight - Mumbai-Delhi RT",        Date.new(2024,  7, 22), tags: [ "travel" ])
+      txn(user, hdfc_primary, "debit",    6_800.00, "Hotel - Delhi 3N",                Date.new(2024,  7, 23), tags: [ "travel" ])
+      txn(user, sbi_salary,   "credit",  42_000.00, "Consulting Invoice #2024-07",     Date.new(2024,  7, 31), tags: [ "freelance" ])
+      txn(user, hdfc_primary, "debit",   12_000.00, "Annual Health Insurance",         Date.new(2024,  8,  5), tags: [ "insurance", "health" ])
+      txn(user, icici_nre,    "credit", 180_000.00, "Foreign Remittance - Aug 2024",   Date.new(2024,  8, 12), tags: [ "remittance" ], ref: "SWFT2408A1")
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q2 FY25",             Date.new(2024,  9, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "debit",   22_000.00, "Flight + Hotel - Goa",            Date.new(2024, 10,  3), tags: [ "travel" ])
+      txn(user, hdfc_primary, "credit",   7_500.00, "Cashback - Credit Card Oct",      Date.new(2024, 10, 18), tags: [ "cashback" ])
+      txn(user, sbi_salary,   "credit",  65_000.00, "Year-end Bonus Q2",               Date.new(2024, 10, 28), tags: [ "salary", "bonus" ])
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q3 FY25",             Date.new(2024, 12, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "debit",   45_000.00, "iPhone 16 Pro",                   Date.new(2024, 12, 20), tags: [ "electronics" ])
+      txn(user, hdfc_primary, "debit",    6_500.00, "Christmas Gifts",                 Date.new(2024, 12, 24), tags: [ "shopping" ])
+      txn(user, sbi_salary,   "credit",  80_000.00, "Annual Performance Bonus",        Date.new(2024, 12, 30), tags: [ "salary", "bonus" ])
 
       # 2025
-      txn(user, icici_nre,    "credit", 200_000.00, "Foreign Remittance - Jan 2025",   Date.new(2025,  1, 10), tags: ["remittance"], ref: "SWFT2501B2")
-      txn(user, hdfc_primary, "debit",   15_500.00, "Flight - Bangkok",                Date.new(2025,  1, 18), tags: ["travel"])
-      txn(user, hdfc_primary, "debit",   22_000.00, "Hotel - Bangkok 4N",              Date.new(2025,  1, 19), tags: ["travel"])
-      txn(user, hdfc_primary, "debit",   12_000.00, "Medical - Shoulder",              Date.new(2025,  2, 14), tags: ["medical"])
-      txn(user, hdfc_primary, "credit",  48_000.00, "Health Insurance Claim",          Date.new(2025,  3,  1), tags: ["insurance", "health"])
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q4 FY25",             Date.new(2025,  3, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "credit",  22_000.00, "ITR Refund FY24",                 Date.new(2025,  4,  8), tags: ["tax", "refund"], ref: "ITRITR2425A")
-      txn(user, sbi_salary,   "credit",  90_000.00, "Consulting Invoice #2025-04",     Date.new(2025,  4, 30), tags: ["freelance"])
-      txn(user, hdfc_primary, "debit",   18_000.00, "Two-Wheeler Insurance",           Date.new(2025,  5, 22), tags: ["insurance", "vehicle"])
-      txn(user, hdfc_primary, "debit",   35_000.00, "Bike Service + Parts",            Date.new(2025,  6, 10), tags: ["vehicle"])
-      txn(user, hdfc_primary, "debit",    4_200.00, "Apple One + Spotify Annual",      Date.new(2025,  7,  1), tags: ["subscriptions"])
-      txn(user, hdfc_primary, "credit",   8_200.00, "Cashback - CC Annual Rewards",    Date.new(2025,  7, 20), tags: ["cashback"])
-      txn(user, icici_nre,    "credit", 220_000.00, "Foreign Remittance - Aug 2025",   Date.new(2025,  8,  5), tags: ["remittance"], ref: "SWFT2508C3")
-      txn(user, sbi_salary,   "credit",  75_000.00, "Consulting Invoice #2025-08",     Date.new(2025,  8, 29), tags: ["freelance"])
-      txn(user, hdfc_primary, "debit",   28_000.00, "MacBook Pro Accessories",         Date.new(2025,  9,  4), tags: ["electronics"])
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q2 FY26",             Date.new(2025,  9, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "debit",   16_000.00, "Diwali Shopping",                 Date.new(2025, 10, 28), tags: ["shopping", "gifts"])
-      txn(user, sbi_salary,   "credit", 100_000.00, "Diwali Bonus",                    Date.new(2025, 10, 29), tags: ["salary", "bonus"])
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q3 FY26",             Date.new(2025, 12, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "debit",   42_000.00, "Flight + Hotel - Europe",         Date.new(2025, 12,  5), tags: ["travel"])
-      txn(user, hdfc_primary, "debit",   25_000.00, "Europe Trip Expenses",            Date.new(2025, 12, 10), tags: ["travel"])
-      txn(user, sbi_salary,   "credit",  85_000.00, "Year-end Performance Bonus",      Date.new(2025, 12, 28), tags: ["salary", "bonus"])
+      txn(user, icici_nre,    "credit", 200_000.00, "Foreign Remittance - Jan 2025",   Date.new(2025,  1, 10), tags: [ "remittance" ], ref: "SWFT2501B2")
+      txn(user, hdfc_primary, "debit",   15_500.00, "Flight - Bangkok",                Date.new(2025,  1, 18), tags: [ "travel" ])
+      txn(user, hdfc_primary, "debit",   22_000.00, "Hotel - Bangkok 4N",              Date.new(2025,  1, 19), tags: [ "travel" ])
+      txn(user, hdfc_primary, "debit",   12_000.00, "Medical - Shoulder",              Date.new(2025,  2, 14), tags: [ "medical" ])
+      txn(user, hdfc_primary, "credit",  48_000.00, "Health Insurance Claim",          Date.new(2025,  3,  1), tags: [ "insurance", "health" ])
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q4 FY25",             Date.new(2025,  3, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "credit",  22_000.00, "ITR Refund FY24",                 Date.new(2025,  4,  8), tags: [ "tax", "refund" ], ref: "ITRITR2425A")
+      txn(user, sbi_salary,   "credit",  90_000.00, "Consulting Invoice #2025-04",     Date.new(2025,  4, 30), tags: [ "freelance" ])
+      txn(user, hdfc_primary, "debit",   18_000.00, "Two-Wheeler Insurance",           Date.new(2025,  5, 22), tags: [ "insurance", "vehicle" ])
+      txn(user, hdfc_primary, "debit",   35_000.00, "Bike Service + Parts",            Date.new(2025,  6, 10), tags: [ "vehicle" ])
+      txn(user, hdfc_primary, "debit",    4_200.00, "Apple One + Spotify Annual",      Date.new(2025,  7,  1), tags: [ "subscriptions" ])
+      txn(user, hdfc_primary, "credit",   8_200.00, "Cashback - CC Annual Rewards",    Date.new(2025,  7, 20), tags: [ "cashback" ])
+      txn(user, icici_nre,    "credit", 220_000.00, "Foreign Remittance - Aug 2025",   Date.new(2025,  8,  5), tags: [ "remittance" ], ref: "SWFT2508C3")
+      txn(user, sbi_salary,   "credit",  75_000.00, "Consulting Invoice #2025-08",     Date.new(2025,  8, 29), tags: [ "freelance" ])
+      txn(user, hdfc_primary, "debit",   28_000.00, "MacBook Pro Accessories",         Date.new(2025,  9,  4), tags: [ "electronics" ])
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q2 FY26",             Date.new(2025,  9, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "debit",   16_000.00, "Diwali Shopping",                 Date.new(2025, 10, 28), tags: [ "shopping", "gifts" ])
+      txn(user, sbi_salary,   "credit", 100_000.00, "Diwali Bonus",                    Date.new(2025, 10, 29), tags: [ "salary", "bonus" ])
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q3 FY26",             Date.new(2025, 12, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "debit",   42_000.00, "Flight + Hotel - Europe",         Date.new(2025, 12,  5), tags: [ "travel" ])
+      txn(user, hdfc_primary, "debit",   25_000.00, "Europe Trip Expenses",            Date.new(2025, 12, 10), tags: [ "travel" ])
+      txn(user, sbi_salary,   "credit",  85_000.00, "Year-end Performance Bonus",      Date.new(2025, 12, 28), tags: [ "salary", "bonus" ])
 
       # 2026
-      txn(user, axis_current, "credit",  50_000.00, "Client Payment - Project A",      Date.new(2026,  1, 12), tags: ["freelance"])
-      txn(user, axis_current, "credit",  75_000.00, "Client Payment - Project B",      Date.new(2026,  2, 18), tags: ["freelance"])
-      txn(user, icici_nre,    "credit", 250_000.00, "Foreign Remittance - Mar 2026",   Date.new(2026,  3,  3), tags: ["remittance"], ref: "SWFT2603D4")
-      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q4 FY26",             Date.new(2026,  3, 15), tags: ["tax"])
-      txn(user, hdfc_primary, "credit",  35_000.00, "ITR Refund FY25",                 Date.new(2026,  4, 22), tags: ["tax", "refund"])
-      txn(user, hdfc_primary, "debit",   55_000.00, "Annual Term Insurance Premium",   Date.new(2026,  5,  1), tags: ["insurance", "life"])
-      txn(user, axis_current, "credit",  60_000.00, "Client Payment - Project C",      Date.new(2026,  5,  3), tags: ["freelance"])
+      txn(user, axis_current, "credit",  50_000.00, "Client Payment - Project A",      Date.new(2026,  1, 12), tags: [ "freelance" ])
+      txn(user, axis_current, "credit",  75_000.00, "Client Payment - Project B",      Date.new(2026,  2, 18), tags: [ "freelance" ])
+      txn(user, icici_nre,    "credit", 250_000.00, "Foreign Remittance - Mar 2026",   Date.new(2026,  3,  3), tags: [ "remittance" ], ref: "SWFT2603D4")
+      txn(user, hdfc_primary, "debit",    9_600.00, "Advance Tax Q4 FY26",             Date.new(2026,  3, 15), tags: [ "tax" ])
+      txn(user, hdfc_primary, "credit",  35_000.00, "ITR Refund FY25",                 Date.new(2026,  4, 22), tags: [ "tax", "refund" ])
+      txn(user, hdfc_primary, "debit",   55_000.00, "Annual Term Insurance Premium",   Date.new(2026,  5,  1), tags: [ "insurance", "life" ])
+      txn(user, axis_current, "credit",  60_000.00, "Client Payment - Project C",      Date.new(2026,  5,  3), tags: [ "freelance" ])
 
       puts "Created #{user.transactions.count} base transactions"
 
@@ -233,7 +233,7 @@ namespace :db do
         is_active: false, closed_date: "2024-06-01", closed_amount: 159_750.00
       )
       # Maturity credit back to HDFC
-      txn(user, hdfc_primary, "credit", 159_750.00, "FD Maturity: #{cfd1.account_number}", Date.new(2024, 6, 1), tags: ["investment", "fd_maturity"])
+      txn(user, hdfc_primary, "credit", 159_750.00, "FD Maturity: #{cfd1.account_number}", Date.new(2024, 6, 1), tags: [ "investment", "fd_maturity" ])
 
       # FD-SBI-2024-001: opened Jul 2024 (in-history), matured Dec 2024
       # Opening debit from SBI + maturity credit to SBI
@@ -245,13 +245,13 @@ namespace :db do
         maturity_amount: 77_625.00, balance: 0.0,
         is_active: false, closed_date: "2024-12-31", closed_amount: 77_625.00
       )
-      txn(user, sbi_salary, "debit",  75_000.00, "FD Opening: #{cfd2.account_number}", Date.new(2024, 7, 1),   tags: ["investment", "fd"])
-      txn(user, sbi_salary, "credit", 77_625.00, "FD Maturity: #{cfd2.account_number}", Date.new(2024, 12, 31), tags: ["investment", "fd_maturity"])
+      txn(user, sbi_salary, "debit",  75_000.00, "FD Opening: #{cfd2.account_number}", Date.new(2024, 7, 1),   tags: [ "investment", "fd" ])
+      txn(user, sbi_salary, "credit", 77_625.00, "FD Maturity: #{cfd2.account_number}", Date.new(2024, 12, 31), tags: [ "investment", "fd_maturity" ])
       # Link FD balance to SBI as credit transaction (auto via TermAccount create doesn't run here)
       user.transactions.create!(
         transaction_type: "credit", amount: 75_000.00,
         description: "FD Opening: #{cfd2.account_number}", date: Date.new(2024, 7, 1),
-        tags: ["investment", "fd"], linked_account: cfd2
+        tags: [ "investment", "fd" ], linked_account: cfd2
       )
 
       puts "Created #{user.term_accounts.count} term accounts (4 active, 2 closed)"
@@ -336,7 +336,7 @@ namespace :db do
         # ITC
         { ui: ui_itc,      name: "ITC",           date: "2024-03-20", amount: 19_500, cv: 22_000, qty: 50,  price:  390, pa: zerodha_pa },
         # Bajaj Finance
-        { ui: ui_bajfin,   name: "Bajaj Finance", date: "2024-09-10", amount: 35_400, cv: 41_200, qty:  5,  price: 7080, pa: kite_pa },
+        { ui: ui_bajfin,   name: "Bajaj Finance", date: "2024-09-10", amount: 35_400, cv: 41_200, qty:  5,  price: 7080, pa: kite_pa }
       ]
 
       stocks.each do |s|
@@ -351,7 +351,7 @@ namespace :db do
         if purchase_date >= history_start
           txn(user, hdfc_primary, "debit", s[:amount],
               "Stock Purchase: #{s[:name]} (#{s[:qty]}×₹#{s[:price]})",
-              purchase_date, tags: ["investment", "stocks"])
+              purchase_date, tags: [ "investment", "stocks" ])
         end
       end
 
@@ -370,7 +370,7 @@ namespace :db do
           amounts: sip_months.each_with_index.map { |_, i| i < 17 ? 8_000 : 10_000 } },
         { ui: ui_mirae,      name: "Mirae Asset ELSS",       pa: groww_pa, folio: "3456789/01",
           nav_lo: 32.1,  nav_hi: 40.8,
-          amounts: sip_months.each_with_index.map { |_, i| i < 17 ? 5_000 : 8_000 } },
+          amounts: sip_months.each_with_index.map { |_, i| i < 17 ? 5_000 : 8_000 } }
       ]
 
       sip_funds.each do |fund|
@@ -387,7 +387,7 @@ namespace :db do
             units: units, nav_at_purchase: nav
           )
           txn(user, hdfc_primary, "debit", fund[:amounts][i],
-              "SIP - #{fund[:name]}", dt, tags: ["investment", "sip"])
+              "SIP - #{fund[:name]}", dt, tags: [ "investment", "sip" ])
         end
       end
 
@@ -400,7 +400,7 @@ namespace :db do
             { date: "2024-01-03", amount: 25_000, nav: 74.2,  cv: 30_200 },
             { date: "2024-07-03", amount: 25_000, nav: 78.8,  cv: 28_500 },
             { date: "2025-01-03", amount: 30_000, nav: 81.5,  cv: 33_000 },
-            { date: "2025-07-03", amount: 30_000, nav: 84.2,  cv: 31_500 },
+            { date: "2025-07-03", amount: 30_000, nav: 84.2,  cv: 31_500 }
           ]
         },
         # Nippon India Index Nifty — quarterly
@@ -411,7 +411,7 @@ namespace :db do
             { date: "2024-07-10", amount: 15_000, nav: 228.0, cv: 17_100 },
             { date: "2024-10-10", amount: 15_000, nav: 235.6, cv: 16_500 },
             { date: "2025-01-10", amount: 15_000, nav: 241.8, cv: 16_200 },
-            { date: "2025-04-10", amount: 15_000, nav: 248.6, cv: 15_800 },
+            { date: "2025-04-10", amount: 15_000, nav: 248.6, cv: 15_800 }
           ]
         },
         # Axis Midcap — 3 lumpsum annually
@@ -419,9 +419,9 @@ namespace :db do
           lots: [
             { date: "2024-04-05", amount: 30_000, nav: 85.2,  cv: 37_800 },
             { date: "2024-10-05", amount: 30_000, nav: 93.5,  cv: 34_200 },
-            { date: "2025-04-05", amount: 30_000, nav: 102.8, cv: 31_500 },
+            { date: "2025-04-05", amount: 30_000, nav: 102.8, cv: 31_500 }
           ]
-        },
+        }
       ]
 
       lumpsum_mfs.each do |fund|
@@ -439,7 +439,7 @@ namespace :db do
           if purchase_date >= history_start
             txn(user, hdfc_primary, "debit", lot[:amount],
                 "MF Purchase - #{fund[:name]}", purchase_date,
-                tags: ["investment", "mutual_fund"])
+                tags: [ "investment", "mutual_fund" ])
           end
         end
       end
@@ -448,12 +448,12 @@ namespace :db do
 
       # ── Follios ───────────────────────────────────────────────────────────
       [
-        [ui_hdfc_flexi, groww_pa, "2345678/01"],
-        [ui_parag,      coin_pa,  "8765432/01"],
-        [ui_mirae,      groww_pa, "3456789/01"],
-        [ui_sbi_blue,   coin_pa,  "9876543/01"],
-        [ui_nippon,     groww_pa, "1122334/01"],
-        [ui_axis_mid,   groww_pa, "5566778/01"],
+        [ ui_hdfc_flexi, groww_pa, "2345678/01" ],
+        [ ui_parag,      coin_pa,  "8765432/01" ],
+        [ ui_mirae,      groww_pa, "3456789/01" ],
+        [ ui_sbi_blue,   coin_pa,  "9876543/01" ],
+        [ ui_nippon,     groww_pa, "1122334/01" ],
+        [ ui_axis_mid,   groww_pa, "5566778/01" ]
       ].each do |ui, pa, folio|
         user.follios.create!(user_instrument: ui, platform_account: pa, folio_number: folio)
       end
@@ -478,7 +478,7 @@ namespace :db do
       puts "  Tracked Instruments: #{user.user_instruments.count}"
       puts ""
       puts "  Account Balances:"
-      [hdfc_primary, sbi_salary, icici_nre, axis_current, indus_nro].each do |a|
+      [ hdfc_primary, sbi_salary, icici_nre, axis_current, indus_nro ].each do |a|
         puts "    #{a.nickname.ljust(22)} ₹#{a.reload.balance.to_f.round(2)}"
       end
       puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

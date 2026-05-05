@@ -11,6 +11,6 @@ class CreateImportRecords < ActiveRecord::Migration[8.1]
       t.datetime :created_at, null: false
     end
 
-    add_index :import_records, [:importable_type, :importable_id], name: "idx_import_records_importable"
+    add_index :import_records, [ :importable_type, :importable_id ], name: "idx_import_records_importable"
   end
 end

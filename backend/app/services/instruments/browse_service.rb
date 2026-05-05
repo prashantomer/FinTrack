@@ -5,7 +5,7 @@ module Instruments
     end
 
     def call
-      limit  = [(@params[:limit] || 50).to_i, 200].min
+      limit  = [ (@params[:limit] || 50).to_i, 200 ].min
       offset = (@params[:cursor] || 0).to_i
 
       scope = Instrument.alphabetical

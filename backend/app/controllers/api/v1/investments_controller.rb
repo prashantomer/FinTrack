@@ -1,7 +1,7 @@
 module Api
   module V1
     class InvestmentsController < ApplicationController
-      before_action :set_investment, only: [:show, :update, :destroy]
+      before_action :set_investment, only: [ :show, :update, :destroy ]
 
       def index
         result = Investments::QueryService.new(current_user, query_params).call

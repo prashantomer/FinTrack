@@ -1,7 +1,7 @@
 module Api
   module V1
     class InstrumentsController < ApplicationController
-      before_action :set_instrument, only: [:show, :update, :track, :untrack]
+      before_action :set_instrument, only: [ :show, :update, :track, :untrack ]
 
       def index
         result = Instruments::BrowseService.new(browse_params).call

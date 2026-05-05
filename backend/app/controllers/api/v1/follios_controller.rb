@@ -1,11 +1,11 @@
 module Api
   module V1
     class FolliosController < ApplicationController
-      before_action :set_follio, only: [:show, :update, :destroy]
+      before_action :set_follio, only: [ :show, :update, :destroy ]
 
       def index
-        page_size = [[((params[:page_size] || 20).to_i), 1].max, 200].min
-        page      = [((params[:page] || 1).to_i), 1].max
+        page_size = [ [ ((params[:page_size] || 20).to_i), 1 ].max, 200 ].min
+        page      = [ ((params[:page] || 1).to_i), 1 ].max
         offset    = (page - 1) * page_size
 
         scope = current_user.follios.includes(user_instrument: :instrument, platform_account: :platform)

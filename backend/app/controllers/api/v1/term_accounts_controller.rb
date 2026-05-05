@@ -1,7 +1,7 @@
 module Api
   module V1
     class TermAccountsController < ApplicationController
-      before_action :set_term_account, only: [:show, :close, :audit_logs]
+      before_action :set_term_account, only: [ :show, :close, :audit_logs ]
 
       def index
         render_success(data: current_user.term_accounts.includes(parent_account: :bank).order(created_at: :desc))
@@ -52,7 +52,7 @@ module Api
 
       def audit_log_json(audit)
         raw = audit.audited_changes["balance"]
-        old_val, new_val = raw.is_a?(Array) ? [raw[0], raw[1]] : [nil, raw]
+        old_val, new_val = raw.is_a?(Array) ? [ raw[0], raw[1] ] : [ nil, raw ]
         {
           id:          audit.id,
           table_name:  "term_account",

@@ -1,6 +1,6 @@
 module Imports
   class ProcessInvestmentRowService
-    DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"].freeze
+    DATE_FORMATS = [ "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y" ].freeze
 
     def initialize(batch, row, idx)
       @batch = batch

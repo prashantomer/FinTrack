@@ -15,7 +15,7 @@ class CreateImportBatches < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :import_batches, [:user_id, :import_type, :import_version],
+    add_index :import_batches, [ :user_id, :import_type, :import_version ],
               unique: true, name: "idx_import_batches_version"
   end
 end

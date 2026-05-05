@@ -6,8 +6,8 @@ module Investments
     end
 
     def call
-      page_size = [[(@params[:page_size] || @params[:limit] || 20).to_i, 1].max, 200].min
-      page      = [(@params[:page] || 1).to_i, 1].max
+      page_size = [ [ (@params[:page_size] || @params[:limit] || 20).to_i, 1 ].max, 200 ].min
+      page      = [ (@params[:page] || 1).to_i, 1 ].max
       offset    = (page - 1) * page_size
 
       scope = @user.investments.includes(:user_instrument)

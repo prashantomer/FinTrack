@@ -1,6 +1,6 @@
 namespace :transactions do
   desc "Correct a transaction amount/type and recalculate account balance. Usage: rake transactions:correct[id]"
-  task :correct, [:id] => :environment do |_, args|
+  task :correct, [ :id ] => :environment do |_, args|
     txn = Transaction.find(args[:id])
     puts "Transaction ##{txn.id}: #{txn.transaction_type} #{txn.amount} on #{txn.date}"
     puts "Description: #{txn.description}"
@@ -33,7 +33,7 @@ namespace :transactions do
   end
 
   desc "Deactivate a transaction and reverse its balance impact. Usage: rake transactions:deactivate[id]"
-  task :deactivate, [:id] => :environment do |_, args|
+  task :deactivate, [ :id ] => :environment do |_, args|
     txn = Transaction.find(args[:id])
     abort "Transaction ##{txn.id} is already inactive" unless txn.is_active
 

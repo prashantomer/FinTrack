@@ -5,6 +5,6 @@ class CreateUserInstruments < ActiveRecord::Migration[8.1]
       t.references :instrument, null: false, foreign_key: { on_delete: :cascade }
       t.datetime :added_at, null: false, default: -> { "NOW()" }
     end
-    add_index :user_instruments, [:user_id, :instrument_id], unique: true
+    add_index :user_instruments, [ :user_id, :instrument_id ], unique: true
   end
 end

@@ -18,7 +18,7 @@ class CreateTransactions < ActiveRecord::Migration[8.1]
       t.boolean :is_active,         null: false, default: true
       t.timestamps
     end
-    add_index :transactions, [:date, :id]
+    add_index :transactions, [ :date, :id ]
     add_index :transactions, :public_id, unique: true
   end
 end

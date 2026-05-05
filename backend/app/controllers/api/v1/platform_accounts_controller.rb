@@ -1,7 +1,7 @@
 module Api
   module V1
     class PlatformAccountsController < ApplicationController
-      before_action :set_platform_account, only: [:show, :update, :destroy]
+      before_action :set_platform_account, only: [ :show, :update, :destroy ]
 
       def index
         render_success(data: current_user.platform_accounts.includes(:platform).order(:nickname))

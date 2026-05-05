@@ -1,7 +1,7 @@
 class Account < ApplicationRecord
   class Error < StandardError; end
 
-  audited only: [:balance]
+  audited only: [ :balance ]
 
   belongs_to :user
   belongs_to :bank
