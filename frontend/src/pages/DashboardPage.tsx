@@ -71,7 +71,8 @@ function StatCard({
 
 // ── Account balances ─────────────────────────────────────────────────────────
 
-function AccountBalancesCard({ accounts, total }: { accounts: AccountSummary[]; total: number }) {
+function AccountBalancesCard({ accounts, total, formatCurrency }: { accounts: AccountSummary[]; total: number; formatCurrency: (v: number) => string }) {
+  const fmt = { format: formatCurrency }
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-2">
@@ -108,11 +109,13 @@ function AccountBalancesCard({ accounts, total }: { accounts: AccountSummary[]; 
 // ── Portfolio breakdown ──────────────────────────────────────────────────────
 
 function PortfolioCard({
-  holdings, total,
+  holdings, total, formatCurrency,
 }: {
   holdings: InvestmentTypeBreakdown[]
   total: number
+  formatCurrency: (v: number) => string
 }) {
+  const fmt = { format: formatCurrency }
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-2">
@@ -161,6 +164,9 @@ function PortfolioCard({
 
 function CashFlowCard() {
   const [months, setMonths] = useState(6)
+  const { formatCurrency, formatCurrencyCompact } = useCurrency()
+  const fmtCompact = formatCurrencyCompact
+  const tooltipFmt = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
   const { data: trends } = useSpendingTrends(months)
 
   return (
@@ -200,7 +206,8 @@ function CashFlowCard() {
 
 // ── Recent transactions ──────────────────────────────────────────────────────
 
-function RecentTransactionsCard({ transactions }: { transactions: RecentTransaction[] }) {
+function RecentTransactionsCard({ transactions, formatCurrency }: { transactions: RecentTransaction[]; formatCurrency: (v: number) => string }) {
+  const fmt = { format: formatCurrency }
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-2">
@@ -235,7 +242,8 @@ function RecentTransactionsCard({ transactions }: { transactions: RecentTransact
 
 // ── Upcoming maturities ──────────────────────────────────────────────────────
 
-function UpcomingMaturitiesCard({ maturities }: { maturities: TermAccountSummary[] }) {
+function UpcomingMaturitiesCard({ maturities, formatCurrency }: { maturities: TermAccountSummary[]; formatCurrency: (v: number) => string }) {
+  const fmt = { format: formatCurrency }
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -285,10 +293,8 @@ function UpcomingMaturitiesCard({ maturities }: { maturities: TermAccountSummary
 
 export function DashboardPage() {
   const [, forceRender] = useState(0)
-  const { formatCurrency, formatCurrencyCompact } = useCurrency()
+  const { formatCurrency } = useCurrency()
   const fmt = { format: formatCurrency }
-  const fmtCompact = formatCurrencyCompact
-  const tooltipFmt = (v: ValueType | undefined) => typeof v === 'number' ? formatCurrency(v) : String(v ?? '')
 
   const { data: dash, dataUpdatedAt, isFetching } = useDashboard()
   const { mutate: refreshCache, isPending: isRefreshing } = useRefreshDashboard()
@@ -415,10 +421,12 @@ export function DashboardPage() {
         <AccountBalancesCard
           accounts={dash?.accounts ?? []}
           total={dash?.accounts_balance ?? 0}
+          formatCurrency={formatCurrency}
         />
         <PortfolioCard
           holdings={dash?.investment_holdings ?? []}
           total={dash?.portfolio_value ?? 0}
+          formatCurrency={formatCurrency}
         />
       </div>
 
@@ -427,12 +435,12 @@ export function DashboardPage() {
         <div className="lg:col-span-2">
           <CashFlowCard />
         </div>
-        <RecentTransactionsCard transactions={dash?.recent_transactions ?? []} />
+        <RecentTransactionsCard transactions={dash?.recent_transactions ?? []} formatCurrency={formatCurrency} />
       </div>
 
       {/* ── Upcoming maturities ── */}
       {(dash?.upcoming_maturities?.length ?? 0) > 0 && (
-        <UpcomingMaturitiesCard maturities={dash!.upcoming_maturities} />
+        <UpcomingMaturitiesCard maturities={dash!.upcoming_maturities} formatCurrency={formatCurrency} />
       )}
     </div>
   )
