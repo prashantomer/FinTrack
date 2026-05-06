@@ -6,20 +6,39 @@ FactoryBot.define do
 
     import_type { "investments" }
     file_name   { generate(:import_file_name) }
-    raw_csv     { "investment_type,name\nstock,Acme Corp\n" }
     status      { "pending" }
     total_rows  { 0 }
     processed_rows { 0 }
     failed_rows    { 0 }
 
+    after(:build) do |batch|
+      batch.file.attach(
+        io: StringIO.new("investment_type,name\nstock,Acme Corp\n"),
+        filename: batch.file_name,
+        content_type: "text/csv"
+      )
+    end
+
     trait :transactions do
       import_type { "transactions" }
-      raw_csv     { "date,amount,type\n2024-01-01,1000,credit\n" }
+      after(:build) do |batch|
+        batch.file.attach(
+          io: StringIO.new("date,amount,type\n2024-01-01,1000,credit\n"),
+          filename: batch.file_name,
+          content_type: "text/csv"
+        )
+      end
     end
 
     trait :term_accounts do
       import_type { "term_accounts" }
-      raw_csv     { "account_type,amount,open_date\nfd,50000,2024-01-01\n" }
+      after(:build) do |batch|
+        batch.file.attach(
+          io: StringIO.new("account_type,amount,open_date\nfd,50000,2024-01-01\n"),
+          filename: batch.file_name,
+          content_type: "text/csv"
+        )
+      end
     end
 
     trait :processing do
