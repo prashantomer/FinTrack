@@ -9,6 +9,7 @@ import { setupErrorReporter } from '@/lib/errorReporter'
 import { AuthProvider } from '@/context/AuthContext'
 import { getErrorMessage } from '@/lib/errors'
 import { AccountsPage } from '@/pages/AccountsPage'
+import { AssistantPage } from '@/pages/AssistantPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { HoldingsPage } from '@/pages/HoldingsPage'
 import { InstrumentsPage } from '@/pages/InstrumentsPage'
@@ -47,6 +48,7 @@ function AppRoutes() {
                 <Route path="/portfolio" element={<PortfolioPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/imports" element={<ImportsPage />} />
+                <Route path="/assistant" element={<AssistantPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AppShell>

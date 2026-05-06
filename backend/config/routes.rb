@@ -61,6 +61,21 @@ Rails.application.routes.draw do
       end
 
       post "errors", to: "client_errors#create"
+
+      namespace :assistant do
+        resource :setting, only: [ :show, :update ]
+        post "setting/test", to: "settings#test"
+
+        resources :messages, only: [ :index, :create ] do
+          collection { delete :all, to: "messages#destroy_all" }
+          member do
+            post   :pin
+            delete :pin, action: :unpin
+          end
+        end
+        resources :attachments, only: [ :create, :show ]
+        post :sessions, to: "sessions#create"
+      end
     end
   end
 end

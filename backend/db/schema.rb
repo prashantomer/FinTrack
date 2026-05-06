@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_06_090844) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_06_115418) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -57,6 +57,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_090844) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "assistant_messages", force: :cascade do |t|
+    t.text "content"
+    t.datetime "created_at", null: false
+    t.integer "latency_ms"
+    t.string "model"
+    t.boolean "pinned", default: false, null: false
+    t.string "provider"
+    t.string "role", null: false
+    t.uuid "session_id", null: false
+    t.integer "token_estimate"
+    t.integer "tokens_in"
+    t.integer "tokens_out"
+    t.jsonb "tool_arguments"
+    t.string "tool_name"
+    t.jsonb "tool_result"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "created_at"], name: "index_assistant_messages_on_user_id_and_created_at"
+    t.index ["user_id", "session_id"], name: "index_assistant_messages_on_user_id_and_session_id"
+    t.index ["user_id"], name: "idx_assistant_messages_pinned", where: "(pinned IS TRUE)"
+    t.index ["user_id"], name: "index_assistant_messages_on_user_id"
   end
 
   create_table "audits", force: :cascade do |t|
@@ -236,6 +259,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_090844) do
     t.index ["user_id"], name: "index_transactions_on_user_id"
   end
 
+  create_table "user_assistant_settings", force: :cascade do |t|
+    t.text "api_key"
+    t.string "base_url"
+    t.datetime "created_at", null: false
+    t.integer "daily_limit", default: 100, null: false
+    t.text "last_test_error"
+    t.string "last_test_status"
+    t.datetime "last_tested_at"
+    t.string "model"
+    t.string "provider"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id"], name: "index_user_assistant_settings_on_user_id", unique: true
+  end
+
   create_table "user_instruments", force: :cascade do |t|
     t.datetime "added_at", default: -> { "now()" }, null: false
     t.bigint "instrument_id", null: false
@@ -263,6 +301,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_090844) do
   add_foreign_key "accounts", "users", on_delete: :cascade
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "assistant_messages", "users"
   add_foreign_key "follios", "platform_accounts", on_delete: :cascade
   add_foreign_key "follios", "user_instruments", on_delete: :cascade
   add_foreign_key "follios", "users", on_delete: :cascade
@@ -277,6 +316,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_090844) do
   add_foreign_key "term_accounts", "users", on_delete: :cascade
   add_foreign_key "transactions", "instruments", on_delete: :nullify
   add_foreign_key "transactions", "users", on_delete: :cascade
+  add_foreign_key "user_assistant_settings", "users"
   add_foreign_key "user_instruments", "instruments", on_delete: :cascade
   add_foreign_key "user_instruments", "users", on_delete: :cascade
 end

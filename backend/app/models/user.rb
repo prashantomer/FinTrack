@@ -10,6 +10,12 @@ class User < ApplicationRecord
   has_many :transactions,      dependent: :destroy
   has_many :follios,           dependent: :destroy
   has_many :import_batches,    dependent: :destroy
+  has_many :assistant_messages, dependent: :destroy
+  has_one  :assistant_setting,  class_name: "UserAssistantSetting", dependent: :destroy
+
+  def assistant_setting!
+    assistant_setting || build_assistant_setting
+  end
 
   validates :email,      presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, presence: true

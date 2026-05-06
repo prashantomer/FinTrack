@@ -46,5 +46,7 @@ module Backend
     config.active_record.yaml_column_permitted_classes = [
       BigDecimal, Date, Time, DateTime, Symbol
     ]
+
+    config.middleware.use Rack::Attack
   end
 end

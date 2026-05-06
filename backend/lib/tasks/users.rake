@@ -46,7 +46,7 @@ CURRENCIES = [
   { label: "CAD  – Canadian Dollar    C$ (e.g. C$1,234)",             code: "CAD", locale: "en-CA" },
   { label: "SGD  – Singapore Dollar   S$ (e.g. S$1,234)",             code: "SGD", locale: "en-SG" },
   { label: "AED  – UAE Dirham         AED (e.g. AED 1,234)",          code: "AED", locale: "ar-AE" },
-  { label: "Other – enter manually",                                  code: nil,   locale: nil },
+  { label: "Other – enter manually",                                  code: nil,   locale: nil }
 ].freeze
 
 def pick_currency
@@ -62,9 +62,9 @@ def pick_currency
     if entry[:code].nil?
       code   = UsersRakeIO.prompt_required("  Currency code   (e.g. CHF, MXN, BRL)")
       locale = UsersRakeIO.prompt_required("  Locale          (e.g. de-CH, es-MX, pt-BR)")
-      return [code, locale]
+      return [ code, locale ]
     end
-    return [entry[:code], entry[:locale]]
+    return [ entry[:code], entry[:locale] ]
   end
 end
 
@@ -112,7 +112,7 @@ namespace :users do
     { label: "Investments",       assoc: :investments,       format: ->(i) { "##{i.id}  #{i.investment_type.to_s.ljust(15)}  #{i.name}" } },
     { label: "Transactions",      assoc: :transactions,      format: ->(t) { "##{t.id}  #{t.date}  #{t.transaction_type.to_s.ljust(6)}  #{format('%.2f', t.amount).rjust(12)}  #{t.description || '—'}" } },
     { label: "Term accounts",     assoc: :term_accounts,     format: ->(t) { "##{t.id}  #{t.account_type.to_s.upcase.ljust(3)}  #{(t.account_number || '—').ljust(24)}  #{format('%.2f', t.balance).rjust(12)}  #{t.is_active ? 'active' : 'closed'}" } },
-    { label: "Accounts",          assoc: :accounts,          format: ->(a) { "##{a.id}  #{a.bank.short_name.ljust(6)}  #{a.nickname.ljust(20)}  #{format('%.2f', a.balance).rjust(12)}  #{a.account_type}" } },
+    { label: "Accounts",          assoc: :accounts,          format: ->(a) { "##{a.id}  #{a.bank.short_name.ljust(6)}  #{a.nickname.ljust(20)}  #{format('%.2f', a.balance).rjust(12)}  #{a.account_type}" } }
   ].freeze
 
   desc "Wipe a user's financial data (interactive). Pass FAST=1 to confirm once and delete everything."

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, LayoutDashboard, LogOut, PieChart, Settings, TrendingUp, Upload } from 'lucide-react'
+import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, LayoutDashboard, LogOut, PieChart, Settings, Sparkles, TrendingUp, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/context/AuthContext'
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/portfolio', label: 'Portfolio', icon: PieChart },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/imports', label: 'Imports', icon: Upload },
+  { to: '/assistant', label: 'Assistant', icon: Sparkles },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
