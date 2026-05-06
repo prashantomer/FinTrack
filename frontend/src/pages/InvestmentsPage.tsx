@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { InvestmentForm } from '@/components/investments/InvestmentForm'
@@ -13,7 +14,8 @@ import { calcGainLoss } from '@/lib/finance'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import type { Investment, InvestmentType } from '@/types'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 15
+const ALL_TYPES: InvestmentType[] = ['stock', 'mutual_fund']
 
 export function InvestmentsPage() {
   const qc = useQueryClient()
@@ -21,8 +23,9 @@ export function InvestmentsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Investment | null>(null)
   const [page, setPage] = useState(1)
+  const [typeFilter, setTypeFilter] = useState<InvestmentType | undefined>(undefined)
 
-  const { data, isLoading, isFetching } = useInvestments(undefined, page, PAGE_SIZE)
+  const { data, isLoading, isFetching } = useInvestments(typeFilter ? [typeFilter] : undefined, page, PAGE_SIZE)
   const createMutation = useCreateInvestment()
   const updateMutation = useUpdateInvestment()
   const deleteMutation = useDeleteInvestment()
@@ -53,7 +56,22 @@ export function InvestmentsPage() {
         <Button onClick={() => { setEditing(null); setOpen(true) }}><Plus size={16} className="mr-1" />Add</Button>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-4">
+        <div className="flex flex-wrap gap-3">
+          <Select
+            value={typeFilter ?? 'all'}
+            onValueChange={v => { setTypeFilter(v === 'all' ? undefined : v as InvestmentType); setPage(1) }}
+          >
+            <SelectTrigger className="w-44"><SelectValue placeholder="All Types" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {ALL_TYPES.map(t => (
+                <SelectItem key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {isLoading ? (
           <div className="text-muted-foreground">Loading…</div>
         ) : (

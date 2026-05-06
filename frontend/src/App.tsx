@@ -10,7 +10,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { getErrorMessage } from '@/lib/errors'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { FolliosPage } from '@/pages/FolliosPage'
+import { HoldingsPage } from '@/pages/HoldingsPage'
 import { InstrumentsPage } from '@/pages/InstrumentsPage'
 import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -42,7 +42,7 @@ function AppRoutes() {
                 <Route path="/transactions" element={<TransactionsPage />} />
                 <Route path="/platform-accounts" element={<PlatformAccountsPage />} />
                 <Route path="/instruments" element={<InstrumentsPage />} />
-                <Route path="/follios" element={<FolliosPage />} />
+                <Route path="/holdings" element={<HoldingsPage />} />
                 <Route path="/investments" element={<InvestmentsPage />} />
                 <Route path="/portfolio" element={<PortfolioPage />} />
                 <Route path="/reports" element={<ReportsPage />} />

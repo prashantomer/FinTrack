@@ -1,16 +1,16 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import { ArrowDownRight, ArrowUpRight, Landmark, RefreshCw, TrendingUp, Wallet } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, ExternalLink, Landmark, RefreshCw, TrendingUp, Wallet } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Bar, CartesianGrid, ComposedChart, Line,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import type { ValueType } from 'recharts/types/component/DefaultTooltipContent'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { MaturitiesSheet, MaturitiesTable } from '@/components/accounts/MaturitiesSheet'
 import { useDashboard, useDashboardCacheStatus, useRefreshDashboard, useSpendingTrends } from '@/hooks/useReports'
 import { ACCOUNT_TYPE_LABELS, INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -50,17 +50,17 @@ function StatCard({
   trend?: { label: string; positive: boolean }
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon size={16} className="text-muted-foreground" />
+    <Card size="sm">
+      <CardHeader className="flex flex-row items-center justify-between pb-1">
+        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon size={14} className="text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+        <div className="text-xl font-bold leading-tight">{value}</div>
+        {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
         {trend && (
-          <p className={`text-xs font-medium mt-1 flex items-center gap-0.5 ${trend.positive ? 'text-green-600' : 'text-red-500'}`}>
-            {trend.positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+          <p className={`text-[11px] font-medium mt-0.5 flex items-center gap-0.5 ${trend.positive ? 'text-green-600' : 'text-red-500'}`}>
+            {trend.positive ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
             {trend.label}
           </p>
         )}
@@ -74,30 +74,32 @@ function StatCard({
 function AccountBalancesCard({ accounts, total, formatCurrency }: { accounts: AccountSummary[]; total: number; formatCurrency: (v: number) => string }) {
   const fmt = { format: formatCurrency }
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
+    <Card size="sm" className="flex flex-col">
+      <CardHeader className="pb-1">
         <CardTitle className="text-sm">Bank Accounts</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
-        {accounts.map((a) => (
-          <div key={a.id} className="flex items-center justify-between px-6 py-3 border-b last:border-0">
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{a.nickname}</p>
-              <p className="text-xs text-muted-foreground">
-                {a.bank_short_name}
-                <span className="mx-1 opacity-40">·</span>
-                {ACCOUNT_TYPE_LABELS[a.account_type as keyof typeof ACCOUNT_TYPE_LABELS] ?? a.account_type}
+      <CardContent className="flex-1 p-0 flex flex-col">
+        <div>
+          {accounts.map((a) => (
+            <div key={a.id} className="flex items-center justify-between px-6 py-3 border-b last:border-0">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{a.nickname}</p>
+                <p className="text-xs text-muted-foreground">
+                  {a.bank_short_name}
+                  <span className="mx-1 opacity-40">·</span>
+                  {ACCOUNT_TYPE_LABELS[a.account_type as keyof typeof ACCOUNT_TYPE_LABELS] ?? a.account_type}
+                </p>
+              </div>
+              <p className={`text-sm font-mono font-semibold shrink-0 ml-4 ${a.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {fmt.format(a.balance)}
               </p>
             </div>
-            <p className={`text-sm font-mono font-semibold shrink-0 ml-4 ${a.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {fmt.format(a.balance)}
-            </p>
-          </div>
-        ))}
-        {accounts.length === 0 && (
-          <p className="text-sm text-muted-foreground px-6 py-4">No active accounts</p>
-        )}
-        <div className="flex items-center justify-between px-6 py-3 bg-muted/40">
+          ))}
+          {accounts.length === 0 && (
+            <p className="text-sm text-muted-foreground px-6 py-4">No active accounts</p>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-6 py-3 bg-muted/40 mt-auto border-t">
           <p className="text-xs font-medium text-muted-foreground">Total</p>
           <p className="text-sm font-bold">{fmt.format(total)}</p>
         </div>
@@ -117,8 +119,8 @@ function PortfolioCard({
 }) {
   const fmt = { format: formatCurrency }
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
+    <Card size="sm" className="flex flex-col">
+      <CardHeader className="pb-1">
         <CardTitle className="text-sm">Portfolio Breakdown</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 p-0">
@@ -171,8 +173,8 @@ function CashFlowCard() {
   const { data: trends } = useSpendingTrends(months)
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card size="sm">
+      <CardHeader className="flex flex-row items-center justify-between pb-1">
         <CardTitle className="text-sm">Monthly Cash Flow</CardTitle>
         <div className="flex gap-1">
           {[3, 6, 12].map((m) => (
@@ -189,7 +191,7 @@ function CashFlowCard() {
         </div>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={150}>
           <ComposedChart data={trends?.months ?? []} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
@@ -207,15 +209,23 @@ function CashFlowCard() {
 
 // ── Recent transactions ──────────────────────────────────────────────────────
 
+const RECENT_TRANSACTIONS_LIMIT = 5
+
 function RecentTransactionsCard({ transactions, formatCurrency }: { transactions: RecentTransaction[]; formatCurrency: (v: number) => string }) {
   const fmt = { format: formatCurrency }
+  const navigate = useNavigate()
+  const visible = transactions.slice(0, RECENT_TRANSACTIONS_LIMIT)
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
+    <Card size="sm" className="flex flex-col">
+      <CardHeader className="pb-1 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Recent Transactions</CardTitle>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => navigate('/transactions')}>
+          View all
+          <ExternalLink size={12} />
+        </Button>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        {transactions.map((t) => (
+        {visible.map((t) => (
           <div key={t.id} className="flex items-start justify-between px-6 py-3 border-b last:border-0 gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm truncate">
@@ -233,7 +243,7 @@ function RecentTransactionsCard({ transactions, formatCurrency }: { transactions
             </p>
           </div>
         ))}
-        {transactions.length === 0 && (
+        {visible.length === 0 && (
           <p className="text-sm text-muted-foreground px-6 py-4">No transactions yet</p>
         )}
       </CardContent>
@@ -243,48 +253,21 @@ function RecentTransactionsCard({ transactions, formatCurrency }: { transactions
 
 // ── Upcoming maturities ──────────────────────────────────────────────────────
 
-function UpcomingMaturitiesCard({ maturities, formatCurrency }: { maturities: TermAccountSummary[]; formatCurrency: (v: number) => string }) {
-  const fmt = { format: formatCurrency }
+const MATURITIES_PREVIEW_LIMIT = 2
+
+function UpcomingMaturitiesCard({ maturities, formatCurrency, onViewAll }: { maturities: TermAccountSummary[]; formatCurrency: (v: number) => string; onViewAll: () => void }) {
+  const visible = maturities.slice(0, MATURITIES_PREVIEW_LIMIT)
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card size="sm">
+      <CardHeader className="pb-1 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Upcoming Maturities <span className="text-muted-foreground font-normal">(next 90 days)</span></CardTitle>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={onViewAll}>
+          View all ({maturities.length})
+          <ExternalLink size={12} />
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Account</TableHead>
-              <TableHead>Bank</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Matures</TableHead>
-              <TableHead className="text-right">Days</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
-              <TableHead className="text-right">Payout</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {maturities.map((ta) => (
-              <TableRow key={ta.id}>
-                <TableCell className="font-mono text-sm">{ta.account_number || '—'}</TableCell>
-                <TableCell className="text-sm">{ta.bank_short_name}</TableCell>
-                <TableCell>
-                  <Badge variant={(ta.type ?? ta.account_type) === 'fd' ? 'default' : 'secondary'}>
-                    {(ta.type ?? ta.account_type ?? '').toUpperCase()}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{ta.maturity_date}</TableCell>
-                <TableCell className={`text-right font-mono text-sm font-semibold ${ta.days_remaining <= 14 ? 'text-orange-500' : 'text-muted-foreground'}`}>
-                  {ta.days_remaining}d
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm">{fmt.format(ta.balance)}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-green-600">
-                  {ta.maturity_amount != null ? fmt.format(ta.maturity_amount) : '—'}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <MaturitiesTable maturities={visible} formatCurrency={formatCurrency} />
       </CardContent>
     </Card>
   )
@@ -294,6 +277,7 @@ function UpcomingMaturitiesCard({ maturities, formatCurrency }: { maturities: Te
 
 export function DashboardPage() {
   const [, forceRender] = useState(0)
+  const [maturitiesSheetOpen, setMaturitiesSheetOpen] = useState(false)
   const { formatCurrency } = useCurrency()
   const fmt = { format: formatCurrency }
 
@@ -317,9 +301,9 @@ export function DashboardPage() {
     : null
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* ── Header ── */}
-      <div className="shrink-0 border-b bg-background px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-10 border-b bg-background px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -378,46 +362,49 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-5">
-      {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Net Worth"
-          value={fmt.format(dash?.net_worth ?? 0)}
-          icon={Wallet}
-          sub={`${fmt.format((dash?.accounts_balance ?? 0) + (dash?.term_accounts_balance ?? 0))} cash · ${fmt.format(dash?.portfolio_value ?? 0)} invested`}
-        />
-        <StatCard
-          title="Cash Balance"
-          value={fmt.format(dash?.accounts_balance ?? 0)}
-          icon={Landmark}
-          sub={dash && dash.term_accounts_balance > 0 ? `+ ${fmt.format(dash.term_accounts_balance)} in FD / PPF` : undefined}
-        />
-        <StatCard
-          title="This Month"
-          value={fmt.format(thisMonthNet)}
-          icon={thisMonthNet >= 0 ? ArrowUpRight : ArrowDownRight}
-          sub={`↑ ${fmt.format(dash?.this_month_inbound ?? 0)} · ↓ ${fmt.format(dash?.this_month_outbound ?? 0)}`}
-          trend={prevMonthNet !== 0 ? { label: momLabel, positive: momDelta >= 0 } : undefined}
-        />
-        <StatCard
-          title="Portfolio"
-          value={fmt.format(dash?.portfolio_value ?? 0)}
-          icon={TrendingUp}
-          sub={`${fmt.format(dash?.total_invested ?? 0)} invested`}
-          trend={
-            dash && dash.total_invested > 0
-              ? {
-                  label: `${dash.unrealized_gain >= 0 ? '+' : ''}${fmt.format(dash.unrealized_gain)} (${gainPct}%)`,
-                  positive: (dash.unrealized_gain ?? 0) >= 0,
-                }
-              : undefined
-          }
-        />
+      <div className="px-6 pt-4 pb-10 flex flex-col gap-3">
+      {/* ── Stat cards (2×2) + Cash Flow ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard
+            title="Net Worth"
+            value={fmt.format(dash?.net_worth ?? 0)}
+            icon={Wallet}
+            sub={`${fmt.format((dash?.accounts_balance ?? 0) + (dash?.term_accounts_balance ?? 0))} cash · ${fmt.format(dash?.portfolio_value ?? 0)} invested`}
+          />
+          <StatCard
+            title="Cash Balance"
+            value={fmt.format(dash?.accounts_balance ?? 0)}
+            icon={Landmark}
+            sub={dash && dash.term_accounts_balance > 0 ? `+ ${fmt.format(dash.term_accounts_balance)} in FD / PPF` : undefined}
+          />
+          <StatCard
+            title="This Month"
+            value={fmt.format(thisMonthNet)}
+            icon={thisMonthNet >= 0 ? ArrowUpRight : ArrowDownRight}
+            sub={`↑ ${fmt.format(dash?.this_month_inbound ?? 0)} · ↓ ${fmt.format(dash?.this_month_outbound ?? 0)}`}
+            trend={prevMonthNet !== 0 ? { label: momLabel, positive: momDelta >= 0 } : undefined}
+          />
+          <StatCard
+            title="Portfolio"
+            value={fmt.format(dash?.portfolio_value ?? 0)}
+            icon={TrendingUp}
+            sub={`${fmt.format(dash?.total_invested ?? 0)} invested`}
+            trend={
+              dash && dash.total_invested > 0
+                ? {
+                    label: `${dash.unrealized_gain >= 0 ? '+' : ''}${fmt.format(dash.unrealized_gain)} (${gainPct}%)`,
+                    positive: (dash.unrealized_gain ?? 0) >= 0,
+                  }
+                : undefined
+            }
+          />
+        </div>
+        <CashFlowCard />
       </div>
 
-      {/* ── Accounts + Portfolio ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ── Accounts + Portfolio + Recent Transactions ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AccountBalancesCard
           accounts={dash?.accounts ?? []}
           total={dash?.accounts_balance ?? 0}
@@ -428,21 +415,25 @@ export function DashboardPage() {
           total={dash?.portfolio_value ?? 0}
           formatCurrency={formatCurrency}
         />
-      </div>
-
-      {/* ── Cash flow + Recent transactions ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <CashFlowCard />
-        </div>
         <RecentTransactionsCard transactions={dash?.recent_transactions ?? []} formatCurrency={formatCurrency} />
       </div>
 
       {/* ── Upcoming maturities ── */}
       {(dash?.upcoming_maturities?.length ?? 0) > 0 && (
-        <UpcomingMaturitiesCard maturities={dash!.upcoming_maturities} formatCurrency={formatCurrency} />
+        <UpcomingMaturitiesCard
+          maturities={dash!.upcoming_maturities}
+          formatCurrency={formatCurrency}
+          onViewAll={() => setMaturitiesSheetOpen(true)}
+        />
       )}
       </div>
+
+      <MaturitiesSheet
+        open={maturitiesSheetOpen}
+        onClose={() => setMaturitiesSheetOpen(false)}
+        maturities={dash?.upcoming_maturities ?? []}
+        formatCurrency={formatCurrency}
+      />
     </div>
   )
 }
