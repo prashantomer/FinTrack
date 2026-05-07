@@ -62,10 +62,12 @@ RSpec.describe Daily::PriceAndPnlSnapshotJob, type: :job do
       expect(HoldingSnapshot.last.snapshot_date).to eq(Date.current)
     end
 
-    it "skips the body when today is already complete and only ensures the next-day schedule" do
+    it "re-runs the body on a same-day re-trigger and refreshes prices/stats without duplicate rows" do
       described_class.perform_now("2026-05-07")
-      expect(Reports::HoldingSnapshotService).not_to receive(:snapshot_all!)
-      described_class.perform_now("2026-05-07")
+      expect(Reports::HoldingSnapshotService).to receive(:snapshot_all!).with(date: Date.new(2026, 5, 7)).and_call_original
+      expect {
+        described_class.perform_now("2026-05-07")
+      }.not_to change(HoldingSnapshot, :count)
     end
 
     it "calls schedule_next_run! on success and on failure (via ensure)" do

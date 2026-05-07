@@ -7,8 +7,10 @@ module Daily
   #   4. Schedule the next run for tomorrow 05:00 IST (in `ensure`, so the
   #      chain survives a failure body — the schedule never dies)
   #
-  # Idempotent. Both data writes are upserts. Same-day re-runs (catch-up,
-  # manual triggers) skip the body if today's run is already complete.
+  # Idempotent at the data layer: both writes are upserts keyed on
+  # (instrument, date) and (holding, date) respectively. Same-day re-runs
+  # always re-fetch prices and refresh stats — they don't create duplicate
+  # rows but they do bring values up to date if anything moved during the day.
   #
   # Retry policy: Sidekiq retries on failure up to 5 times with its default
   # exponential-with-jitter backoff (≈15s, ≈30s, ≈90s, ≈4m, ≈10m). Any
@@ -26,14 +28,11 @@ module Daily
       date = date_iso ? Date.parse(date_iso) : Date.current
       task = SystemTask.named(TASK_NAME)
 
-      if task.last_completed_date == date && task.last_status == "ok"
-        Rails.logger.info "[daily_pnl] already complete for #{date}, skipping body"
-        return
-      end
-
       Rails.logger.info "[daily_pnl] starting run for #{date}"
       began = Time.current
 
+      # Both writes are upserts — re-running for the same date refreshes
+      # values without creating duplicate rows.
       Instruments::PriceFetchService.call
       written = Reports::HoldingSnapshotService.snapshot_all!(date: date)
 
