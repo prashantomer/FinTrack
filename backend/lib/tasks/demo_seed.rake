@@ -16,7 +16,7 @@ namespace :db do
 
       user.transactions.delete_all
       user.investments.delete_all
-      user.follios.delete_all
+      user.folios.delete_all
       user.term_accounts.delete_all
       user.accounts.delete_all
       user.platform_accounts.delete_all
@@ -339,13 +339,16 @@ namespace :db do
         { ui: ui_bajfin,   name: "Bajaj Finance", date: "2024-09-10", amount: 35_400, cv: 41_200, qty:  5,  price: 7080, pa: kite_pa }
       ]
 
-      stocks.each do |s|
+      stocks.each_with_index do |s, idx|
         purchase_date = Date.parse(s[:date])
+        order_id = format("%s%05d", purchase_date.strftime("%y%m%d"), 100_000 + idx)
+        trade_id  = format("%s%05d", purchase_date.strftime("%y%m%d"), 900_000 + idx)
         user.investments.create!(
-          investment_type: "stock",
+          investment_type: "stock", trade_type: "buy",
           name: s[:name], amount_invested: s[:amount], current_value: s[:cv],
           purchase_date: purchase_date, user_instrument: s[:ui],
-          platform_account: s[:pa], quantity: s[:qty], buy_price: s[:price]
+          platform_account: s[:pa], quantity: s[:qty], price: s[:price],
+          order_id: order_id, trade_id: trade_id
         )
         # Debit transaction only for in-history purchases
         if purchase_date >= history_start
@@ -353,6 +356,31 @@ namespace :db do
               "Stock Purchase: #{s[:name]} (#{s[:qty]}×₹#{s[:price]})",
               purchase_date, tags: [ "investment", "stocks" ])
         end
+      end
+
+      # ── Stock partial exits (SELL trades) ─────────────────────────────────
+      # Each sell trade reduces the net position and credits proceeds back to HDFC.
+      # Demonstrates: realized gain (TCS), realized loss (Wipro), partial exit (Reliance).
+      stock_sells = [
+        { ui: ui_tcs,      name: "TCS",      date: "2025-05-12", amount: 25_500, qty:  5, price: 5_100, pa: zerodha_pa, note: "Booking partial profit" },
+        { ui: ui_reliance, name: "Reliance", date: "2025-09-08", amount: 31_500, qty: 10, price: 3_150, pa: kite_pa,    note: "Exit older lot at peak" },
+        { ui: ui_wipro,    name: "Wipro",    date: "2026-02-04", amount: 11_200, qty: 20, price:   560, pa: upstox_pa,  note: "Stop-loss exit" }
+      ]
+      stock_sells.each_with_index do |s, idx|
+        sell_date = Date.parse(s[:date])
+        order_id = format("%s%05d", sell_date.strftime("%y%m%d"), 200_000 + idx)
+        trade_id  = format("%s%05d", sell_date.strftime("%y%m%d"), 800_000 + idx)
+        user.investments.create!(
+          investment_type: "stock", trade_type: "sell",
+          name: s[:name], amount_invested: s[:amount],
+          purchase_date: sell_date, user_instrument: s[:ui],
+          platform_account: s[:pa], quantity: s[:qty], price: s[:price],
+          order_id: order_id, trade_id: trade_id,
+          notes: s[:note]
+        )
+        txn(user, hdfc_primary, "credit", s[:amount],
+            "Stock Sale: #{s[:name]} (#{s[:qty]}×₹#{s[:price]})",
+            sell_date, tags: [ "investment", "stocks", "sell" ])
       end
 
       # ── MF SIP investments (25 months per fund, each lot has a debit txn) ─
@@ -384,7 +412,7 @@ namespace :db do
             name: fund[:name], amount_invested: fund[:amounts][i], current_value: cv,
             purchase_date: dt, user_instrument: fund[:ui],
             platform_account: fund[:pa], folio_number: fund[:folio],
-            units: units, nav_at_purchase: nav
+            units: units, price: nav
           )
           txn(user, hdfc_primary, "debit", fund[:amounts][i],
               "SIP - #{fund[:name]}", dt, tags: [ "investment", "sip" ])
@@ -429,11 +457,11 @@ namespace :db do
           purchase_date = Date.parse(lot[:date])
           units = (lot[:amount] / lot[:nav]).round(3)
           user.investments.create!(
-            investment_type: "mutual_fund",
+            investment_type: "mutual_fund", trade_type: "buy",
             name: fund[:name], amount_invested: lot[:amount], current_value: lot[:cv],
             purchase_date: purchase_date, user_instrument: fund[:ui],
             platform_account: fund[:pa], folio_number: fund[:folio],
-            units: units, nav_at_purchase: lot[:nav]
+            units: units, price: lot[:nav]
           )
           # Only create debit transaction for in-history purchases
           if purchase_date >= history_start
@@ -444,9 +472,24 @@ namespace :db do
         end
       end
 
-      puts "Created #{user.investments.count} investments"
+      # ── MF partial redemption (SELL) ──────────────────────────────────────
+      # SBI Bluechip: redeem 200 units at ₹85.5 → ₹17,100 proceeds
+      sbi_redeem_date = Date.new(2025, 10, 18)
+      user.investments.create!(
+        investment_type: "mutual_fund", trade_type: "sell",
+        name: "SBI Bluechip", amount_invested: 17_100.00,
+        purchase_date: sbi_redeem_date, user_instrument: ui_sbi_blue,
+        platform_account: coin_pa, folio_number: "9876543/01",
+        units: 200, price: 85.50,
+        notes: "Partial redemption — funded Diwali shopping"
+      )
+      txn(user, hdfc_primary, "credit", 17_100.00,
+          "MF Redemption: SBI Bluechip", sbi_redeem_date,
+          tags: [ "investment", "mutual_fund", "sell" ])
 
-      # ── Follios ───────────────────────────────────────────────────────────
+      puts "Created #{user.investments.count} investments (#{user.investments.buys.count} buys, #{user.investments.sells.count} sells)"
+
+      # ── Folios ───────────────────────────────────────────────────────────
       [
         [ ui_hdfc_flexi, groww_pa, "2345678/01" ],
         [ ui_parag,      coin_pa,  "8765432/01" ],
@@ -455,9 +498,9 @@ namespace :db do
         [ ui_nippon,     groww_pa, "1122334/01" ],
         [ ui_axis_mid,   groww_pa, "5566778/01" ]
       ].each do |ui, pa, folio|
-        user.follios.create!(user_instrument: ui, platform_account: pa, folio_number: folio)
+        user.folios.create!(user_instrument: ui, platform_account: pa, folio_number: folio)
       end
-      puts "Created #{user.follios.count} follios"
+      puts "Created #{user.folios.count} folios"
 
       # ── Summary ───────────────────────────────────────────────────────────
       stock_lots = user.investments.where(investment_type: "stock")
@@ -474,7 +517,7 @@ namespace :db do
       puts "    Stocks:          #{stock_lots.count} lots / #{stock_lots.distinct.count(:user_instrument_id)} instruments"
       puts "    Mutual Funds:    #{mf_lots.count} lots / #{mf_lots.distinct.count(:user_instrument_id)} funds"
       puts "  Platform Accounts: #{user.platform_accounts.count}"
-      puts "  Follios:           #{user.follios.count}"
+      puts "  Folios:           #{user.folios.count}"
       puts "  Tracked Instruments: #{user.user_instruments.count}"
       puts ""
       puts "  Account Balances:"

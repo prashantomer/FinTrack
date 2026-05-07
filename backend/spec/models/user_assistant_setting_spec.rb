@@ -1,3 +1,28 @@
+# == Schema Information
+#
+# Table name: user_assistant_settings
+#
+#  id               :bigint           not null, primary key
+#  api_key          :text
+#  base_url         :string
+#  daily_limit      :integer          default(100), not null
+#  last_test_error  :text
+#  last_test_status :string
+#  last_tested_at   :datetime
+#  model            :string
+#  provider         :string
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  user_id          :bigint           not null
+#
+# Indexes
+#
+#  index_user_assistant_settings_on_user_id  (user_id) UNIQUE
+#
+# Foreign Keys
+#
+#  fk_rails_...  (user_id => users.id)
+#
 require "rails_helper"
 
 RSpec.describe UserAssistantSetting, type: :model do

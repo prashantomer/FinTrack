@@ -107,7 +107,7 @@ namespace :users do
   end
 
   WIPE_CATEGORIES = [
-    { label: "Follios",           assoc: :follios,           format: ->(f) { "##{f.id}  #{f.folio_number}" } },
+    { label: "Folios",           assoc: :folios,           format: ->(f) { "##{f.id}  #{f.folio_number}" } },
     { label: "Platform accounts", assoc: :platform_accounts, format: ->(p) { "##{p.id}  #{(p.platform&.name || '—').ljust(20)}  #{p.nickname}" } },
     { label: "Investments",       assoc: :investments,       format: ->(i) { "##{i.id}  #{i.investment_type.to_s.ljust(15)}  #{i.name}" } },
     { label: "Transactions",      assoc: :transactions,      format: ->(t) { "##{t.id}  #{t.date}  #{t.transaction_type.to_s.ljust(6)}  #{format('%.2f', t.amount).rjust(12)}  #{t.description || '—'}" } },
