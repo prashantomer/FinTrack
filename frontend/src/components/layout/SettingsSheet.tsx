@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -36,14 +36,14 @@ export function SettingsSheet({ open, onClose }: Props) {
   const { user, updateUser } = useAuth()
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, control, formState: { errors } } = useForm<FormValues>({
     values: {
       full_name: user ? `${user.first_name} ${user.last_name}` : '',
       currency_code: user?.currency_code ?? 'INR',
     },
   })
 
-  const currencyCode = watch('currency_code')
+  const currencyCode = useWatch({ control, name: 'currency_code' })
   const selectedOption = CURRENCY_OPTIONS.find(o => o.code === currencyCode)
 
   async function onSubmit(data: FormValues) {

@@ -13,6 +13,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8000',
+      // Active Storage download endpoints (signed URLs from rails_blob_path)
+      '/rails': 'http://localhost:8000',
     },
   },
 })

@@ -1,6 +1,24 @@
 import { useEffect, useRef } from 'react'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble, ToolGroupBubble } from './MessageBubble'
 import type { AssistantMessage } from '@/api/assistant'
+
+type Tile =
+  | { kind: 'message'; message: AssistantMessage }
+  | { kind: 'tools'; messages: AssistantMessage[] }
+
+function buildTiles(items: AssistantMessage[]): Tile[] {
+  const tiles: Tile[] = []
+  for (const m of items) {
+    if (m.role === 'tool') {
+      const last = tiles[tiles.length - 1]
+      if (last && last.kind === 'tools') last.messages.push(m)
+      else tiles.push({ kind: 'tools', messages: [m] })
+    } else {
+      tiles.push({ kind: 'message', message: m })
+    }
+  }
+  return tiles
+}
 
 interface Props {
   messages: AssistantMessage[]
@@ -48,16 +66,22 @@ export function MessageList({ messages, isThinking, onPin, onUnpin, onReference,
               <div className="flex-1 border-t" />
             </div>
           )}
-          {g.items.map(m => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              onPin={onPin}
-              onUnpin={onUnpin}
-              onReference={onReference}
-              isReferenced={referencedIds?.has(m.id)}
-            />
-          ))}
+          {buildTiles(g.items).map(tile => {
+            if (tile.kind === 'tools') {
+              return <ToolGroupBubble key={`tools-${tile.messages[0].id}`} messages={tile.messages} />
+            }
+            const m = tile.message
+            return (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                onPin={onPin}
+                onUnpin={onUnpin}
+                onReference={onReference}
+                isReferenced={referencedIds?.has(m.id)}
+              />
+            )
+          })}
         </div>
       ))}
       {isThinking && (

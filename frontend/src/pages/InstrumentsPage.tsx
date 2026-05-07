@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { BookOpen } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+// (useEffect kept for the BrowseSheet infinite-scroll listener below)
+import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/hooks/useDebounce'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -16,9 +17,18 @@ import {
   useTrackedInstruments,
   useUntrackInstrument,
 } from '@/hooks/useInstruments'
-import { useInvestments } from '@/hooks/useInvestments'
+import { usePortfolio } from '@/hooks/useReports'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import type { Instrument, InvestmentType } from '@/types'
+
+function formatPrice(p: number): string {
+  return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(p)
+}
+
+function shortDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+}
 
 // ── Browse sheet ──────────────────────────────────────────────────────────────
 
@@ -117,6 +127,7 @@ function BrowseSheet({ open, onClose, trackedIds }: BrowseSheetProps) {
                     <TableHead>Type</TableHead>
                     <TableHead>Ticker</TableHead>
                     <TableHead>Fund House</TableHead>
+                    <TableHead className="text-right">Last Price</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -132,6 +143,16 @@ function BrowseSheet({ open, onClose, trackedIds }: BrowseSheetProps) {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {inst.fund_house || '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {inst.last_price != null ? (
+                          <div className="flex flex-col items-end leading-tight">
+                            <span>{formatPrice(inst.last_price)}</span>
+                            {inst.last_price_at && (
+                              <span className="text-[10px] text-muted-foreground">{shortDate(inst.last_price_at)}</span>
+                            )}
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-right">
                         {trackedIds.has(inst.id) ? (
@@ -157,7 +178,7 @@ function BrowseSheet({ open, onClose, trackedIds }: BrowseSheetProps) {
                   ))}
                   {instruments.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                         No instruments found
                       </TableCell>
                     </TableRow>
@@ -184,17 +205,16 @@ function BrowseSheet({ open, onClose, trackedIds }: BrowseSheetProps) {
 // ── Tracked instrument table ──────────────────────────────────────────────────
 
 interface TrackedTableProps {
-  title: string
   instruments: Instrument[]
   emptyMessage: string
+  allowUntrack?: boolean
 }
 
-function TrackedTable({ title, instruments, emptyMessage }: TrackedTableProps) {
+function TrackedTable({ instruments, emptyMessage, allowUntrack = false }: TrackedTableProps) {
   const untrackMutation = useUntrackInstrument()
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{title}</h2>
       <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
@@ -203,6 +223,7 @@ function TrackedTable({ title, instruments, emptyMessage }: TrackedTableProps) {
               <TableHead>Type</TableHead>
               <TableHead>Ticker</TableHead>
               <TableHead>Fund House</TableHead>
+              <TableHead className="text-right">Last Price</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -219,22 +240,38 @@ function TrackedTable({ title, instruments, emptyMessage }: TrackedTableProps) {
                 <TableCell className="text-sm text-muted-foreground">
                   {inst.fund_house || '—'}
                 </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {inst.last_price != null ? (
+                    <div className="flex flex-col items-end leading-tight">
+                      <span>{formatPrice(inst.last_price)}</span>
+                      {inst.last_price_at && (
+                        <span className="text-[10px] text-muted-foreground">{shortDate(inst.last_price_at)}</span>
+                      )}
+                    </div>
+                  ) : <span className="text-muted-foreground">—</span>}
+                </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => untrackMutation.mutate(inst.id)}
-                    disabled={untrackMutation.isPending}
-                  >
-                    Untrack
-                  </Button>
+                  {allowUntrack ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => untrackMutation.mutate(inst.id)}
+                      disabled={untrackMutation.isPending}
+                    >
+                      Untrack
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground italic" title="Cannot untrack — has trades. Delete all trades first.">
+                      has trades
+                    </span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
             {instruments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   {emptyMessage}
                 </TableCell>
               </TableRow>
@@ -248,23 +285,44 @@ function TrackedTable({ title, instruments, emptyMessage }: TrackedTableProps) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+type TabKey = 'held' | 'withdrawn' | 'idle'
+const PAGE_SIZE = 25
+
 export function InstrumentsPage() {
   const qc = useQueryClient()
   const [browseOpen, setBrowseOpen] = useState(false)
+  const [tab, setTab] = useState<TabKey>('held')
+  const [page, setPage] = useState(1)
 
   const { data: tracked = [], isLoading: trackedLoading, isFetching } = useTrackedInstruments()
-  const { data: investmentsData } = useInvestments(undefined, 1, 200)
+  const { data: portfolio } = usePortfolio()
   const trackedIds = new Set(tracked.map(i => i.id))
 
-  // Instrument IDs that have at least one investment
-  const instrumentIdsInPortfolio = new Set(
-    (investmentsData?.items ?? [])
-      .map(inv => inv.instrument_id)
-      .filter((id): id is number => id !== null)
-  )
+  // Bucket each tracked instrument using portfolio aggregation:
+  //   held       → position with is_closed=false (net qty > 0)
+  //   withdrawn  → position but is_closed=true (all sold off)
+  //   idle       → no position at all
+  const buckets = useMemo(() => {
+    const positions    = portfolio?.positions ?? []
+    const heldIds      = new Set(positions.filter(p => !p.is_closed).map(p => p.instrument_id))
+    const withdrawnIds = new Set(positions.filter(p =>  p.is_closed).map(p => p.instrument_id))
+    return {
+      held:      tracked.filter(i =>  heldIds.has(i.id)),
+      withdrawn: tracked.filter(i => !heldIds.has(i.id) &&  withdrawnIds.has(i.id)),
+      idle:      tracked.filter(i => !heldIds.has(i.id) && !withdrawnIds.has(i.id)),
+    }
+  }, [tracked, portfolio])
 
-  const inPortfolio = tracked.filter(i => instrumentIdsInPortfolio.has(i.id))
-  const notYetInPortfolio = tracked.filter(i => !instrumentIdsInPortfolio.has(i.id))
+  const TABS: { value: TabKey; label: string; count: number; emptyMessage: string }[] = [
+    { value: 'held',      label: 'Currently Held',  count: buckets.held.length,      emptyMessage: 'No tracked instruments are currently held — buy some to see positions here' },
+    { value: 'withdrawn', label: 'Fully Withdrawn', count: buckets.withdrawn.length, emptyMessage: 'No tracked instruments have been fully sold off' },
+    { value: 'idle',      label: 'Not Yet Invested', count: buckets.idle.length,    emptyMessage: 'All tracked instruments have at least one trade' },
+  ]
+
+  const active     = buckets[tab]
+  const totalPages = Math.max(1, Math.ceil(active.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const paged      = useMemo(() => active.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE), [active, safePage])
 
   return (
     <div className="flex flex-col h-full">
@@ -279,24 +337,55 @@ export function InstrumentsPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-8">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-4">
+        <div className="flex gap-1 border-b">
+          {TABS.map(t => (
+            <button
+              key={t.value}
+              onClick={() => { setTab(t.value); setPage(1) }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+                tab === t.value
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label}
+              <Badge variant={tab === t.value ? 'default' : 'outline'} className="text-[10px] px-1.5">
+                {t.count}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
         {trackedLoading ? (
           <div className="text-muted-foreground text-sm">Loading…</div>
         ) : (
-          <>
-            <TrackedTable
-              title="In Portfolio"
-              instruments={inPortfolio}
-              emptyMessage="No tracked instruments with investments yet"
-            />
-            <TrackedTable
-              title="Not Yet Invested"
-              instruments={notYetInPortfolio}
-              emptyMessage="All tracked instruments have investments — or track one via Browse All"
-            />
-          </>
+          <TrackedTable
+            instruments={paged}
+            emptyMessage={TABS.find(t => t.value === tab)?.emptyMessage ?? ''}
+            allowUntrack={tab === 'idle'}
+          />
         )}
       </div>
+
+      {active.length > 0 && (
+        <div className="border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm gap-4">
+          <span className="text-muted-foreground">
+            {active.length} {active.length === 1 ? 'instrument' : 'instruments'}
+          </span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>
+                <ChevronLeft size={14} />Prev
+              </Button>
+              <span className="text-muted-foreground px-1 text-xs">Page {safePage} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>
+                Next<ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <BrowseSheet
         open={browseOpen}

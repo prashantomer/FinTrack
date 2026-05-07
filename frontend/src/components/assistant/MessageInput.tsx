@@ -12,12 +12,25 @@ interface Props {
   disabled?: boolean
   referencedIds?: number[]
   onUnreference?: (id: number) => void
+  attachment?: AssistantAttachment | null
+  onAttachmentChange?: (attachment: AssistantAttachment | null) => void
 }
 
-export function MessageInput({ onSend, onUpload, isSending, isUploading, disabled, referencedIds = [], onUnreference }: Props) {
+export function MessageInput({
+  onSend, onUpload, isSending, isUploading, disabled,
+  referencedIds = [], onUnreference,
+  attachment: controlledAttachment, onAttachmentChange,
+}: Props) {
   const [text, setText] = useState('')
-  const [attachment, setAttachment] = useState<AssistantAttachment | null>(null)
+  const [internalAttachment, setInternalAttachment] = useState<AssistantAttachment | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  // Allow caller to control the attachment (used by drag-and-drop on the chat area).
+  const attachment = controlledAttachment !== undefined ? controlledAttachment : internalAttachment
+  const setAttachment = (a: AssistantAttachment | null) => {
+    setInternalAttachment(a)
+    onAttachmentChange?.(a)
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -81,7 +94,7 @@ export function MessageInput({ onSend, onUpload, isSending, isUploading, disable
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSend) handleSend()
           }}
-          placeholder="Ask about your data, or attach a CSV to convert…  (⌘/Ctrl + Enter to send)"
+          placeholder="Ask about your data, attach a CSV, or drop a file anywhere on the chat… (⌘/Ctrl + Enter to send)"
           rows={2}
           className="flex-1 resize-none min-h-[44px] max-h-40"
           disabled={disabled}

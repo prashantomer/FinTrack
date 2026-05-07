@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,7 +20,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/')
+      navigate('/dashboard')
     } catch {
       setError('Invalid email or password')
     } finally {
@@ -29,7 +29,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-background">
+    <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">FinTrack</CardTitle>
@@ -64,6 +64,9 @@ export function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">
+        ← Back to home
+      </Link>
     </div>
   )
 }
