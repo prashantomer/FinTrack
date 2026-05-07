@@ -31,6 +31,11 @@ Rails.application.configure do
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test
 
+  # Run ActiveJob synchronously in tests so callbacks that enqueue jobs (e.g.
+  # Holdings::RefreshJob from Investment commits) run immediately. Production
+  # uses :sidekiq via config/application.rb.
+  config.active_job.queue_adapter = :inline
+
   # Tell Action Mailer not to deliver emails to the real world.
   # The :test delivery method accumulates sent emails in the
   # ActionMailer::Base.deliveries array.
