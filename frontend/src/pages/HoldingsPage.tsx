@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +16,7 @@ import { usePlatformAccounts } from '@/hooks/usePlatforms'
 import { useCurrency } from '@/hooks/useCurrency'
 import { calcGainLoss } from '@/lib/finance'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import type { Follio, InvestmentType } from '@/types'
+import type { Follio, InvestmentType, PlatformAccount } from '@/types'
 
 interface FormState {
   follio_id: string
@@ -25,39 +25,46 @@ interface FormState {
 }
 
 const DEFAULT_FORM: FormState = { follio_id: '', user_instrument_id: '', platform_account_id: '' }
-const PAGE_SIZE = 50
+const PAGE_SIZE = 25
+const TABS: { label: string; value: InvestmentType | 'all' }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Stocks', value: 'stock' },
+  { label: 'Mutual Funds', value: 'mutual_fund' },
+]
 
-const ALL_TYPES: InvestmentType[] = ['stock', 'mutual_fund']
-
-export function FolliosPage() {
+export function HoldingsPage() {
   const qc = useQueryClient()
   const { formatCurrency } = useCurrency()
   const [page, setPage] = useState(1)
-  const [typeFilter, setTypeFilter] = useState<InvestmentType | 'all'>('all')
+  const [activeTab, setActiveTab] = useState<InvestmentType | 'all'>('all')
 
-  const { data, isLoading, isFetching } = useFollios(page, PAGE_SIZE)
-  const { data: investmentsData } = useInvestments(undefined, 1, 500)
-  const { data: userInstruments = [] } = useUserInstruments()
+  const { data, isLoading, isFetching } = useInvestments(
+    activeTab !== 'all' ? [activeTab] : undefined,
+    page,
+    PAGE_SIZE
+  )
   const { data: platformAccounts = [] } = usePlatformAccounts()
+  const { data: folliosData } = useFollios(1, 500)
+  const { data: userInstruments = [] } = useUserInstruments()
 
-  const follios = useMemo(() => data?.items ?? [], [data])
+  const investments = data?.items ?? []
   const total = data?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  // Build lookup: user_instrument_id → investment (for units/amount)
-  const investmentByInstrument = useMemo(() => {
-    const map = new Map<number, (typeof investmentsData)['items'][number]>()
-    for (const inv of investmentsData?.items ?? []) {
-      if (inv.user_instrument_id != null) map.set(inv.user_instrument_id, inv)
+  const platformMap = useMemo(() => {
+    const map = new Map<number, PlatformAccount>()
+    for (const pa of platformAccounts) map.set(pa.id, pa)
+    return map
+  }, [platformAccounts])
+
+  // Follio lookup by user_instrument_id for showing the follio ref
+  const follioByInstrument = useMemo(() => {
+    const map = new Map<number, Follio>()
+    for (const f of folliosData?.items ?? []) {
+      if (f.user_instrument_id != null) map.set(f.user_instrument_id, f)
     }
     return map
-  }, [investmentsData])
-
-  const filteredFollios = useMemo(() =>
-    typeFilter === 'all'
-      ? follios
-      : follios.filter(f => f.user_instrument.instrument.type === typeFilter),
-    [follios, typeFilter]
-  )
+  }, [folliosData])
 
   const createMutation = useCreateFollio()
   const updateMutation = useUpdateFollio()
@@ -93,34 +100,45 @@ export function FolliosPage() {
         user_instrument_id: Number(form.user_instrument_id),
         platform_account_id: Number(form.platform_account_id),
       })
-      setPage(1)
     }
     setOpen(false)
+  }
+
+  function handleTabChange(tab: InvestmentType | 'all') {
+    setActiveTab(tab)
+    setPage(1)
   }
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader
         title="Holdings"
-        description="Instruments you hold across platforms"
-        onRefresh={() => qc.invalidateQueries({ queryKey: ['follios'] })}
+        description="Investments you hold across platforms"
+        onRefresh={() => {
+          qc.invalidateQueries({ queryKey: ['investments'] })
+          qc.invalidateQueries({ queryKey: ['follios'] })
+        }}
         isRefreshing={isFetching}
       >
-        <Button onClick={openCreate}><Plus size={16} className="mr-1" />Add Holding</Button>
+        <Button onClick={openCreate}><Plus size={16} className="mr-1" />Add Follio Ref</Button>
       </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-4">
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3">
-          <Select value={typeFilter} onValueChange={v => { setTypeFilter(v as InvestmentType | 'all'); setPage(1) }}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="All Types" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {ALL_TYPES.map(t => (
-                <SelectItem key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Type tabs */}
+        <div className="flex gap-1 border-b">
+          {TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => handleTabChange(tab.value)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === tab.value
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {isLoading ? (
@@ -143,51 +161,50 @@ export function FolliosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFollios.map(f => {
-                  const inv = investmentByInstrument.get(f.user_instrument_id)
-                  const units = inv?.units ?? inv?.quantity ?? null
-                  const invested = inv?.amount_invested ?? null
-                  const currentVal = inv?.current_value ?? invested
-                  const gl = invested != null && currentVal != null ? calcGainLoss(invested, currentVal) : null
+                {investments.map(inv => {
+                  const platform = inv.platform_account_id ? platformMap.get(inv.platform_account_id) : null
+                  const follio = inv.user_instrument_id ? follioByInstrument.get(inv.user_instrument_id) : null
+                  const units = inv.units ?? inv.quantity ?? null
+                  const currentVal = inv.current_value ?? inv.amount_invested
+                  const { gain, pct, isPositive } = calcGainLoss(inv.amount_invested, currentVal)
                   return (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-medium">{f.user_instrument.instrument.name}</TableCell>
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">{inv.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{INVESTMENT_TYPE_LABELS[f.user_instrument.instrument.type]}</Badge>
+                        <Badge variant="outline">{INVESTMENT_TYPE_LABELS[inv.type]}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {f.platform_account.nickname}
-                        <span className="ml-1 text-xs">({f.platform_account.platform.short_name})</span>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {platform
+                          ? <>{platform.nickname} <span className="text-xs">({platform.platform.short_name})</span></>
+                          : <span className="text-xs">—</span>}
                       </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">{f.follio_id}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {follio ? follio.follio_id : <span>—</span>}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {units != null ? units.toLocaleString('en-IN') : <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {invested != null ? formatCurrency(invested) : <span className="text-muted-foreground">—</span>}
+                      <TableCell className="text-right font-mono">{formatCurrency(inv.amount_invested)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(currentVal)}</TableCell>
+                      <TableCell className={`text-right font-mono font-medium ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
+                        {isPositive ? '+' : ''}{formatCurrency(gain)} ({pct}%)
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {currentVal != null ? formatCurrency(currentVal) : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className={`text-right font-mono font-medium ${gl ? (gl.isPositive ? 'text-green-600' : 'text-red-500') : 'text-muted-foreground'}`}>
-                        {gl
-                          ? `${gl.isPositive ? '+' : ''}${formatCurrency(gl.gain)} (${gl.pct}%)`
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{f.created_at.slice(0, 10)}</TableCell>
-                      <TableCell className="flex gap-1 justify-end">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(f)}><Pencil size={14} /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(f.id)}><Trash2 size={14} /></Button>
+                      <TableCell className="text-muted-foreground text-sm">{inv.purchase_date}</TableCell>
+                      <TableCell className="text-right">
+                        {follio && (
+                          <div className="flex gap-1 justify-end">
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(follio)}><Pencil size={14} /></Button>
+                            <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(follio.id)}><Trash2 size={14} /></Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   )
                 })}
-                {filteredFollios.length === 0 && (
+                {investments.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                      {follios.length === 0
-                        ? 'No holdings yet. Track an instrument first, then add a holding to link it to a platform account.'
-                        : 'No holdings match the selected filter.'}
+                      No holdings found{activeTab !== 'all' ? ` for ${INVESTMENT_TYPE_LABELS[activeTab]}` : ''}.
                     </TableCell>
                   </TableRow>
                 )}
@@ -196,29 +213,32 @@ export function FolliosPage() {
           </div>
         )}
 
-        {total > PAGE_SIZE && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{total} total</span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-                <ChevronLeft size={14} />Prev
-              </Button>
-              <span className="text-muted-foreground px-1">Page {page}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={follios.length < PAGE_SIZE}>
-                Next<ChevronRight size={14} />
-              </Button>
-            </div>
-          </div>
-        )}
-        {total > 0 && total <= PAGE_SIZE && (
-          <p className="text-center text-xs text-muted-foreground py-1">{total} holdings</p>
-        )}
       </div>
 
+      {totalPages > 1 ? (
+        <div className="border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{total} total</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+              <ChevronLeft size={14} />Prev
+            </Button>
+            <span className="text-muted-foreground px-1">Page {page} of {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>
+              Next<ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
+      ) : total > 0 && (
+        <div className="border-t bg-background px-6 py-2 shrink-0 text-center text-xs text-muted-foreground">
+          {total} holdings
+        </div>
+      )}
+
+      {/* Sheet for adding/editing follio reference */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-[400px] sm:max-w-[420px] flex flex-col p-0 overflow-hidden">
           <SheetHeader className="border-b px-6 py-5 shrink-0">
-            <SheetTitle className="text-base">{editing ? 'Edit Holding' : 'New Holding'}</SheetTitle>
+            <SheetTitle className="text-base">{editing ? 'Edit Follio Ref' : 'Add Follio Ref'}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">

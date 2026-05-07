@@ -12,7 +12,7 @@ const navItems = [
   { to: '/transactions', label: 'Transactions', icon: CreditCard },
   { to: '/platform-accounts', label: 'Platforms', icon: Briefcase },
   { to: '/instruments', label: 'Instruments', icon: BarChart3 },
-  { to: '/follios', label: 'Follios', icon: FolderOpen },
+  { to: '/holdings', label: 'Holdings', icon: FolderOpen },
   { to: '/investments', label: 'Investments', icon: TrendingUp },
   { to: '/portfolio', label: 'Portfolio', icon: PieChart },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex flex-1 flex-col overflow-y-auto">
         {children}
       </main>
     </div>

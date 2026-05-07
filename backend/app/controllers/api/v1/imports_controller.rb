@@ -37,13 +37,12 @@ module Api
           return render_error(message: "import_type \"#{import_type}\" is not supported")
         end
 
-        raw_csv = file.read.force_encoding("UTF-8")
-
-        batch = current_user.import_batches.create!(
+        batch = current_user.import_batches.new(
           import_type: import_type,
-          file_name:   file.original_filename,
-          raw_csv:     raw_csv
+          file_name:   file.original_filename
         )
+        batch.file.attach(file)
+        batch.save!
 
         job_class = {
           "investments"  => Imports::ProcessInvestmentCsvJob,

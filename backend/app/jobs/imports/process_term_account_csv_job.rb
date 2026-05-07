@@ -8,7 +8,7 @@ module Imports
       batch = ImportBatch.find(import_batch_id)
       batch.update!(status: :processing)
 
-      rows = CSV.parse(batch.raw_csv, headers: true, header_converters: :symbol)
+      rows = CSV.parse(batch.file.download.force_encoding("UTF-8"), headers: true, header_converters: :symbol)
       batch.update!(total_rows: rows.count)
 
       rows.each_with_index do |row, idx|

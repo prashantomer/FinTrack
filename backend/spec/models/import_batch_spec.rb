@@ -12,7 +12,6 @@ RSpec.describe ImportBatch, type: :model do
     it { is_expected.to validate_presence_of(:import_type) }
     it { is_expected.to validate_presence_of(:status) }
     it { is_expected.to validate_presence_of(:file_name) }
-    it { is_expected.to validate_presence_of(:raw_csv) }
 
     it "is valid with all required attributes" do
       expect(subject).to be_valid

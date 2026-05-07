@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CalendarClock, Plus } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -9,6 +9,7 @@ import { AccountsTable } from '@/components/accounts/AccountsTable'
 import { AdjustBalanceSheet } from '@/components/accounts/AdjustBalanceSheet'
 import { CloseAccountSheet } from '@/components/accounts/CloseAccountSheet'
 import { CloseTermSheet } from '@/components/accounts/CloseTermSheet'
+import { MaturitiesSheet } from '@/components/accounts/MaturitiesSheet'
 import { PPFDepositSheet } from '@/components/accounts/PPFDepositSheet'
 import { TermAccountEditSheet } from '@/components/accounts/TermAccountEditSheet'
 import { TermAccountSheet } from '@/components/accounts/TermAccountSheet'
@@ -17,7 +18,9 @@ import { useAccounts, useBanks } from '@/hooks/useBanks'
 import { useTermAccounts } from '@/hooks/useTermAccounts'
 import type { AuditTarget } from '@/hooks/useAuditLogs'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Account, TermAccount } from '@/types'
+import type { Account, TermAccount, TermAccountSummary } from '@/types'
+
+const MATURITY_HORIZON_DAYS = 90
 
 type SheetState =
   | { kind: 'account'; target: Account | null }
@@ -35,6 +38,7 @@ export function AccountsPage() {
   const qc = useQueryClient()
   const { formatCurrency, symbol } = useCurrency()
   const [sheet, setSheet] = useState<SheetState>(null)
+  const [maturitiesOpen, setMaturitiesOpen] = useState(false)
 
   const { data: accounts = [], isLoading, isFetching } = useAccounts()
   const { data: banks = [] } = useBanks()
@@ -43,6 +47,30 @@ export function AccountsPage() {
   const close = () => setSheet(null)
   const totalBalance = accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0)
   const parentCandidates = accounts.filter(a => !a.closed_date && (a.account_type === 'savings' || a.account_type === 'current'))
+
+  const upcomingMaturities = useMemo<TermAccountSummary[]>(() => {
+    const now = new Date()
+    const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    return termAccountsAll
+      .filter(t => t.is_active && t.maturity_date)
+      .map(t => {
+        const [y, m, d] = t.maturity_date.split('-').map(Number)
+        const maturityMs = new Date(y, m - 1, d).getTime()
+        const days = Math.round((maturityMs - todayMs) / 86_400_000)
+        return {
+          id: t.id,
+          account_number: t.account_number,
+          type: t.type,
+          bank_short_name: t.bank.short_name,
+          balance: t.balance,
+          maturity_date: t.maturity_date,
+          maturity_amount: t.maturity_amount,
+          days_remaining: days,
+        }
+      })
+      .filter(t => t.days_remaining <= MATURITY_HORIZON_DAYS)
+      .sort((a, b) => a.days_remaining - b.days_remaining)
+  }, [termAccountsAll])
 
   return (
     <div className="flex flex-col h-full">
@@ -76,9 +104,15 @@ export function AccountsPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Term Accounts</h2>
-            <Button onClick={() => setSheet({ kind: 'term-create' })}>
-              <Plus size={16} className="mr-1" />Add FD / PPF
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setMaturitiesOpen(true)}>
+                <CalendarClock size={16} className="mr-1" />
+                Upcoming Maturities ({upcomingMaturities.length})
+              </Button>
+              <Button onClick={() => setSheet({ kind: 'term-create' })}>
+                <Plus size={16} className="mr-1" />Add FD / PPF
+              </Button>
+            </div>
           </div>
           <TermAccountsTable
             activeTerms={termAccountsAll.filter(t => t.is_active)}
@@ -142,6 +176,13 @@ export function AccountsPage() {
       <AuditLogSidebar
         target={sheet?.kind === 'audit' ? sheet.target : null}
         onClose={close}
+      />
+      <MaturitiesSheet
+        open={maturitiesOpen}
+        onClose={() => setMaturitiesOpen(false)}
+        maturities={upcomingMaturities}
+        formatCurrency={formatCurrency}
+        showAccountsLink={false}
       />
     </div>
   )
