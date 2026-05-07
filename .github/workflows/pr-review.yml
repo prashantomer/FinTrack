@@ -26,12 +26,13 @@ jobs:
   claude:
     name: Claude Code Review
     runs-on: ubuntu-latest
-    # Skip on PRs from forks (no access to ANTHROPIC_API_KEY secret).
+    # Skip on PRs from forks (no access to repo secrets).
     # Best-effort job — never blocks the PR.
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
       pull-requests: write
+      issues: write
       id-token: write
 
     steps:
@@ -39,9 +40,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Mint a GitHub App installation token from a custom App we own
+      # (FINTRACK_REVIEW_APP_ID + FINTRACK_REVIEW_APP_PRIVATE_KEY repo
+      # secrets). Avoids depending on the third-party Claude GitHub App;
+      # the action posts comments under our own bot identity.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.FINTRACK_REVIEW_APP_ID }}
+          private-key: ${{ secrets.FINTRACK_REVIEW_APP_PRIVATE_KEY }}
+
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
           track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
