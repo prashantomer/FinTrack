@@ -53,11 +53,7 @@ function LotRow({ lot }: { lot: LotRead }) {
         {lot.quantity != null ? `${lot.quantity} u` : lot.units != null ? `${lot.units} u` : '—'}
       </TableCell>
       <TableCell className="text-muted-foreground text-right font-mono">
-        {lot.buy_price != null
-          ? formatCurrency(lot.buy_price)
-          : lot.nav_at_purchase != null
-          ? formatCurrency(lot.nav_at_purchase)
-          : '—'}
+        {lot.price != null ? formatCurrency(lot.price) : '—'}
       </TableCell>
       <TableCell className="text-right font-mono">{formatCurrency(lot.amount_invested)}</TableCell>
       <TableCell className="text-right">
@@ -75,7 +71,7 @@ function PositionRow({ position }: { position: PortfolioPosition }) {
   return (
     <>
       <TableRow
-        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        className="cursor-pointer"
         onClick={() => setExpanded(e => !e)}
       >
         <TableCell className="font-medium">

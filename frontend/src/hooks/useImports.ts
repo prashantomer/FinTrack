@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createImport, getImport, listImports } from '@/api/imports'
 import type { ImportType } from '@/types'
@@ -7,6 +7,19 @@ export function useImports(page = 1) {
   return useQuery({
     queryKey: ['imports', page],
     queryFn:  () => listImports(page),
+  })
+}
+
+// Infinite-scroll variant — used by ImportsPage. Backend paginates by
+// `?page=N&page_size=20`; each page yields up to 20 batches and we keep
+// requesting the next page until `items.length < page_size`.
+export function useInfiniteImports(pageSize = 20) {
+  return useInfiniteQuery({
+    queryKey:    ['imports', 'infinite', pageSize],
+    initialPageParam: 1,
+    queryFn:     ({ pageParam }) => listImports(pageParam as number, pageSize),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.items.length < pageSize ? undefined : allPages.length + 1,
   })
 }
 

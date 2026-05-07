@@ -187,6 +187,9 @@ export interface Instrument {
   isin: string | null
   exchange: string | null
   fund_house: string | null
+  /** Latest market close (NSE bhavcopy) for stocks, AMFI NAV for MFs. */
+  last_price: number | null
+  last_price_at: string | null
   created_at: string
 }
 
@@ -215,28 +218,55 @@ export interface UserInstrument {
   instrument: Instrument
 }
 
-// ── Follios ──────────────────────────────────────────────────────────────────
+// ── Holdings (STI: Folio for MFs, EquityHolding for stocks) ─────────────────
 
-export interface Follio {
+export type HoldingType = 'Folio' | 'EquityHolding'
+
+export interface Holding {
   id: number
-  follio_id: string
+  type: HoldingType
+  /** MF folio number — null/empty for EquityHolding rows. */
+  folio_number: string | null
   user_id: number
   user_instrument_id: number
   platform_account_id: number
+  notes: string | null
+
+  // Cached stats — refreshed on every Investment write by Holdings::RefreshService
+  buy_lots: number | null
+  sell_lots: number | null
+  total_units: number | null
+  avg_buy_price: number | null
+  total_invested: number | null
+  current_value: number | null
+  unrealized_gain: number | null
+  realized_gain: number | null
+  is_closed: boolean
+  last_calculated_at: string | null
+
   created_at: string
   user_instrument: UserInstrument
   platform_account: PlatformAccount
 }
 
-export interface FollioCreate {
-  follio_id: string
+export interface HoldingCreate {
+  type?: HoldingType
+  folio_number?: string
   user_instrument_id: number
   platform_account_id: number
+  notes?: string
 }
 
-export interface FollioUpdate {
-  follio_id?: string
+export interface HoldingUpdate {
+  folio_number?: string
+  notes?: string
 }
+
+// Backwards-compat aliases (existing UI used Folio/* types) — both refer to
+// the same union now. Folio specifically = MF holdings; the union covers both.
+export type Folio = Holding
+export type FolioCreate = HoldingCreate
+export type FolioUpdate = HoldingUpdate
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
@@ -279,10 +309,13 @@ export interface TransactionCreate {
 
 // ── Investments ──────────────────────────────────────────────────────────────
 
+export type TradeType = 'buy' | 'sell'
+
 export interface Investment {
   id: number
   user_id: number
   type: InvestmentType
+  trade_type: TradeType
   name: string
   amount_invested: number
   current_value: number | null
@@ -293,11 +326,25 @@ export interface Investment {
   instrument_id: number | null
   created_at: string
   quantity: number | null
-  buy_price: number | null
-  folio_number: string | null
   units: number | null
-  nav_at_purchase: number | null
+  /**
+   * Per-share price for stocks, per-unit NAV for mutual funds. Same column
+   * regardless of trade_type (buy/sell).
+   */
+  price: number | null
+  /** Broker / platform order ID — one order can fill in multiple trades. */
+  order_id: string | null
+  /** Broker trade / execution ID — one fill within an order. */
+  trade_id: string | null
+  folio_number: string | null
   transaction_public_id: string | null
+  /** Live market price from instruments.last_price (NSE close / AMFI NAV). */
+  instrument_last_price: number | null
+  instrument_last_price_at: string | null
+  /** Server-computed: qty × last_price, only for buy rows when both are present. */
+  live_current_value: number | null
+  live_gain: number | null
+  live_gain_pct: number | null
 }
 
 export interface InvestmentListResponse {
@@ -307,12 +354,14 @@ export interface InvestmentListResponse {
   page_size: number
 }
 
-export interface FollioListResponse {
-  items: Follio[]
+export interface HoldingListResponse {
+  items: Holding[]
   total: number
   page: number
   page_size: number
 }
+
+export type FolioListResponse = HoldingListResponse
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
@@ -333,6 +382,7 @@ export interface ImportBatch {
   total_rows:     number
   processed_rows: number
   failed_rows:    number
+  duplicate_rows: number
   import_version: number
   progress_pct:   number
   import_records: ImportRowResult[]
@@ -457,34 +507,63 @@ export interface InvestmentSummaryReport {
 
 // ── Portfolio ─────────────────────────────────────────────────────────────────
 
+export interface LotPnl {
+  /** Signed P&L for this lot. BUY → unrealized on still-held qty; SELL → realized (FIFO). */
+  value: number
+  /** Percentage gain/loss vs cost basis; null when cost basis is 0. */
+  pct: number | null
+  /** Human-readable label (e.g. "Realized (FIFO)", "Unrealized (held 5 units)"). */
+  label: string
+}
+
 export interface LotRead {
   id: number
+  trade_type: TradeType
   purchase_date: string
   amount_invested: number
   current_value: number | null
   quantity: number | null
-  buy_price: number | null
-  folio_number: string | null
   units: number | null
-  nav_at_purchase: number | null
+  price: number | null
+  folio_number: string | null
   platform_account_nickname: string | null
   notes: string | null
+  /** Per-lot P&L, FIFO-based, computed by `Reports::PortfolioService`. May be null
+   * for buy lots that have been fully consumed by FIFO sells. */
+  pnl: LotPnl | null
 }
 
 export interface PortfolioPosition {
   user_instrument_id: number
+  instrument_id: number
   instrument_name: string
   instrument_ticker: string | null
   instrument_exchange: string | null
   type: InvestmentType
   platform_accounts: string[]
   total_lots: number
+  buy_lots: number
+  sell_lots: number
+  /** Net residual quantity (= buy qty − sell qty). 0 for fully exited positions. */
   total_units: number | null
+  /** Cost basis of CURRENTLY HELD shares (= net_qty × avg_buy_price). */
   total_invested: number
+  /** Cash-flow accounting: gross buys − gross sale proceeds. */
+  net_cash_deployed: number
   avg_buy_price: number | null
+  /** Current price per unit (derived from buy lots' current_value). */
+  current_price: number | null
+  /** Market value of held shares (= net_qty × current_price). */
   current_value: number
   unrealized_gain: number
   unrealized_gain_pct: number
+  realized_gain: number
+  /** MF only: latest buy-lot folio_number for this position (null when unset). */
+  folio_number: string | null
+  /** Held units with purchase age >= 365 days (FIFO-based). 0 when closed. */
+  long_term_units: number
+  /** Held units with purchase age < 365 days (FIFO-based). 0 when closed. */
+  short_term_units: number
   lots: LotRead[]
 }
 
