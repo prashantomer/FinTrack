@@ -57,7 +57,7 @@ RSpec.describe Holdings::PositionCalculator do
     it "satisfies the canonical identity under both methods" do
       identity = stats[:current_value] - stats[:net_cash_deployed]
       expect(identity).to eq(2_750)
-      expect(stats[:unrealized_gain] + stats[:realized_gain]).to                              eq(2_750)
+      expect(stats[:unrealized_gain] + stats[:realized_gain]).to eq(2_750)
       expect(stats[:wavg][:unrealized_gain] + stats[:wavg][:realized_gain]).to eq(2_750)
     end
 

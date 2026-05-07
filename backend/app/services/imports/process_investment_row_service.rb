@@ -125,10 +125,10 @@ module Imports
       raw = @row[:trade_type].to_s.strip.downcase
       return "buy" if raw.empty? # default for files without the column
       mapped = case raw
-               when "buy", "b", "purchase" then "buy"
-               when "sell", "s", "sale", "exit" then "sell"
-               else raw
-               end
+      when "buy", "b", "purchase" then "buy"
+      when "sell", "s", "sale", "exit" then "sell"
+      else raw
+      end
       unless Investment.trade_types.key?(mapped)
         raise "trade_type \"#{@row[:trade_type]}\" is not valid (buy/sell)"
       end

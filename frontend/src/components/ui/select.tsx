@@ -26,13 +26,18 @@ function extractText(node: React.ReactNode): string {
 
 // ── Select (Root wrapper) ─────────────────────────────────────────────────────
 
+type SelectProps = Omit<SelectPrimitive.Root.Props<string>, "onValueChange"> & {
+  /** Fires when the user picks an option. Null is normalised to "" before reaching consumers. */
+  onValueChange?: (value: string) => void
+}
+
 function Select({
   value: valueProp,
   defaultValue,
   onValueChange,
   children,
   ...props
-}: SelectPrimitive.Root.Props) {
+}: SelectProps) {
   const [labels, setLabels] = React.useState<Map<string, string>>(() => new Map())
 
   const [currentValue, setCurrentValue] = React.useState<string>(
@@ -58,10 +63,13 @@ function Select({
     [labels]
   )
 
-  const handleValueChange = React.useCallback(
-    (v: string, event: Event) => {
-      setCurrentValue(v)
-      onValueChange?.(v, event)
+  const handleValueChange = React.useCallback<
+    NonNullable<SelectPrimitive.Root.Props<string>["onValueChange"]>
+  >(
+    (v) => {
+      const next = v ?? ""
+      setCurrentValue(next)
+      onValueChange?.(next)
     },
     [onValueChange]
   )

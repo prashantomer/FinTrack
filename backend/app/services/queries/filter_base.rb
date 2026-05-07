@@ -98,9 +98,15 @@ module Queries
     end
 
     def with_range(scope, column, gte: nil, lte: nil)
-      scope = scope.where("#{column} >= ?", gte) if gte.present?
-      scope = scope.where("#{column} <= ?", lte) if lte.present?
-      scope
+      # Use ActiveRecord's hash-with-range syntax so the column name flows
+      # through identifier quoting and the bounds are parameterized — no
+      # string interpolation, no SQL-injection surface for `column`.
+      range =
+        if    gte.present? && lte.present? then gte..lte
+        elsif gte.present?                 then gte..
+        elsif lte.present?                 then ..lte
+        end
+      range ? scope.where(column => range) : scope
     end
 
     def with_ilike_any(scope, columns, term, casts: {})

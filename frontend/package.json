@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "postinstall": "node -e \"const { execSync } = require('child_process'); try { const root = execSync('git rev-parse --show-toplevel', { stdio: ['ignore','pipe','ignore'] }).toString().trim(); execSync('git -C ' + JSON.stringify(root) + ' config core.hooksPath .githooks', { stdio: 'ignore' }); } catch (_) {}\""
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

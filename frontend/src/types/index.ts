@@ -564,6 +564,8 @@ export interface PortfolioPosition {
   long_term_units: number
   /** Held units with purchase age < 365 days (FIFO-based). 0 when closed. */
   short_term_units: number
+  /** True when net quantity is zero (all buy lots fully sold off). */
+  is_closed: boolean
   lots: LotRead[]
 }
 

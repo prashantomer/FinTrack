@@ -75,7 +75,7 @@ RSpec.describe Assistants::Tools::ExplainPortfolioPnl, type: :service do
       identity = pos[:current_value].to_f - pos[:net_cash_deployed].to_f
       expect(identity).to eq(2_750)
       expect(pos[:wavg][:unrealized_gain].to_f + pos[:wavg][:realized_gain].to_f).to eq(2_750)
-      expect(pos[:fifo][:unrealized_gain] + pos[:fifo][:realized_gain]).to             eq(2_750)
+      expect(pos[:fifo][:unrealized_gain] + pos[:fifo][:realized_gain]).to eq(2_750)
       expect(pos[:identity_check]).to eq(2_750)
     end
 

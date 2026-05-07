@@ -70,7 +70,7 @@ interface InnerProps {
   setting: AssistantSetting
   update: (payload: AssistantSettingUpdate) => Promise<AssistantSetting>
   isUpdating: boolean
-  test: (payload?: AssistantSettingUpdate) => Promise<AssistantTestResult>
+  test: (payload: AssistantSettingUpdate) => Promise<AssistantTestResult>
   isTesting: boolean
 }
 

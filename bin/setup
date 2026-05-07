@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# One-time per-clone setup. Run after git clone.
+#
+# Currently wires git's hook path to the committed .githooks directory so
+# bin/pre-push-checks runs on every push. Idempotent — safe to re-run.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+current="$(git config --get core.hooksPath || true)"
+if [[ "$current" == ".githooks" ]]; then
+  echo "✓ git hooks already wired to .githooks"
+else
+  git config core.hooksPath .githooks
+  echo "✓ wired git hooks → .githooks (was: ${current:-default})"
+fi
+
+chmod +x .githooks/pre-push bin/pre-push-checks 2>/dev/null || true
+echo "✓ bin/pre-push-checks will now run on every git push"
+echo "  bypass once with:  git push --no-verify"

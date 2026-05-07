@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Pre-push checks for FinTrack.
+#
+# Runs every quality gate that should be green before code reaches the
+# remote: backend specs, lint, security scan, advisory check, frontend
+# typecheck, lint, and production build. Independent checks run in
+# parallel; output is aggregated into a single status table.
+#
+# Usage:
+#   bin/pre-push-checks            # run everything
+#   bin/pre-push-checks --quick    # skip the slow ones (build, brakeman)
+#
+# Exit code 0 if all checks pass, 1 if any fail.
+
+set -uo pipefail
+
+QUICK=0
+[[ "${1-}" == "--quick" ]] && QUICK=1
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_DIR="$(mktemp -d)"
+trap 'rm -rf "$LOG_DIR"' EXIT
+
+# ── colors ──────────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+  RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'
+  DIM=$'\033[2m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
+else
+  RED=""; GREEN=""; YELLOW=""; DIM=""; BOLD=""; RESET=""
+fi
+
+# ── runner: launch_check <name> <log-name> <command…> ───────────────────
+declare -a NAMES PIDS LOGS
+launch_check() {
+  local name="$1" log_name="$2"; shift 2
+  local log="$LOG_DIR/$log_name.log"
+  ( "$@" ) >"$log" 2>&1 &
+  NAMES+=("$name")
+  PIDS+=("$!")
+  LOGS+=("$log")
+}
+
+# ── parallel checks ─────────────────────────────────────────────────────
+echo "${BOLD}FinTrack pre-push checks${RESET}${DIM} — $(date '+%H:%M:%S')${RESET}"
+echo
+echo "Launching parallel checks…"
+
+launch_check "backend rubocop"        "rubocop"   bash -c "cd '$ROOT/backend' && bundle exec rubocop --format simple"
+launch_check "backend bundler-audit"  "audit"     bash -c "cd '$ROOT/backend' && bundle exec bundle-audit check --update"
+launch_check "frontend eslint"        "eslint"    bash -c "cd '$ROOT/frontend' && npm run lint --silent"
+launch_check "frontend typecheck"     "tsc"       bash -c "cd '$ROOT/frontend' && npx tsc --noEmit"
+
+if [[ $QUICK -eq 0 ]]; then
+  launch_check "backend brakeman"     "brakeman"  bash -c "cd '$ROOT/backend' && bundle exec brakeman --no-pager -q --exit-on-warn"
+  launch_check "frontend build"       "build"     bash -c "cd '$ROOT/frontend' && npm run build --silent"
+fi
+
+# ── wait & collect ──────────────────────────────────────────────────────
+declare -a STATUSES
+for i in "${!PIDS[@]}"; do
+  if wait "${PIDS[$i]}"; then
+    STATUSES[$i]=0
+  else
+    STATUSES[$i]=$?
+  fi
+done
+
+# ── sequential check: rspec (uses DB; running it parallel doubles the
+# load on a shared test DB and races migrations) ────────────────────────
+echo "Running backend specs (sequential, uses DB)…"
+RSPEC_LOG="$LOG_DIR/rspec.log"
+( cd "$ROOT/backend" && bundle exec rspec --no-color ) >"$RSPEC_LOG" 2>&1
+RSPEC_STATUS=$?
+NAMES+=("backend rspec")
+STATUSES+=("$RSPEC_STATUS")
+LOGS+=("$RSPEC_LOG")
+
+# ── summary ─────────────────────────────────────────────────────────────
+echo
+echo "${BOLD}Results${RESET}"
+echo "$(printf '%.0s─' {1..60})"
+overall=0
+for i in "${!NAMES[@]}"; do
+  name="${NAMES[$i]}"
+  status="${STATUSES[$i]}"
+  if [[ "$status" -eq 0 ]]; then
+    printf "  ${GREEN}✓${RESET} %-28s ${DIM}pass${RESET}\n" "$name"
+  else
+    overall=1
+    summary=$(tail -n 3 "${LOGS[$i]}" | tr '\n' ' ' | head -c 90)
+    printf "  ${RED}✗${RESET} %-28s ${RED}fail${RESET} ${DIM}(exit %s)${RESET}\n" "$name" "$status"
+    printf "    ${DIM}└─ %s${RESET}\n" "$summary"
+  fi
+done
+echo "$(printf '%.0s─' {1..60})"
+
+if [[ $overall -eq 0 ]]; then
+  echo "${GREEN}${BOLD}All checks passed.${RESET} Push is safe."
+  exit 0
+else
+  echo "${RED}${BOLD}Some checks failed.${RESET} Full logs:"
+  for i in "${!NAMES[@]}"; do
+    [[ "${STATUSES[$i]}" -ne 0 ]] && printf "  ${YELLOW}%s${RESET}: %s\n" "${NAMES[$i]}" "${LOGS[$i]}"
+  done
+  echo "${DIM}Re-run a single check with: bash -c \"cd backend && bundle exec rubocop\" (etc.)${RESET}"
+  exit 1
+fi

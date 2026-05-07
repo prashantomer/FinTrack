@@ -325,6 +325,29 @@ From the UI: **/assistant** → settings panel → switch providers without losi
 
 ---
 
+## Pre-push checks
+
+A single script runs every quality gate before code reaches the remote — backend specs, Rubocop, Brakeman, bundler-audit, frontend ESLint, typecheck, and production build. Independent checks run in parallel; the summary table at the end shows pass/fail per check with log paths for failures.
+
+```bash
+bin/pre-push-checks            # full sweep (~30–60 s)
+bin/pre-push-checks --quick    # skip the slow ones (Brakeman + Vite build)
+```
+
+### Wire it as a git hook (one-time per clone)
+
+```bash
+git config core.hooksPath .githooks
+```
+
+After that, every `git push` runs the checks first and refuses the push on failure. Bypass for a single push: `git push --no-verify` (use sparingly).
+
+### Or invoke via Claude Code
+
+`.claude/agents/pre-push.md` is registered — `/agents pre-push` runs the same checks and reports findings inline.
+
+---
+
 ## Testing
 
 ### Backend (RSpec)
