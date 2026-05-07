@@ -11,6 +11,8 @@ module Assistants
         Tools::QueryTermAccounts.new(user),
         Tools::QueryAccounts.new(user),
         Tools::QueryInvestments.new(user),
+        Tools::ExplainPortfolioPnl.new(user),
+        Tools::LookupInstruments.new(user),
         Tools::AnalyseCsv.new(user),
         Tools::GenerateImportCsv.new(user)
       ]

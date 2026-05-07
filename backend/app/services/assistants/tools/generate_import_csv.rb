@@ -26,6 +26,16 @@ module Assistants
               type: "object",
               description: "Optional FinTrack column → mapping of source value to target value. Example: { type: { BUY: 'debit', SELL: 'credit' } }",
               additionalProperties: { type: "object", additionalProperties: { type: "string" } }
+            },
+            row_filter: {
+              type: "object",
+              description: "Optional. Keep only rows where the source `column` has one of `values` (case-insensitive). Use this to drop SELL rows when converting a broker tradebook into the investments import (FinTrack tracks holdings, not trades).",
+              properties: {
+                column: { type: "string", description: "Source CSV column name to test" },
+                values: { type: "array", items: { type: "string" }, description: "Allow-list of acceptable values" }
+              },
+              required: %w[column values],
+              additionalProperties: false
             }
           },
           required: %w[source_attachment_id target_import_type column_mapping],
@@ -39,6 +49,7 @@ module Assistants
         target = a["target_import_type"]
         mapping = (a["column_mapping"] || {}).transform_keys(&:to_s)
         transforms = (a["value_transforms"] || {}).transform_keys(&:to_s)
+        filter = a["row_filter"]
 
         source_msg = user.assistant_messages.find_by(id: source_id)
         return { error: "source_not_found" } unless source_msg && source_msg.file.attached?
@@ -48,11 +59,23 @@ module Assistants
         target_headers = target_template[:headers]
 
         source_csv = CSV.parse(source_msg.file.download.force_encoding("UTF-8"), headers: true)
+        total_rows = source_csv.size
+
+        kept_rows = if filter.is_a?(Hash) && filter["column"].present?
+          allowed = Array(filter["values"]).map { |v| v.to_s.downcase }
+          source_csv.select { |row| allowed.include?(row[filter["column"]].to_s.strip.downcase) }
+        else
+          # Use `each_entry`/`map` over the CSV::Table to preserve CSV::Row objects.
+          # `CSV::Table#to_a` flattens each row to a plain Array, which would make
+          # string-keyed indexing fail downstream with TypeError.
+          source_csv.map { |row| row }
+        end
+        skipped = total_rows - kept_rows.size
 
         out = CSV.generate(headers: true) do |csv|
           csv << target_headers
-          source_csv.each do |row|
-            csv << target_headers.map { |h| transform_value(h, row[mapping[h]], transforms) }
+          kept_rows.each do |row|
+            csv << target_headers.map { |h| transform_value(h, source_value_for(row, mapping[h]), transforms) }
           end
         end
 
@@ -62,7 +85,7 @@ module Assistants
           role: "tool",
           tool_name: name,
           tool_arguments: a,
-          tool_result: { row_count: source_csv.size, target_import_type: target },
+          tool_result: { row_count: kept_rows.size, skipped_rows: skipped, target_import_type: target },
           content: nil
         )
         generated.file.attach(
@@ -71,14 +94,19 @@ module Assistants
           content_type: "text/csv"
         )
 
+        file_url = Rails.application.routes.url_helpers.rails_blob_path(generated.file, only_path: true)
+
         {
           generated_attachment_id: generated.id,
           filename: generated.file.filename.to_s,
-          row_count: source_csv.size,
+          file_url: file_url,
+          row_count: kept_rows.size,
+          skipped_rows: skipped,
+          source_row_count: total_rows,
           target_import_type: target,
           target_headers: target_headers,
-          preview: source_csv.first(3).map { |row|
-            target_headers.each_with_object({}) { |h, acc| acc[h] = transform_value(h, row[mapping[h]], transforms) }
+          preview: kept_rows.first(3).map { |row|
+            target_headers.each_with_object({}) { |h, acc| acc[h] = transform_value(h, source_value_for(row, mapping[h]), transforms) }
           }
         }
       rescue CSV::MalformedCSVError => e
@@ -86,6 +114,14 @@ module Assistants
       end
 
       private
+
+      # Look up a source column from the CSV::Row safely. Mapping may omit some
+      # target columns (the LLM commonly maps a subset), in which case the value
+      # is "" — never nil-index a CSV::Row, which raises TypeError.
+      def source_value_for(row, source_col)
+        return "" if source_col.nil? || source_col.to_s.strip.empty?
+        row[source_col.to_s]
+      end
 
       def transform_value(target_col, source_value, transforms)
         return "" if source_value.nil?

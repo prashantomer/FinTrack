@@ -41,4 +41,34 @@ RSpec.describe "Assistants::Tools user-isolation", type: :model do
       expect(result[:items].map { |t| t[:description] }).not_to include("Bob salary")
     end
   end
+
+  describe Assistants::Tools::LookupInstruments do
+    before do
+      Instrument.create!(name: "HDFC Bank Ltd", ticker_symbol: "HDFCBANK", isin: "INE040A01034", investment_type: "stock", exchange: "NSE")
+      Instrument.create!(name: "State Bank of India", ticker_symbol: "SBIN", isin: "INE062A01020", investment_type: "stock", exchange: "NSE")
+      Instrument.create!(name: "HDFC Top 100 Fund - Direct Growth", ticker_symbol: nil, investment_type: "mutual_fund", fund_house: "HDFC AMC")
+    end
+
+    it "searches the global catalogue by ticker symbol" do
+      result = described_class.new(alice).call(symbol: "HDFCBANK")
+      expect(result[:count]).to eq(1)
+      expect(result[:instruments].first[:name]).to eq("HDFC Bank Ltd")
+    end
+
+    it "errors when no query term is provided" do
+      result = described_class.new(alice).call({})
+      expect(result[:error]).to eq("missing_query")
+    end
+
+    it "treats fund name passed in `symbol` as a name match for MF instruments without a ticker" do
+      result = described_class.new(alice).call(symbol: "HDFC Top 100", type: "mutual_fund")
+      expect(result[:count]).to eq(1)
+      expect(result[:instruments].first[:name]).to eq("HDFC Top 100 Fund - Direct Growth")
+    end
+
+    it "surfaces the MF name as the effective ticker for callers" do
+      result = described_class.new(alice).call(name: "HDFC Top 100", type: "mutual_fund")
+      expect(result[:instruments].first[:ticker_symbol]).to eq("HDFC Top 100 Fund - Direct Growth")
+    end
+  end
 end

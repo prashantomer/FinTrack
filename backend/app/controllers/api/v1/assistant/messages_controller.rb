@@ -4,7 +4,7 @@ module Api
       class MessagesController < ApplicationController
         # GET /api/v1/assistant/messages?session_id=...&limit=...&before=...
         def index
-          scope = current_user.assistant_messages.chronological
+          scope = current_user.assistant_messages.chronological.with_attached_file
           scope = scope.where(session_id: params[:session_id]) if params[:session_id].present?
           scope = scope.where("id < ?", params[:before]) if params[:before].present?
           limit = (params[:limit] || 100).to_i.clamp(1, 500)
