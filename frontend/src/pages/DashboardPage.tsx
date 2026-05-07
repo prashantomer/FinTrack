@@ -124,12 +124,12 @@ function PortfolioCard({
         <CardTitle className="text-sm">Portfolio Breakdown</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        {holdings.map((h) => {
+        {holdings.map((h, i) => {
           const hType = h.type ?? h.investment_type ?? ''
           const pct = total > 0 ? (h.current_value / total) * 100 : 0
           const color = INVESTMENT_COLORS[hType] ?? '#94a3b8'
           return (
-            <div key={hType || h.total_invested} className="px-6 py-3 border-b last:border-0">
+            <div key={`${hType}-${i}`} className="px-6 py-3 border-b last:border-0">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
@@ -233,8 +233,8 @@ function RecentTransactionsCard({ transactions, formatCurrency }: { transactions
               </p>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span className="text-xs text-muted-foreground">{fmtDate(t.date)}</span>
-                {t.tags.length > 0 && t.description && t.tags.map((tag) => (
-                  <span key={tag} className="text-xs bg-muted px-1.5 py-0.5 rounded">{tag}</span>
+                {t.tags.length > 0 && t.description && t.tags.map((tag, i) => (
+                  <span key={`${tag}-${i}`} className="text-xs bg-muted px-1.5 py-0.5 rounded">{tag}</span>
                 ))}
               </div>
             </div>

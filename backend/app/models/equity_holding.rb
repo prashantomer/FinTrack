@@ -9,9 +9,11 @@
 #  folio_number        :string(50)
 #  is_closed           :boolean          default(FALSE), not null
 #  last_calculated_at  :datetime
+#  long_term_units     :decimal(15, 4)
 #  notes               :text
 #  realized_gain       :decimal(14, 2)
 #  sell_lots           :integer
+#  short_term_units    :decimal(15, 4)
 #  total_invested      :decimal(14, 2)
 #  total_units         :decimal(15, 4)
 #  type                :string           default("Folio"), not null

@@ -368,8 +368,8 @@ function StepUpload({
               <table className="text-xs w-full border-collapse">
                 <thead>
                   <tr className="bg-muted">
-                    {headers.slice(0, 6).map(h => (
-                      <th key={h} className="px-2 py-1.5 text-left font-semibold border-r last:border-r-0 whitespace-nowrap">{h}</th>
+                    {headers.slice(0, 6).map((h, i) => (
+                      <th key={`${h}-${i}`} className="px-2 py-1.5 text-left font-semibold border-r last:border-r-0 whitespace-nowrap">{h}</th>
                     ))}
                     {headers.length > 6 && <th className="px-2 py-1.5 text-muted-foreground">+{headers.length - 6} more</th>}
                   </tr>

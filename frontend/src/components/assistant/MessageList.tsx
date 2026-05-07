@@ -58,7 +58,7 @@ export function MessageList({ messages, isThinking, onPin, onUnpin, onReference,
   return (
     <div ref={ref} className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3">
       {groups.map((g, i) => (
-        <div key={g.session_id} className="flex flex-col gap-3">
+        <div key={`${g.session_id}-${i}`} className="flex flex-col gap-3">
           {i > 0 && (
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground my-2">
               <div className="flex-1 border-t" />

@@ -49,6 +49,8 @@ module Holdings
         buy_lots:           stats[:buy_lots],
         sell_lots:          stats[:sell_lots],
         total_units:        stats[:total_units],
+        long_term_units:    stats[:long_term_units],
+        short_term_units:   stats[:short_term_units],
         avg_buy_price:      stats[:avg_buy_price],
         total_invested:     stats[:total_invested],
         current_value:      stats[:current_value],
@@ -58,10 +60,55 @@ module Holdings
         last_calculated_at: Time.current
       )
       holding.save!
+
+      persist_lot_pnl(lots, stats[:lot_pnl] || {})
+
       holding
     end
 
     private
+
+    # Write per-lot P&L back onto each Investment row. Uses `update_columns`
+    # to skip validations and the `after_save_commit` callback, otherwise we'd
+    # re-enqueue a Holdings::RefreshJob for every lot we touch and loop.
+    #
+    # BUY lots get `lot_unrealized_gain`; SELL lots get `lot_realized_gain`.
+    # Lots that the FIFO walk fully consumed (and no remainder) end up with
+    # both columns nil — see Investment#pnl helpers for read-side handling.
+    def persist_lot_pnl(lots, lot_pnl_map)
+      now = Time.current
+      lots.each do |inv|
+        entry = lot_pnl_map[inv.id]
+        if entry
+          if inv.buy?
+            next if equal_to_two?(inv.lot_unrealized_gain, entry[:value]) && inv.lot_pnl_at
+            inv.update_columns(
+              lot_unrealized_gain: entry[:value],
+              lot_realized_gain:   nil,
+              lot_pnl_at:          now
+            )
+          else
+            next if equal_to_two?(inv.lot_realized_gain, entry[:value]) && inv.lot_pnl_at
+            inv.update_columns(
+              lot_realized_gain:   entry[:value],
+              lot_unrealized_gain: nil,
+              lot_pnl_at:          now
+            )
+          end
+        elsif inv.lot_unrealized_gain.present? || inv.lot_realized_gain.present?
+          # Lot was previously tracked but is no longer in the FIFO map (e.g.
+          # a buy lot that's been fully consumed). Clear it.
+          inv.update_columns(lot_unrealized_gain: nil, lot_realized_gain: nil, lot_pnl_at: now)
+        end
+      end
+    end
+
+    # Compare to two-decimal precision to avoid spurious writes when float
+    # round-trip introduces sub-cent drift.
+    def equal_to_two?(a, b)
+      return false if a.nil? || b.nil?
+      a.to_d.round(2) == b.to_d.round(2)
+    end
 
     def destroy_if_empty
       Holding.where(user_id: user.id,

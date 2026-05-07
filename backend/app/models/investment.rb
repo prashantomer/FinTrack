@@ -7,6 +7,9 @@
 #  current_value         :decimal(14, 2)
 #  folio_number          :string(50)
 #  investment_type       :string           not null
+#  lot_pnl_at            :datetime
+#  lot_realized_gain     :decimal(14, 2)
+#  lot_unrealized_gain   :decimal(14, 2)
 #  name                  :string(255)      not null
 #  notes                 :text
 #  price                 :decimal(14, 4)

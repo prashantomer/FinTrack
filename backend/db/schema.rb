@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_175454) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_175456) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -146,10 +146,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_175454) do
     t.string "folio_number", limit: 50
     t.boolean "is_closed", default: false, null: false
     t.datetime "last_calculated_at"
+    t.decimal "long_term_units", precision: 15, scale: 4
     t.text "notes"
     t.bigint "platform_account_id", null: false
     t.decimal "realized_gain", precision: 14, scale: 2
     t.integer "sell_lots"
+    t.decimal "short_term_units", precision: 15, scale: 4
     t.decimal "total_invested", precision: 14, scale: 2
     t.decimal "total_units", precision: 15, scale: 4
     t.string "type", default: "Folio", null: false
@@ -225,6 +227,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_175454) do
     t.decimal "current_value", precision: 14, scale: 2
     t.string "folio_number", limit: 50
     t.string "investment_type", null: false
+    t.datetime "lot_pnl_at"
+    t.decimal "lot_realized_gain", precision: 14, scale: 2
+    t.decimal "lot_unrealized_gain", precision: 14, scale: 2
     t.string "name", limit: 255, null: false
     t.text "notes"
     t.string "order_id", limit: 64
