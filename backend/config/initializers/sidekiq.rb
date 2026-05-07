@@ -16,5 +16,11 @@ SIDEKIQ_REDIS_DB = ENV.fetch("SIDEKIQ_REDIS_DB", "0")
 
 sidekiq_redis_url = "#{REDIS_BASE_URL}/#{SIDEKIQ_REDIS_DB}"
 
-Sidekiq.configure_server { |c| c.redis = { url: sidekiq_redis_url } }
+Sidekiq.configure_server do |c|
+  c.redis = { url: sidekiq_redis_url }
+  # Verbose logs in dev surface every job lifecycle event (perform start,
+  # args, success, failure, scheduled-set placement). Production stays at
+  # the default (info) to avoid log volume blowing up.
+  c.logger.level = Logger::DEBUG if Rails.env.development?
+end
 Sidekiq.configure_client { |c| c.redis = { url: sidekiq_redis_url } }
