@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  review:
+  copilot:
     name: Copilot Code Review
     runs-on: ubuntu-latest
     permissions:
@@ -22,3 +22,59 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/requested_reviewers \
             -f "reviewers[]=copilot-pull-request-review[bot]" || true
+
+  claude:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    # Skip on PRs from forks (no access to ANTHROPIC_API_KEY secret).
+    # Best-effort job — never blocks the PR.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a pull request for FinTrack — a Rails 8.1 API
+            backend (Sidekiq, JWT, audited, ActiveStorage) + React 19 SPA
+            frontend (TanStack Query, base-ui, Tailwind v4). CLAUDE.md at
+            the repo root has the full architecture and constraints — read
+            it first.
+
+            Focus the review on:
+            - Correctness and edge cases (FIFO portfolio math, dedup
+              ladders in importers, idempotent upserts, callback loops on
+              `Holdings::RefreshJob`).
+            - Security (per-user data isolation in assistant tools, SQL
+              injection in raw `where` calls, XSS in user-rendered text,
+              encrypted columns).
+            - Performance gotchas (N+1 inside Sidekiq jobs, missing
+              indexes, unbatched bulk writes).
+            - Test coverage on the changed code paths.
+            - Style conventions: no comments unless the WHY is non-obvious,
+              no half-implemented features, no defensive code for
+              impossible scenarios.
+
+            Skip nits that are matters of personal taste. Don't restate
+            what the diff already shows — focus on what could go wrong
+            in production.
+
+            Use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) for line-anchored issues, and
+            `gh pr comment` for the top-level summary. Don't submit review
+            text as chat — only post via GitHub comments.
+
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
