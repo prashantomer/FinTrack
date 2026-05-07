@@ -1,8 +1,0 @@
-# sidekiq-cron schedules. Loaded from config/initializers/sidekiq.rb.
-# Times are interpreted in Rails.application.config.time_zone (Asia/Kolkata).
-
-daily_pnl_snapshot:
-  cron: "0 5 * * *"
-  class: "Daily::PriceAndPnlSnapshotJob"
-  queue: default
-  description: "Fetch latest instrument prices and snapshot every user's holdings."

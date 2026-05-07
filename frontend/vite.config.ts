@@ -15,6 +15,8 @@ export default defineConfig({
       '/api': 'http://localhost:8000',
       // Active Storage download endpoints (signed URLs from rails_blob_path)
       '/rails': 'http://localhost:8000',
+      // Sidekiq Web UI (HTTP basic auth gated by SIDEKIQ_USERNAME/PASSWORD env)
+      '/sidekiq': 'http://localhost:8000',
     },
   },
 })

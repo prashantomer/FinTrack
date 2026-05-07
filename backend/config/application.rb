@@ -48,5 +48,13 @@ module Backend
     ]
 
     config.middleware.use Rack::Attack
+
+    # Sidekiq::Web (mounted at /sidekiq) needs Rack session middleware for its
+    # CSRF protection. API-only Rails strips sessions/cookies by default — add
+    # them back. The Rails API itself uses JWT for auth, so this middleware is
+    # effectively only used by the Sidekiq dashboard.
+    config.session_store :cookie_store, key: "_fintrack_session", same_site: :lax
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use config.session_store, config.session_options
   end
 end
