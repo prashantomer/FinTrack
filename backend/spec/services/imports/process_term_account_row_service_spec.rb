@@ -173,6 +173,31 @@ RSpec.describe Imports::ProcessTermAccountRowService, type: :service do
     end
   end
 
+  describe "duplicate detection" do
+    it "skips when (account_type, account_number) matches an existing FD" do
+      call_fd_service(account_number: "FD-001")
+      expect {
+        call_fd_service(idx: 1, account_number: "FD-001", amount: "999999")
+      }.not_to change(TermAccount, :count)
+    end
+
+    it "returns DUPLICATE and creates a :skipped ImportRecord referencing the existing FD" do
+      first  = call_fd_service(account_number: "FD-001")
+      result = call_fd_service(idx: 1, account_number: "FD-001")
+      expect(result).to eq(described_class::DUPLICATE)
+      ir = ImportRecord.where(status: "skipped").last
+      expect(ir.importable).to eq(first)
+      expect(ir.notes).to include("Duplicate of TermAccount ##{first.id}").and include("FD #FD-001")
+    end
+
+    it "falls back to (parent_account, open_date, amount, account_type) when no number is given" do
+      call_fd_service(account_number: nil)
+      expect {
+        call_fd_service(idx: 1, account_number: nil)
+      }.not_to change(TermAccount, :count)
+    end
+  end
+
   describe "error cases" do
     it "raises when parent_account_nickname is blank" do
       account  # ensure account exists

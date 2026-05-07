@@ -17,9 +17,8 @@ RSpec.describe Imports::ProcessInvestmentRowService, type: :service do
       current_value:    "12000",
       purchase_date:    "2024-01-15",
       quantity:         "100",
-      buy_price:        "100.0",
       units:            nil,
-      nav_at_purchase:  nil,
+      price:            "100.0",
       folio_number:     nil,
       platform_name:    nil,
       notes:            nil
@@ -165,6 +164,44 @@ RSpec.describe Imports::ProcessInvestmentRowService, type: :service do
       it "sets importable to the created investment" do
         call_service
         expect(ImportRecord.last.importable).to eq(Investment.last)
+      end
+    end
+
+    describe "duplicate detection" do
+      it "skips when a row with the same trade_id already exists" do
+        call_service(trade_id: "TRADE-999")
+        expect {
+          call_service(idx: 1, trade_id: "TRADE-999", amount_invested: "20000")
+        }.not_to change(Investment, :count)
+      end
+
+      it "returns the DUPLICATE sentinel when trade_id matches an existing investment" do
+        call_service(trade_id: "TRADE-999")
+        result = call_service(idx: 1, trade_id: "TRADE-999")
+        expect(result).to eq(described_class::DUPLICATE)
+      end
+
+      it "creates a :skipped ImportRecord that references the existing investment" do
+        first  = call_service(trade_id: "TRADE-999")
+        call_service(idx: 1, trade_id: "TRADE-999")
+        ir = ImportRecord.where(status: "skipped").last
+        expect(ir.importable).to eq(first)
+        expect(ir.notes).to include("Duplicate of Investment ##{first.id}").and include("trade_id TRADE-999")
+      end
+
+      it "falls back to (order_id, purchase_date) when trade_id is absent" do
+        call_service(order_id: "ORDER-1", trade_id: nil)
+        expect {
+          call_service(idx: 1, order_id: "ORDER-1", trade_id: nil)
+        }.not_to change(Investment, :count)
+      end
+
+      it "falls back to a structural exact match when no IDs are present" do
+        create(:platform, name: "Zerodha", platform_type: "broker")
+        call_service(trade_id: nil, order_id: nil, platform_name: "Zerodha")
+        expect {
+          call_service(idx: 1, trade_id: nil, order_id: nil, platform_name: "Zerodha")
+        }.not_to change(Investment, :count)
       end
     end
 

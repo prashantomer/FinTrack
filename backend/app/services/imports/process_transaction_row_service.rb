@@ -1,6 +1,7 @@
 module Imports
   class ProcessTransactionRowService
     DATE_FORMATS = [ "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y" ].freeze
+    DUPLICATE    = :duplicate
 
     def initialize(batch, row, idx)
       @batch = batch
@@ -19,6 +20,11 @@ module Imports
 
       linked_account = resolve_linked_account
       tags           = parse_tags(@row[:tags])
+      bank_ref       = @row[:bank_ref].presence
+
+      if (existing = find_duplicate(date, amount, type, linked_account, bank_ref))
+        return register_duplicate(existing)
+      end
 
       txn = Transaction.create!(
         user:                 @user,
@@ -27,7 +33,7 @@ module Imports
         date:                 date,
         description:          @row[:description].presence,
         tags:                 tags,
-        bank_ref:             @row[:bank_ref].presence,
+        bank_ref:             bank_ref,
         linked_account_type:  linked_account ? linked_account.class.name : nil,
         linked_account_id:    linked_account&.id
       )
@@ -38,9 +44,46 @@ module Imports
         status:     :ok,
         notes:      linked_account ? "Linked to account: #{linked_account.nickname}" : nil
       )
+      txn
     end
 
     private
+
+    # Dedupe ladder:
+    #   1. bank_ref — UTR/IMPS reference is unique per credit/transfer
+    #   2. (date, amount, type, linked_account) — exact structural match
+    def find_duplicate(date, amount, type, linked_account, bank_ref)
+      if bank_ref
+        existing = @user.transactions.find_by(bank_ref: bank_ref)
+        return existing if existing
+      end
+
+      scope = @user.transactions.where(
+        date:                date,
+        amount:              amount,
+        transaction_type:    type,
+        linked_account_type: linked_account ? linked_account.class.name : nil,
+        linked_account_id:   linked_account&.id
+      )
+      scope.first
+    end
+
+    def register_duplicate(existing)
+      reference =
+        if existing.bank_ref.present?
+          "bank_ref #{existing.bank_ref}"
+        else
+          "#{existing.date}, ₹#{existing.amount} #{existing.transaction_type}"
+        end
+
+      @batch.import_records.create!(
+        importable: existing,
+        row_index:  @idx,
+        status:     :skipped,
+        notes:      "Duplicate of Transaction ##{existing.id} (#{reference})"
+      )
+      DUPLICATE
+    end
 
     def resolve_linked_account
       nickname = @row[:linked_account_nickname].presence

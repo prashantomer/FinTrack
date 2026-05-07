@@ -5,17 +5,18 @@ module Imports
     TEMPLATES = {
       "investments" => {
         headers: %w[
-          investment_type name isin ticker_symbol exchange fund_house
+          trade_type investment_type name isin ticker_symbol exchange fund_house
           amount_invested current_value purchase_date
-          quantity buy_price
-          units nav_at_purchase
-          folio_number platform_name notes
+          quantity units price
+          order_id trade_id folio_number platform_name notes
         ],
         rows: [
-          [ "stock",       "Reliance Industries", "INE002A01018", "RELIANCE", "NSE", "",
-           "15000.00", "18500.00", "2024-01-15", "10", "1500.00", "", "", "", "Zerodha", "Long-term hold" ],
-          [ "mutual_fund", "HDFC Top 100 Fund",   "",             "",         "",    "HDFC AMC",
-           "50000.00", "62000.00", "2024-02-01", "", "", "100.00", "500.00", "12345678", "Groww", "Monthly SIP" ]
+          [ "buy",  "stock",       "Reliance Industries", "INE002A01018", "RELIANCE", "NSE", "",
+           "15000.00", "18500.00", "2024-01-15", "10", "",   "1500.00", "240115000123456", "240115000999111", "",         "Zerodha", "Long-term hold" ],
+          [ "sell", "stock",       "Reliance Industries", "INE002A01018", "RELIANCE", "NSE", "",
+           "5000.00",  "",         "2024-06-10", "3",  "",   "1666.67", "240610000789012", "240610000888222", "",         "Zerodha", "Partial exit" ],
+          [ "buy",  "mutual_fund", "HDFC Top 100 Fund",   "",             "",         "",    "HDFC AMC",
+           "50000.00", "62000.00", "2024-02-01", "",   "100.00", "500.00", "",                "",                 "12345678", "Groww",   "Monthly SIP" ]
         ]
       }.freeze,
       "transactions" => {

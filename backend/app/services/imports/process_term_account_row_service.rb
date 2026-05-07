@@ -1,6 +1,7 @@
 module Imports
   class ProcessTermAccountRowService
     DATE_FORMATS = [ "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y" ].freeze
+    DUPLICATE    = :duplicate
 
     def initialize(batch, row, idx)
       @batch = batch
@@ -21,11 +22,16 @@ module Imports
       interest_rate  = @row[:interest_rate].to_f
       raise "interest_rate is required" unless interest_rate > 0
 
+      account_number = @row[:account_number].presence
+      if (existing = find_duplicate(account_type, account_number, parent_account, open_date, amount))
+        return register_duplicate(existing)
+      end
+
       attrs = {
         user:              @user,
         parent_account:    parent_account,
         account_type:      account_type,
-        account_number:    @row[:account_number].presence,
+        account_number:    account_number,
         amount:            amount,
         open_date:         open_date,
         interest_rate:     interest_rate,
@@ -53,9 +59,44 @@ module Imports
         status:     :ok,
         notes:      "#{account_type.upcase} linked to account: #{parent_account.nickname}"
       )
+      ta
     end
 
     private
+
+    # Dedupe ladder:
+    #   1. (account_type, account_number) — for FDs that carry a unique number
+    #   2. (parent_account, open_date, amount, account_type) — structural match
+    def find_duplicate(account_type, account_number, parent_account, open_date, amount)
+      if account_number
+        existing = @user.term_accounts.find_by(account_type: account_type, account_number: account_number)
+        return existing if existing
+      end
+
+      @user.term_accounts.find_by(
+        parent_account_id: parent_account.id,
+        open_date:         open_date,
+        amount:            amount,
+        account_type:      account_type
+      )
+    end
+
+    def register_duplicate(existing)
+      reference =
+        if existing.account_number.present?
+          "#{existing.account_type.upcase} ##{existing.account_number}"
+        else
+          "#{existing.account_type.upcase} opened #{existing.open_date}, ₹#{existing.amount}"
+        end
+
+      @batch.import_records.create!(
+        importable: existing,
+        row_index:  @idx,
+        status:     :skipped,
+        notes:      "Duplicate of TermAccount ##{existing.id} (#{reference})"
+      )
+      DUPLICATE
+    end
 
     def resolve_parent_account!
       nickname = @row[:parent_account_nickname].to_s.strip

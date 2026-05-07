@@ -2,6 +2,11 @@ module Imports
   class ProcessInvestmentRowService
     DATE_FORMATS = [ "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y" ].freeze
 
+    # Returned (instead of an Investment record) when the row matches an
+    # existing investment by a strong dedupe key. The job uses this sentinel
+    # to bump ImportBatch#duplicate_rows.
+    DUPLICATE = :duplicate
+
     def initialize(batch, row, idx)
       @batch = batch
       @user  = batch.user
@@ -11,27 +16,37 @@ module Imports
 
     def call
       investment_type = normalize_type!
+      trade_type      = normalize_trade_type!
 
       instrument      = resolve_instrument(investment_type)
       user_instrument = Instruments::TrackService.new(@user, instrument).track
       platform_account = resolve_platform_account
 
-      follio = resolve_follio(user_instrument, platform_account)
-
       amount_invested = @row[:amount_invested].to_f
       purchase_date   = parse_date!(@row[:purchase_date])
 
+      # `price` is the unified per-share / per-unit price column. For backwards
+      # compatibility we still accept legacy `buy_price` and `nav_at_purchase`
+      # in CSV files exported before the schema unification.
+      price = (@row[:price].presence || @row[:buy_price].presence || @row[:nav_at_purchase].presence)&.to_f
+
+      if (existing = find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type))
+        return register_duplicate(existing)
+      end
+
       investment = Investment.create!(
         user:                @user,
+        trade_type:          trade_type,
         investment_type:     investment_type,
         name:                instrument.name,
         amount_invested:     amount_invested,
         current_value:       @row[:current_value].presence&.to_f,
         purchase_date:       purchase_date,
         quantity:            @row[:quantity].presence&.to_f,
-        buy_price:           @row[:buy_price].presence&.to_f,
         units:               @row[:units].presence&.to_f,
-        nav_at_purchase:     @row[:nav_at_purchase].presence&.to_f,
+        price:               price,
+        order_id:            @row[:order_id].presence,
+        trade_id:            @row[:trade_id].presence,
         folio_number:        @row[:folio_number].presence,
         notes:               @row[:notes].presence,
         user_instrument:     user_instrument,
@@ -46,9 +61,57 @@ module Imports
         status:     :ok,
         notes:      matched_txn ? "Linked to txn ##{matched_txn.id}" : nil
       )
+      investment
     end
 
     private
+
+    # Dedupe ladder, strongest key first:
+    #   1. trade_id  — broker-assigned, globally unique per fill
+    #   2. order_id + purchase_date — covers files where trade_id is absent
+    #      but order_id is reused only within the same date for that user
+    #   3. structural exact match — instrument × platform × date × amount × side
+    def find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type)
+      trade_id = @row[:trade_id].presence
+      if trade_id
+        existing = @user.investments.find_by(trade_id: trade_id)
+        return existing if existing
+      end
+
+      order_id = @row[:order_id].presence
+      if order_id
+        existing = @user.investments.find_by(order_id: order_id, purchase_date: purchase_date)
+        return existing if existing
+      end
+
+      return nil unless user_instrument && platform_account
+      @user.investments.find_by(
+        user_instrument_id:  user_instrument.id,
+        platform_account_id: platform_account.id,
+        purchase_date:       purchase_date,
+        amount_invested:     amount_invested,
+        trade_type:          trade_type
+      )
+    end
+
+    def register_duplicate(existing)
+      reference =
+        if existing.trade_id.present?
+          "trade_id #{existing.trade_id}"
+        elsif existing.order_id.present?
+          "order_id #{existing.order_id}"
+        else
+          "purchase_date #{existing.purchase_date}, amount #{existing.amount_invested}"
+        end
+
+      @batch.import_records.create!(
+        importable: existing,
+        row_index:  @idx,
+        status:     :skipped,
+        notes:      "Duplicate of Investment ##{existing.id} (#{reference})"
+      )
+      DUPLICATE
+    end
 
     def normalize_type!
       raw = @row[:investment_type].to_s.strip.downcase
@@ -56,6 +119,20 @@ module Imports
         raise "investment_type \"#{raw}\" is not valid (stock/mutual_fund)"
       end
       raw
+    end
+
+    def normalize_trade_type!
+      raw = @row[:trade_type].to_s.strip.downcase
+      return "buy" if raw.empty? # default for files without the column
+      mapped = case raw
+               when "buy", "b", "purchase" then "buy"
+               when "sell", "s", "sale", "exit" then "sell"
+               else raw
+               end
+      unless Investment.trade_types.key?(mapped)
+        raise "trade_type \"#{@row[:trade_type]}\" is not valid (buy/sell)"
+      end
+      mapped
     end
 
     # Instrument resolution: ISIN → ticker → name fuzzy → create
@@ -106,18 +183,6 @@ module Imports
         platform:  platform,
         nickname:  platform_name
       )
-    end
-
-    # Follio: find_or_create when folio_number + both associations present
-    def resolve_follio(user_instrument, platform_account)
-      folio_number = @row[:folio_number].presence
-      return nil unless folio_number && user_instrument && platform_account
-
-      Follio.find_or_create_by(
-        user:             @user,
-        user_instrument:  user_instrument,
-        platform_account: platform_account
-      ) { |f| f.folio_number = folio_number }
     end
 
     # Best-effort transaction matching — never raises

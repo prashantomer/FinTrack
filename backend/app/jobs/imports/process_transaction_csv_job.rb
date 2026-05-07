@@ -12,7 +12,8 @@ module Imports
       batch.update!(total_rows: rows.count)
 
       rows.each_with_index do |row, idx|
-        Imports::ProcessTransactionRowService.new(batch, row, idx).call
+        result = Imports::ProcessTransactionRowService.new(batch, row, idx).call
+        batch.increment!(:duplicate_rows) if result == Imports::ProcessTransactionRowService::DUPLICATE
         batch.increment!(:processed_rows)
       rescue => e
         batch.increment!(:failed_rows)
