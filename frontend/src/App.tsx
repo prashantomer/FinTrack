@@ -18,7 +18,6 @@ import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { LandingPage } from '@/pages/LandingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { PlatformAccountsPage } from '@/pages/PlatformAccountsPage'
-import { PerformancePage } from '@/pages/PerformancePage'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { TransactionsPage } from '@/pages/TransactionsPage'
@@ -51,7 +50,6 @@ function AppRoutes() {
                 <Route path="/holdings" element={<HoldingsPage />} />
                 <Route path="/investments" element={<InvestmentsPage />} />
                 <Route path="/portfolio" element={<PortfolioPage />} />
-                <Route path="/performance" element={<PerformancePage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/imports" element={<ImportsPage />} />
                 <Route path="/assistant" element={<AssistantPage />} />
