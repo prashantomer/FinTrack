@@ -3,6 +3,7 @@ import type {
   DashboardCacheStatus,
   DashboardReport,
   InvestmentSummaryReport,
+  PerformanceReport,
   PortfolioReport,
   SpendingTrendsReport,
 } from '@/types'
@@ -36,5 +37,12 @@ export async function getDashboardCacheStatus() {
 
 export async function getPortfolio() {
   const res = await client.get<ApiResponse<PortfolioReport>>('/reports/portfolio')
+  return res.data.data
+}
+
+export async function getPerformance(days = 90) {
+  const res = await client.get<ApiResponse<PerformanceReport>>('/reports/performance', {
+    params: { days },
+  })
   return res.data.data
 }

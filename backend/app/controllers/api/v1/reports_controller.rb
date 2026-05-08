@@ -32,6 +32,11 @@ module Api
       def portfolio
         render_success(data: Reports::PortfolioService.new(current_user).call)
       end
+
+      def performance
+        days = params[:days].presence&.to_i || Reports::PerformanceService::DEFAULT_DAYS
+        render_success(data: Reports::PerformanceService.new(current_user, days: days).call)
+      end
     end
   end
 end

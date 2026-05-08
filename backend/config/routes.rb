@@ -82,6 +82,7 @@ Rails.application.routes.draw do
         get    "spending-trends",       to: "reports#spending_trends"
         get    "investment-summary",    to: "reports#investment_summary"
         get    :portfolio,              to: "reports#portfolio"
+        get    :performance,            to: "reports#performance"
       end
 
       post "errors", to: "client_errors#create"

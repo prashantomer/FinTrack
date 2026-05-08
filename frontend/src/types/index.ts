@@ -584,3 +584,34 @@ export interface PortfolioReport {
   by_platform: PortfolioPlatformBreakdown[]
   positions: PortfolioPosition[]
 }
+
+// ── Performance / Trends ────────────────────────────────────────────────────
+
+export interface PerformanceTotals {
+  current_value: number
+  unrealized_gain: number
+  realized_30d: number
+}
+
+export interface PerformanceNetWorthPoint {
+  date: string   // ISO date
+  value: number
+}
+
+/**
+ * One row per snapshot date with platform-account names as keys.
+ * `date` is always present; the rest of the keys are platform nicknames
+ * (e.g., "Coin by Zerodha") whose values are that day's `current_value`
+ * for the platform.
+ */
+export interface PerformancePerPlatformPoint {
+  date: string
+  [platformName: string]: string | number
+}
+
+export interface PerformanceReport {
+  totals: PerformanceTotals
+  net_worth_series: PerformanceNetWorthPoint[]
+  per_platform_series: PerformancePerPlatformPoint[]
+  days: number
+}
