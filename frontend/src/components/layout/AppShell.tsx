@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, Home, LayoutDashboard, LogOut, PieChart, Settings, Sparkles, TrendingUp, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/context/AuthContext'
 import { SettingsSheet } from './SettingsSheet'
 
@@ -43,7 +42,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           FinTrack
         </Link>
-        <Separator />
         <nav className="flex flex-1 flex-col gap-1 p-2">
           {navItems.map(({ to, label, icon: Icon }) => {
             const active = location.pathname === to
@@ -63,7 +61,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
           })}
         </nav>
-        <Separator />
         <div className="flex items-center gap-2 p-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-sidebar-foreground">{displayName}</p>
