@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 // (useEffect kept for the BrowseSheet infinite-scroll listener below)
 import { Link } from 'react-router-dom'
-import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/hooks/useDebounce'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -298,10 +298,25 @@ export function InstrumentsPage() {
   const [browseOpen, setBrowseOpen] = useState(false)
   const [tab, setTab] = useState<TabKey>('held')
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const search = useDebounce(searchInput, 250).trim().toLowerCase()
 
   const { data: tracked = [], isLoading: trackedLoading, isFetching } = useTrackedInstruments()
   const { data: portfolio } = usePortfolio()
   const trackedIds = new Set(tracked.map(i => i.id))
+
+  // Filter the tracked list by search term before bucketing — keeps the
+  // tab counts honest. Match across name, ticker, ISIN, and fund_house so
+  // both stocks and MFs are reachable by the obvious identifier.
+  const filteredTracked = useMemo(() => {
+    if (!search) return tracked
+    return tracked.filter(i =>
+      i.name.toLowerCase().includes(search) ||
+      (i.ticker_symbol && i.ticker_symbol.toLowerCase().includes(search)) ||
+      (i.isin && i.isin.toLowerCase().includes(search)) ||
+      (i.fund_house && i.fund_house.toLowerCase().includes(search)),
+    )
+  }, [tracked, search])
 
   // Bucket each tracked instrument using portfolio aggregation:
   //   held       → position with is_closed=false (net qty > 0)
@@ -312,11 +327,11 @@ export function InstrumentsPage() {
     const heldIds      = new Set(positions.filter(p => !p.is_closed).map(p => p.instrument_id))
     const withdrawnIds = new Set(positions.filter(p =>  p.is_closed).map(p => p.instrument_id))
     return {
-      held:      tracked.filter(i =>  heldIds.has(i.id)),
-      withdrawn: tracked.filter(i => !heldIds.has(i.id) &&  withdrawnIds.has(i.id)),
-      idle:      tracked.filter(i => !heldIds.has(i.id) && !withdrawnIds.has(i.id)),
+      held:      filteredTracked.filter(i =>  heldIds.has(i.id)),
+      withdrawn: filteredTracked.filter(i => !heldIds.has(i.id) &&  withdrawnIds.has(i.id)),
+      idle:      filteredTracked.filter(i => !heldIds.has(i.id) && !withdrawnIds.has(i.id)),
     }
-  }, [tracked, portfolio])
+  }, [filteredTracked, portfolio])
 
   const TABS: { value: TabKey; label: string; count: number; emptyMessage: string }[] = [
     { value: 'held',      label: 'Currently Held',  count: buckets.held.length,      emptyMessage: 'No tracked instruments are currently held — buy some to see positions here' },
@@ -343,8 +358,9 @@ export function InstrumentsPage() {
       </PageHeader>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-4">
-        <div className="flex gap-1 border-b">
-          {TABS.map(t => (
+        <div className="flex items-end gap-3 border-b">
+          <div className="flex gap-1 flex-1">
+            {TABS.map(t => (
             <button
               key={t.value}
               onClick={() => { setTab(t.value); setPage(1) }}
@@ -360,6 +376,25 @@ export function InstrumentsPage() {
               </Badge>
             </button>
           ))}
+          </div>
+          <div className="relative w-72 pb-1">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchInput}
+              onChange={e => { setSearchInput(e.target.value); setPage(1) }}
+              placeholder="Search instruments…"
+              className="pl-8 pr-8 h-8"
+            />
+            {searchInput && (
+              <button
+                onClick={() => { setSearchInput(''); setPage(1) }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {trackedLoading ? (
@@ -367,7 +402,11 @@ export function InstrumentsPage() {
         ) : (
           <TrackedTable
             instruments={paged}
-            emptyMessage={TABS.find(t => t.value === tab)?.emptyMessage ?? ''}
+            emptyMessage={
+              search
+                ? `No tracked instruments match "${searchInput}" in this tab`
+                : (TABS.find(t => t.value === tab)?.emptyMessage ?? '')
+            }
             allowUntrack={tab === 'idle'}
           />
         )}

@@ -315,7 +315,9 @@ Reports::HoldingSnapshotService.new(User.first, date: Date.current).call
 
 ### Backfilling historical prices (`instruments:backfill_prices`)
 
-The daily fetch only writes today's close. To populate a year (or more) of history — e.g. before showing the Instrument Profile price chart on a fresh install — fan out via Sidekiq:
+The daily fetch only writes today's close. To populate a year (or more) of history — e.g. before showing the Instrument Profile price chart on a fresh install — fan out via Sidekiq.
+
+> **Auto-fires on first track.** When a user subscribes (tracks) an instrument for the first time, `Instruments::TrackService` enqueues `Instruments::FirstTimeBackfillJob` for that one instrument. The job calls `Instruments::PriceBackfillScheduler.enqueue_for(instrument)`, which fans out the same per-day NSE / per-range AMFI work but scoped to a single id/ISIN, and skips dates already covered by the daily job. The bulk CSV-import path passes `backfill: false` to avoid 25k+ jobs from a 100-row import — re-run `instruments:backfill_prices` once after a large import to populate.
 
 ```bash
 # Smoke first — confirms both NSE and AMFI parsers actually work end-to-end

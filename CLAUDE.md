@@ -208,6 +208,12 @@ Holdings cache aggregated stats per `(user_instrument × platform_account)` — 
 
 Same-day re-runs upsert in place: `created_at` survives, `updated_at` bumps, `update_only` is restricted to the stat columns.
 
+**Historical price backfill** (`Instruments::PriceBackfillService` + the two `Instruments::Backfill*Job`s on the `:price_backfill` Sidekiq queue):
+
+- Bulk path: `bin/rails instruments:backfill_prices DAYS=365` enumerates tracked instruments and fans out one NSE job per trading weekday + one AMFI job per 30-day chunk. Idempotent via the `(instrument_id, price_date)` unique index.
+- Per-track path: `Instruments::TrackService#track` enqueues `Instruments::FirstTimeBackfillJob` whenever a fresh `UserInstrument` row is created (default `backfill: true`). The job calls `Instruments::PriceBackfillScheduler.enqueue_for(instrument)`, which scopes the same per-day NSE / per-range AMFI work to a single id/ISIN and **skips dates already covered** by the daily fetch (cheap pre-flight via `InstrumentPriceHistory.pluck(:price_date)`). Bulk callers (CSV importer) opt out with `track(backfill: false)` so a 100-row import doesn't fan out 25k+ jobs — run the rake task once after a big import instead.
+- Source strings differ on purpose: daily writes `nse_bhavcopy` / `amfi_navall`, backfill writes `nse_bhavcopy` (NSE source format is identical) / `amfi_navhistory`. The portal endpoint AMFI history uses a different column order than `NAVAll.txt` (scheme name before ISIN, repurchase + sale-price columns before the date) — the parser indexes accordingly.
+
 **Importer** (`Imports::Process*RowService` per type, kicked off by Sidekiq jobs):
 
 - Investment CSVs: `Imports::InvestmentFormatAdapters` auto-detects Zerodha Coin (`segment=MF`) and Kite (`segment=EQ`) tradebooks; everything else uses the `Default` adapter that expects FinTrack's canonical schema.

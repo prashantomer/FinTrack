@@ -324,7 +324,9 @@ export function InstrumentProfilePage() {
             {lotsQ.isLoading ? (
               <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
             ) : (
-              <InstrumentLotsTable lots={lots as LotRead[]} />
+              <ScrollableRows count={lots.length}>
+                <InstrumentLotsTable lots={lots as LotRead[]} />
+              </ScrollableRows>
             )}
           </CardContent>
         </Card>
@@ -338,6 +340,7 @@ export function InstrumentProfilePage() {
             ) : txns.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">No linked transactions.</p>
             ) : (
+              <ScrollableRows count={txns.length}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -362,10 +365,28 @@ export function InstrumentProfilePage() {
                   ))}
                 </TableBody>
               </Table>
+              </ScrollableRows>
             )}
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+// When there are more than ~10 rows, cap the wrapper height and scroll
+// internally with a hidden scrollbar (works in WebKit + Firefox + Edge).
+// Below the threshold we render plain children so short tables don't get
+// an unnecessary clipped frame.
+function ScrollableRows({ count, children }: { count: number; children: React.ReactNode }) {
+  if (count <= 10) return <>{children}</>
+  return (
+    <div
+      className="max-h-[440px] overflow-y-auto
+                 [scrollbar-width:none]
+                 [&::-webkit-scrollbar]:hidden"
+    >
+      {children}
     </div>
   )
 }

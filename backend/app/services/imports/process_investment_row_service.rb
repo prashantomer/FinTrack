@@ -19,7 +19,10 @@ module Imports
       trade_type      = normalize_trade_type!
 
       instrument      = resolve_instrument(investment_type)
-      user_instrument = Instruments::TrackService.new(@user, instrument).track
+      # Bulk path — skip the first-time backfill so a CSV with 100 new
+      # instruments doesn't fan out 25k+ Sidekiq jobs. The user can run
+      # `instruments:backfill_prices` once after the import to populate.
+      user_instrument = Instruments::TrackService.new(@user, instrument).track(backfill: false)
       platform_account = resolve_platform_account
 
       amount_invested = @row[:amount_invested].to_f

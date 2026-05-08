@@ -65,6 +65,16 @@ RSpec.configure do |config|
 
   config.include AuthHelper, type: :request
 
+  # Globally no-op the per-instrument backfill coordinator in tests.
+  # The :inline ActiveJob adapter would otherwise execute the job
+  # synchronously every time a TrackService.track creates a fresh
+  # UserInstrument — and that job fans out 250+ live NSE bhavcopy
+  # fetches. Tests that want to verify enqueueing override with their
+  # own `expect(...).to receive(:perform_later)` and overwrite this stub.
+  config.before(:each) do
+    allow(Instruments::FirstTimeBackfillJob).to receive(:perform_later)
+  end
+
   # Filter lines from Rails gems in backtraces.
   config.filter_rails_from_backtrace!
   # arbitrary gems may also be filtered via:
