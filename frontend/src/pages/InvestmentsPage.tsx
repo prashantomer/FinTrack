@@ -164,7 +164,6 @@ export function InvestmentsPage() {
                   <TableHead className="text-right">Current Value</TableHead>
                   <TableHead className="text-right">Gain / Loss</TableHead>
                   <TableHead>Order ID</TableHead>
-                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -178,7 +177,7 @@ export function InvestmentsPage() {
                   const isPositive = (gain ?? 0) >= 0
                   return (
                     <TableRow key={inv.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium group">
                         <div className="flex flex-col leading-tight">
                           <div className="flex items-center gap-1.5">
                             <span>{inv.name}</span>
@@ -189,6 +188,15 @@ export function InvestmentsPage() {
                               >
                                 imp
                               </span>
+                            )}
+                            {inv.source === 'manual' && (
+                              <button
+                                onClick={() => { setEditing(inv); setOpen(true) }}
+                                className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                title="Edit notes"
+                              >
+                                <Pencil size={11} />
+                              </button>
                             )}
                           </div>
                           {inv.instrument_last_price != null && (
@@ -230,18 +238,11 @@ export function InvestmentsPage() {
                           </div>
                         ) : '—'}
                       </TableCell>
-                      <TableCell className="flex gap-1 justify-end">
-                        {inv.source === 'manual' && (
-                          <Button size="icon" variant="ghost" onClick={() => { setEditing(inv); setOpen(true) }} title="Edit notes">
-                            <Pencil size={14} />
-                          </Button>
-                        )}
-                      </TableCell>
                     </TableRow>
                   )
                 })}
                 {investments.length === 0 && (
-                  <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No investments yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No investments yet</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
