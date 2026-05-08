@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { FinTrackLogo } from '@/components/Logo'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/context/AuthContext'
@@ -31,8 +32,8 @@ export function LoginPage() {
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">FinTrack</CardTitle>
+        <CardHeader className="items-center">
+          <FinTrackLogo size={28} className="text-xl" />
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

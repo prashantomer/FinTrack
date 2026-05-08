@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, Briefcase, Building2, CreditCard, FolderOpen, Home, LayoutDashboard, LogOut, PieChart, Settings, Sparkles, TrendingUp, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { FinTrackMark } from '@/components/Logo'
 import { useAuth } from '@/context/AuthContext'
 import { SettingsSheet } from './SettingsSheet'
 
@@ -37,10 +38,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r bg-sidebar">
         <Link
           to="/"
-          className="flex h-14 items-center px-4 font-semibold text-sidebar-foreground hover:bg-sidebar-accent/60"
+          className="flex h-14 items-center gap-2 px-4 font-semibold tracking-tight text-sidebar-foreground hover:bg-sidebar-accent/60"
           title="Public landing page"
         >
-          FinTrack
+          <FinTrackMark size={22} />
+          <span>
+            <span>Fin</span>
+            <span className="text-muted-foreground">Track</span>
+          </span>
         </Link>
         <nav className="flex flex-1 flex-col gap-1 p-2">
           {navItems.map(({ to, label, icon: Icon }) => {

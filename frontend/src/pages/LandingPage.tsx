@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { FinTrackMark } from '@/components/Logo'
 import { useAuth } from '@/context/AuthContext'
 
 const trackables = [
@@ -51,10 +52,11 @@ function Nav() {
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <div className="flex size-6 items-center justify-center rounded-md bg-foreground text-background">
-            <PieChart className="size-3.5" />
-          </div>
-          FinTrack
+          <FinTrackMark size={24} />
+          <span>
+            <span>Fin</span>
+            <span className="text-muted-foreground">Track</span>
+          </span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <a href="#features" className="hover:text-foreground">Features</a>
@@ -474,10 +476,10 @@ function Footer() {
     <footer className="bg-background">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-xs text-muted-foreground sm:flex-row">
         <div className="flex items-center gap-2">
-          <div className="flex size-5 items-center justify-center rounded bg-foreground text-background">
-            <PieChart className="size-3" />
-          </div>
-          FinTrack · all your money in one ledger
+          <FinTrackMark size={18} />
+          <span><span>Fin</span><span className="text-muted-foreground">Track</span></span>
+          <span className="text-muted-foreground/60">·</span>
+          <span>all your money in one ledger</span>
         </div>
         <div>Made for personal investors who want their own numbers.</div>
       </div>
