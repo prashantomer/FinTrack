@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Git pre-push hook — runs every quality gate before letting a push reach
+# the remote. Delegates to bin/pre-push-checks so the same script can be
+# invoked manually or by the Claude Code subagent.
+#
+# To enable for this clone, run once:
+#   git config core.hooksPath .githooks
+#
+# To bypass for a single push (use sparingly):
+#   git push --no-verify
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/bin/pre-push-checks" "$@"

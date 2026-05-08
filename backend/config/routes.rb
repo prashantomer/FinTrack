@@ -1,6 +1,24 @@
+require "sidekiq/web"
+
+# Sidekiq Web UI — HTTP basic auth gated. Set SIDEKIQ_USERNAME and
+# SIDEKIQ_PASSWORD in `.env`; without them the UI is disabled (returns 404).
+Sidekiq::Web.use(Rack::Auth::Basic) do |username, password|
+  expected_user = ENV["SIDEKIQ_USERNAME"].to_s
+  expected_pass = ENV["SIDEKIQ_PASSWORD"].to_s
+  next false if expected_user.empty? || expected_pass.empty?
+  ActiveSupport::SecurityUtils.secure_compare(username, expected_user) &
+    ActiveSupport::SecurityUtils.secure_compare(password, expected_pass)
+end if defined?(Sidekiq::Web)
+
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => "/api-docs"
   mount Rswag::Api::Engine => "/api-docs"
+
+  # Sidekiq dashboard. Only mounted when both env vars are set, so a
+  # misconfigured deployment doesn't accidentally expose the UI publicly.
+  if ENV["SIDEKIQ_USERNAME"].present? && ENV["SIDEKIQ_PASSWORD"].present?
+    mount Sidekiq::Web => "/sidekiq"
+  end
 
   get "up" => "rails/health#show", as: :rails_health_check
 
@@ -43,9 +61,15 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :investments
+      resources :investments do
+        collection do
+          patch :folio, action: :update_folio
+        end
+      end
 
-      resources :follios
+      resources :holdings do
+        collection { post :refresh }
+      end
 
       resources :imports, only: [ :index, :create, :show ] do
         collection { get "template/:import_type", to: "imports#template", as: :template }
@@ -61,6 +85,21 @@ Rails.application.routes.draw do
       end
 
       post "errors", to: "client_errors#create"
+
+      namespace :assistant do
+        resource :setting, only: [ :show, :update ]
+        post "setting/test", to: "settings#test"
+
+        resources :messages, only: [ :index, :create ] do
+          collection { delete :all, to: "messages#destroy_all" }
+          member do
+            post   :pin
+            delete :pin, action: :unpin
+          end
+        end
+        resources :attachments, only: [ :create, :show ]
+        post :sessions, to: "sessions#create"
+      end
     end
   end
 end

@@ -148,6 +148,31 @@ RSpec.describe Imports::ProcessTransactionRowService, type: :service do
       end
     end
 
+    describe "duplicate detection" do
+      it "skips when bank_ref matches an existing transaction" do
+        call_service(bank_ref: "UTR-123")
+        expect {
+          call_service(idx: 1, bank_ref: "UTR-123", amount: "9999")
+        }.not_to change(Transaction, :count)
+      end
+
+      it "returns the DUPLICATE sentinel and creates a :skipped ImportRecord with reference" do
+        first = call_service(bank_ref: "UTR-123")
+        result = call_service(idx: 1, bank_ref: "UTR-123")
+        expect(result).to eq(described_class::DUPLICATE)
+        ir = ImportRecord.where(status: "skipped").last
+        expect(ir.importable).to eq(first)
+        expect(ir.notes).to include("Duplicate of Transaction ##{first.id}").and include("bank_ref UTR-123")
+      end
+
+      it "falls back to (date, amount, type, account) when bank_ref is absent" do
+        call_service(bank_ref: nil, linked_account_nickname: "My Savings")
+        expect {
+          call_service(idx: 1, bank_ref: nil, linked_account_nickname: "My Savings")
+        }.not_to change(Transaction, :count)
+      end
+    end
+
     describe "error cases" do
       it "raises when date is blank" do
         expect { call_service(date: "") }.to raise_error(/date is required/)

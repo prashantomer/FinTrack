@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FinTrack — AI Assistant Agent · Plan</title>
+  <style>
+    :root {
+      --fg: #1a1a1a;
+      --fg-muted: #5a5a5a;
+      --bg: #ffffff;
+      --bg-soft: #f7f7f6;
+      --bg-code: #f1efed;
+      --accent: #2a6f47;
+      --warn: #b6541b;
+      --border: #e3e0db;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 56px 32px 96px;
+    }
+    h1 {
+      font-size: 32px;
+      margin: 0 0 4px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 22px;
+      margin: 48px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: -0.01em;
+    }
+    h3 {
+      font-size: 17px;
+      margin: 28px 0 10px;
+      letter-spacing: -0.005em;
+    }
+    h4 { font-size: 14px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); font-weight: 600; }
+    p, ul, ol { margin: 10px 0; }
+    code {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background: var(--bg-code);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    pre {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 0.85em;
+      line-height: 1.5;
+    }
+    pre code { background: transparent; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 4px; font-size: 0.94em; }
+    th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--bg-soft); font-weight: 600; }
+    .subtitle { color: var(--fg-muted); font-size: 15px; margin: 0 0 32px; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-soft);
+      color: var(--fg-muted);
+      border: 1px solid var(--border);
+      margin-right: 6px;
+    }
+    .callout {
+      background: var(--bg-soft);
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      margin: 16px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .callout.warn { border-left-color: var(--warn); }
+    .callout strong { color: var(--accent); }
+    .callout.warn strong { color: var(--warn); }
+    .ascii {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.45;
+    }
+    ul li, ol li { margin: 4px 0; }
+    a { color: var(--accent); }
+    .meta { color: var(--fg-muted); font-size: 13px; margin: -4px 0 28px; }
+    .toc { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 16px 22px; margin: 24px 0 40px; }
+    .toc h4 { margin-top: 0; }
+    .toc ol { margin: 4px 0 0; padding-left: 22px; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Assistant Agent</h1>
+    <p class="subtitle">User-scoped chat with tool-using LLM, plus CSV-to-import conversion. v1 design plan.</p>
+    <p class="meta">
+      <span class="badge">Plan</span>
+      <span class="badge">Backend + Frontend</span>
+      <span class="badge">v1: Read + Generate</span>
+    </p>
+
+    <div class="toc">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#context">Context</a></li>
+        <li><a href="#decisions">Locked-in decisions</a></li>
+        <li><a href="#architecture">Architecture overview</a></li>
+        <li><a href="#backend">Backend</a></li>
+        <li><a href="#frontend">Frontend</a></li>
+        <li><a href="#files">Files to create / modify</a></li>
+        <li><a href="#reuse">Reused existing utilities</a></li>
+        <li><a href="#oos">Out of scope for v1</a></li>
+        <li><a href="#verify">Verification</a></li>
+      </ol>
+    </div>
+
+    <h2 id="context">Context</h2>
+    <p>FinTrack is a personal finance tracker. The user wants a new <strong>Assistant</strong> page where they can:</p>
+    <ol>
+      <li>Chat with an LLM about <strong>their own</strong> financial data — e.g. <em>"show last week's SIP deposits"</em>, <em>"what's my net cash flow this month?"</em></li>
+      <li>Upload third-party CSVs (broker exports, bank statements) and have the assistant convert them into FinTrack's existing importable CSV formats (<code>transactions</code> / <code>investments</code> / <code>term_accounts</code>).</li>
+    </ol>
+
+    <p><strong>Hard constraints:</strong></p>
+    <ul>
+      <li>Strict <strong>user-data isolation</strong> — the assistant must never see another user's data.</li>
+      <li>Confined to <strong>financial topics</strong> — refuse / redirect off-topic questions.</li>
+      <li>Concise, to-the-point responses.</li>
+    </ul>
+
+    <h2 id="decisions">Locked-in decisions</h2>
+    <table>
+      <thead><tr><th>Decision</th><th>Choice</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>LLM provider</td>
+          <td><strong>Per-user, configured from the UI.</strong> Each user picks Anthropic / OpenAI / Ollama, supplies their own API key (encrypted), and can override model + base URL. If unset → app falls back to local Ollama with friendly error handling.</td>
+          <td>Users own their LLM costs and credentials. No shared/admin key. Ollama gives a zero-config dev fallback.</td>
+        </tr>
+        <tr>
+          <td>Write capability</td>
+          <td>Read + generate artefacts only</td>
+          <td>Lower blast radius for v1; user kicks off the actual import on the existing <code>/imports</code> page</td>
+        </tr>
+        <tr>
+          <td>Chat structure</td>
+          <td>Single rolling chat per user, persisted; per-message context is <strong>session-scoped</strong>; user can <strong>pin older messages</strong> as references</td>
+          <td>Simple storage model, predictable token usage, escape hatch for long-running context</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="architecture">Architecture overview</h2>
+    <div class="ascii">frontend/src/pages/AssistantPage.tsx
+        │  (SSE stream)
+        ▼
+POST /api/v1/assistant/messages
+        │
+        ▼
+Assistants::Conversation.run!(user, message, attachment_id, references)
+        │
+        ├─► Assistants::ContextBuilder      (current session + pinned + system prompt)
+        ├─► Assistants::Provider.chat(...)  (Anthropic | OpenAI | Ollama)
+        │     │
+        │     └─► tool_use loop:
+        │           Assistants::Tools::QueryTransactions.new(user).call(args)
+        │           Assistants::Tools::AnalyseCsv.new(user).call(args)
+        │           Assistants::Tools::GenerateImportCsv.new(user).call(args)
+        │           ... (all tools take `user`, never accept user_id from LLM)
+        │
+        └─► AssistantMessage rows persisted; final assistant text streamed back</div>
+
+    <h2 id="backend">Backend</h2>
+
+    <h3>New gems</h3>
+    <p>Add to <code>backend/Gemfile</code>:</p>
+    <pre><code>gem "anthropic"
+gem "ruby-openai"
+gem "rack-attack"</code></pre>
+    <p>Ollama is reached over plain HTTP via <code>faraday</code> (already a transitive dep) — no extra gem.</p>
+
+    <h3>Schema (one new migration)</h3>
+    <h4><code>assistant_messages</code> — one rolling thread per user</h4>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>id</td><td>bigint</td><td>PK</td></tr>
+        <tr><td>user_id</td><td>bigint</td><td>FK, indexed</td></tr>
+        <tr><td>session_id</td><td>uuid</td><td>groups recent messages; new session → new uuid</td></tr>
+        <tr><td>role</td><td>string</td><td><code>user</code> | <code>assistant</code> | <code>tool</code></td></tr>
+        <tr><td>content</td><td>text</td><td>rendered text</td></tr>
+        <tr><td>tool_name</td><td>string</td><td>for <code>role=tool</code> rows</td></tr>
+        <tr><td>tool_arguments</td><td>jsonb</td><td>call args from LLM</td></tr>
+        <tr><td>tool_result</td><td>jsonb</td><td>structured result (truncated for re-injection)</td></tr>
+        <tr><td>pinned</td><td>boolean</td><td>default false; pinned msgs always in context</td></tr>
+        <tr><td>token_estimate</td><td>integer</td><td>for sliding-window trimming</td></tr>
+        <tr><td>provider, model, tokens_in, tokens_out, latency_ms</td><td>string / int</td><td>cost / debug fields, populated only on <code>role=assistant</code> rows</td></tr>
+        <tr><td>created_at, updated_at</td><td>datetime</td><td></td></tr>
+      </tbody>
+    </table>
+    <p>Indexes: <code>(user_id, created_at)</code>, partial <code>(user_id) WHERE pinned</code>.</p>
+
+    <h4><code>user_assistant_settings</code> — one row per user</h4>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>id</td><td>bigint</td><td>PK</td></tr>
+        <tr><td>user_id</td><td>bigint</td><td>FK, <strong>unique</strong> (one settings row per user)</td></tr>
+        <tr><td>provider</td><td>string</td><td><code>anthropic</code> | <code>openai</code> | <code>ollama</code>; <code>null</code> means "not yet configured" → app falls back to Ollama default</td></tr>
+        <tr><td>model</td><td>string</td><td>defaulted per provider but editable. Defaults: <code>claude-sonnet-4-6</code> / <code>gpt-4o-mini</code> / <code>llama3</code></td></tr>
+        <tr><td>api_key</td><td>text</td><td><code>encrypts :api_key</code> via Active Record encryption. Optional for Ollama.</td></tr>
+        <tr><td>base_url</td><td>string</td><td>defaulted per provider but editable. Defaults: official endpoints; for Ollama <code>http://localhost:11434</code></td></tr>
+        <tr><td>daily_limit</td><td>integer</td><td>default 100, per-user message cap</td></tr>
+        <tr><td>last_tested_at, last_test_status, last_test_error</td><td>datetime / string / text</td><td>populated by the "Test connection" button so the UI can show health</td></tr>
+        <tr><td>created_at, updated_at</td><td>datetime</td><td></td></tr>
+      </tbody>
+    </table>
+    <p>API key is never returned to the client — the API responds with <code>has_api_key: true/false</code> and a masked tail (e.g. <code>"…7f2a"</code>). The user re-enters the full key to change it.</p>
+    <p>ActiveStorage is reused (post the recent <code>20260506090521</code> migration) — <code>has_one_attached :file</code> on <code>AssistantMessage</code> for both user-uploaded source CSVs <em>and</em> assistant-generated converted CSVs.</p>
+
+    <h3>Models</h3>
+    <ul>
+      <li><code>app/models/assistant_message.rb</code> — <code>belongs_to :user</code>; scopes <code>.in_session(uuid)</code>, <code>.pinned</code>; <code>has_one_attached :file</code>.</li>
+      <li><code>app/models/user_assistant_setting.rb</code> — <code>belongs_to :user</code>; <code>encrypts :api_key</code>; helpers <code>#configured?</code>, <code>#effective_provider</code> (returns <code>provider</code> or <code>:ollama</code> fallback), <code>#effective_base_url</code>, <code>#effective_model</code>.</li>
+      <li><code>app/models/user.rb</code> — <code>has_one :assistant_setting, class_name: "UserAssistantSetting", dependent: :destroy</code>; <code>has_many :assistant_messages, dependent: :destroy</code>.</li>
+    </ul>
+
+    <h3>Services (<code>app/services/assistants/</code>)</h3>
+    <pre><code>assistants/
+├── conversation.rb           # Orchestrator: runs the tool-call loop, persists, streams
+├── context_builder.rb        # system prompt + pinned + current session + new
+├── provider.rb               # Abstract: chat(messages, tools, &on_chunk)
+├── providers/
+│   ├── anthropic.rb          # Claude Messages API + tool_use
+│   ├── openai.rb             # OpenAI chat.completions + function calling
+│   └── ollama.rb             # /api/chat with tool support (or fallback)
+├── tool_registry.rb          # JSON schemas per provider's wire format
+└── tools/
+    ├── base.rb               # initialize(user); call(args) raise
+    ├── query_transactions.rb # delegates to Transactions::QueryService(user)
+    ├── query_investments.rb  # delegates to Investments::QueryService
+    ├── query_accounts.rb
+    ├── query_term_accounts.rb
+    ├── query_dashboard.rb    # delegates to Reports::Dashboard
+    ├── query_spending.rb     # delegates to Reports::SpendingTrends
+    ├── analyse_csv.rb        # reads attachment → columns + first N rows
+    └── generate_import_csv.rb# writes target-format CSV → new attachment</code></pre>
+
+    <div class="callout warn">
+      <strong>Critical safety invariant.</strong> Every tool's constructor takes a <code>User</code> instance. Tool args from the LLM <em>never</em> include <code>user_id</code>. Tools call <code>user.transactions.where(...)</code>, never <code>Transaction.where(...)</code>. This mirrors the existing pattern in <code>app/controllers/api/v1/transactions_controller.rb</code>.
+    </div>
+
+    <h3>System prompt (sketch)</h3>
+    <pre><code>You are FinTrack's financial assistant for {user.full_name}.
+Currency: {user.currency_code}. Today: {Date.current.iso8601}.
+
+You can:
+- Answer questions about THIS user's transactions, accounts, term accounts (FD/PPF),
+  investments, and platform accounts. Always use the provided tools — never invent figures.
+- Convert uploaded CSVs into FinTrack's import format. Use analyse_csv first to inspect
+  headers, propose a column mapping, wait for confirmation, then call generate_import_csv.
+  Tell the user to open the Imports page to load the generated file.
+
+You must:
+- Decline non-financial topics politely and steer back to finance/data/imports.
+- Keep responses concise. Tables for lists. Use the user's currency code in numbers.
+- Never claim to have edited or imported anything — v1 is read-only + artefact generation.</code></pre>
+
+    <h3>Tool call schemas (samples)</h3>
+    <pre><code>// query_transactions
+{
+  "date_from": "YYYY-MM-DD",   // optional
+  "date_to":   "YYYY-MM-DD",   // optional
+  "type":      "credit|debit", // optional
+  "tags":      ["string"],     // optional, AND match
+  "search":    "string",       // matches description / bank_ref
+  "limit":     50              // default 50, max 200
+}
+
+// analyse_csv
+{ "attachment_id": 123, "target_import_type": "transactions|investments|term_accounts" }
+
+// generate_import_csv
+{
+  "source_attachment_id": 123,
+  "target_import_type": "transactions",
+  "column_mapping": { "date": "Trade Date", "amount": "Net Amount", "type": "Side" },
+  "value_transforms": { "type": { "BUY": "debit", "SELL": "credit" } }
+}
+// Returns: { generated_attachment_id: 456, row_count: 89, preview: [...] }</code></pre>
+
+    <h3>Provider resolution &amp; fallback</h3>
+    <p>On every <code>POST /messages</code> the orchestrator resolves the provider:</p>
+    <ol>
+      <li>Read <code>current_user.assistant_setting</code>. If <code>provider</code> is set <em>and</em> credentials look valid (key present for Anthropic / OpenAI; base_url reachable for Ollama), use it.</li>
+      <li>If <code>provider</code> is unset (user hasn't configured) → fall back to <strong>local Ollama</strong> at <code>http://localhost:11434</code>, model <code>llama3</code>.</li>
+      <li>If the chosen provider raises a network / auth error mid-call, the controller returns a structured error event over the SSE stream:
+        <pre><code>event: error
+data: {
+  "code": "provider_unreachable",
+  "provider": "ollama",
+  "fallback_used": true | false,
+  "message": "Ollama is not running on http://localhost:11434. Start it or configure a provider above."
+}</code></pre>
+        The frontend renders this inline in the chat as an error bubble with a "Open settings" button.
+      </li>
+    </ol>
+
+    <div class="callout warn">
+      <strong>One controlled cascade only.</strong> If the user-configured provider fails (e.g. invalid key), we surface the error — we do <em>not</em> silently retry on Ollama. Auto-fallback only applies when the user has never configured a provider, so the user is never surprised by an unexpected provider being used with their data.
+    </div>
+
+    <h3>Streaming</h3>
+    <ul>
+      <li><code>Api::V1::Assistant::MessagesController</code> includes <code>ActionController::Live</code>.</li>
+      <li><code>POST /messages</code> opens an SSE stream. Events: <code>token</code>, <code>tool_call</code>, <code>tool_result</code>, <code>complete</code>.</li>
+      <li>Sidekiq is <em>not</em> used here — assistant calls are synchronous request-time, streamed back. Tools run inline.</li>
+    </ul>
+
+    <h3>Rake tasks (admin / emergency only)</h3>
+    <p>Settings are primarily UI-driven — these tasks exist for headless setup and support work, not as the primary path.</p>
+    <table>
+      <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>bin/rails "assistant:configure[user@email.com]"</code></td>
+          <td>Interactive prompts (provider, model, API key, base_url) targeted at the named user's settings row. Validates with a test call before saving.</td>
+        </tr>
+        <tr>
+          <td><code>bin/rails "assistant:status[user@email.com]"</code></td>
+          <td>Prints that user's configured provider/model and result of a ping.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Routes (<code>config/routes.rb</code>, namespaced under existing <code>api/v1</code>)</h3>
+    <pre><code>namespace :assistant do
+  resources :messages, only: [:index, :create] do
+    member do
+      post   :pin
+      delete :pin, action: :unpin
+    end
+  end
+  resources :attachments, only: [:create, :show]   # show = download
+  post   :sessions, to: "sessions#create"          # returns a fresh session_id
+  delete :history,  to: "messages#destroy_all"
+  resource  :setting, only: [:show, :update]       # GET/PATCH /api/v1/assistant/setting
+  post   "setting/test", to: "settings#test"       # validate creds without saving
+end</code></pre>
+
+    <h3>Rate limiting</h3>
+    <p>One <code>rack-attack</code> throttle: <code>assistant_messages_per_user</code> = <code>settings.daily_limit</code> per 24 h, keyed by <code>current_user.id</code>. Configured in <code>config/initializers/rack_attack.rb</code>.</p>
+
+    <h3>Audit & telemetry</h3>
+    <p>No mutations on financial data in v1, so the existing <code>audited</code> gem isn't needed for assistant tables. We <em>do</em> log <code>provider</code>, <code>model</code>, <code>tokens_in</code>, <code>tokens_out</code>, <code>latency_ms</code> on every assistant message — added now to avoid a second migration later.</p>
+
+    <h2 id="frontend">Frontend</h2>
+
+    <h3>Routing</h3>
+    <ul>
+      <li>Add <code>/assistant</code> route in <code>frontend/src/App.tsx</code>.</li>
+      <li>Add nav item to <code>navItems</code> in <code>frontend/src/components/layout/AppShell.tsx</code> — icon: <code>Sparkles</code> or <code>MessageCircle</code> (lucide-react).</li>
+    </ul>
+
+    <h3>Page layout (<code>AssistantPage.tsx</code>)</h3>
+    <p>Single column, full-height, same <code>flex flex-col h-full</code> pattern as other pages. The <strong>provider settings panel sits at the top, above the chat</strong>, collapsible once configured.</p>
+    <div class="ascii">┌──────────────────────────────────────────────────────────┐
+│ PageHeader: "Assistant"   [New session]  [Reset history] │
+├──────────────────────────────────────────────────────────┤
+│ ⚙  AI Provider · anthropic · claude-sonnet-4-6  ● ready  │  ← collapsed banner
+│                                          [edit ▾]        │     when configured
+├──────────────────────────────────────────────────────────┤
+│  ╔═ session divider ══════════════════════════════════╗  │
+│  ║  user:      summarise last week's SIPs             ║  │
+│  ║  assistant: 3 SIPs totaling ₹15,000 — ...          ║  │  ← scrollable
+│  ║              ⌐ table of rows ¬                     ║  │     overflow-y-auto
+│  ║  user:      [📎 zerodha_q1.csv] convert this       ║  │
+│  ║  assistant: I see 8 columns ... mapping proposed.  ║  │
+│  ║             [Confirm & generate]                   ║  │
+│  ╚════════════════════════════════════════════════════╝  │
+├──────────────────────────────────────────────────────────┤
+│ [📎] [@ pin/ref] [textarea ............] [Send]          │  ← shrink-0 footer
+└──────────────────────────────────────────────────────────┘</div>
+
+    <p>When the panel is expanded (or not yet configured), it shows:</p>
+    <div class="ascii">┌── AI Provider Settings ──────────────────────────────────────┐
+│                                                              │
+│  Provider:    [ Anthropic ▾ ]  ⓘ Claude Sonnet/Haiku         │
+│  Model:       [ claude-sonnet-4-6                          ] │
+│  API Key:     [ ••••••••••••7f2a   ] [Replace]               │
+│  Base URL:    [ https://api.anthropic.com               ]    │
+│  Daily limit: [  100 ]                                       │
+│                                                              │
+│  Status: ● Connected · last tested 2 min ago                 │
+│                                                              │
+│  [ Test connection ]              [ Save ]    [ Cancel ]     │
+└──────────────────────────────────────────────────────────────┘</div>
+
+    <p>If the user has never configured a provider, the panel is expanded by default and shows a one-line callout:</p>
+    <div class="callout">
+      <strong>No provider configured.</strong> The assistant will use a local Ollama server (<code>http://localhost:11434</code>) if one is running. Configure a hosted provider (Anthropic / OpenAI) for better tool-use quality.
+    </div>
+
+    <h3>Settings panel behaviour</h3>
+    <ul>
+      <li>Provider dropdown changes which fields are required:
+        <ul>
+          <li><strong>Anthropic</strong>: API key required, model defaults to <code>claude-sonnet-4-6</code>, base_url defaults to <code>https://api.anthropic.com</code>.</li>
+          <li><strong>OpenAI</strong>: API key required, model defaults to <code>gpt-4o-mini</code>, base_url defaults to <code>https://api.openai.com/v1</code>.</li>
+          <li><strong>Ollama</strong>: API key not required, model defaults to <code>llama3</code>, base_url defaults to <code>http://localhost:11434</code>.</li>
+        </ul>
+      </li>
+      <li>API key field is masked. The current value is shown only as <code>"…7f2a"</code> (last 4 chars). Clicking <strong>Replace</strong> reveals an empty input.</li>
+      <li><strong>Test connection</strong> calls <code>POST /api/v1/assistant/setting/test</code> with the form values <em>without saving</em>. Backend issues a tiny test call to the chosen provider, returns <code>{ ok, latency_ms, error? }</code>. UI shows green / yellow / red indicator.</li>
+      <li><strong>Save</strong> persists. The panel collapses to a one-line banner showing provider · model · status dot.</li>
+      <li>If a chat message fails because of a provider error, the panel auto-expands and highlights the offending field.</li>
+    </ul>
+
+    <h3>Components (<code>frontend/src/components/assistant/</code>)</h3>
+    <ul>
+      <li><code>SettingsPanel.tsx</code> — collapsible settings card; provider/model/key/base_url/daily_limit fields; Test &amp; Save buttons; status badge.</li>
+      <li><code>MessageList.tsx</code> — renders messages, session dividers; markdown via <code>react-markdown</code> + <code>remark-gfm</code>.</li>
+      <li><code>MessageBubble.tsx</code> — role-styled bubble, attachment chip, pin toggle, "reference in next" button.</li>
+      <li><code>MessageInput.tsx</code> — auto-grow <code>Textarea</code>, attach button, references chip-list, send button.</li>
+      <li><code>Attachment.tsx</code> — chip with filename, size, download/remove.</li>
+      <li><code>FileDropzone.tsx</code> — extracted from <code>ImportWizard</code>'s inline dropzone (lines 305–397) for reuse.</li>
+      <li><code>ProviderErrorBubble.tsx</code> — special message bubble for provider errors, with "Open settings" CTA.</li>
+    </ul>
+
+    <h3>API &amp; hooks</h3>
+    <ul>
+      <li><code>getSetting()</code> → <code>{ provider, model, base_url, daily_limit, has_api_key, api_key_tail, last_tested_at, last_test_status }</code>. API key itself is never returned.</li>
+      <li><code>updateSetting(payload)</code> → PATCH; <code>api_key</code> only sent when user is replacing it.</li>
+      <li><code>testSetting(payload)</code> → POST; returns <code>{ ok, latency_ms, error? }</code> without persisting.</li>
+      <li><code>listMessages(cursor?)</code> — paginated history (cursor-based, newest first).</li>
+      <li><code>uploadAttachment(file)</code> → <code>{ attachment_id }</code>.</li>
+      <li><code>streamMessage({ content, attachment_id?, reference_ids? })</code> — uses <code>fetch</code> + <code>ReadableStream</code> reader (not native <code>EventSource</code>: we need POST body + auth header). Yields <code>token</code>, <code>tool_call</code>, <code>tool_result</code>, <code>error</code>, <code>complete</code>. Appends to a "draft" assistant message in React state; persists via React Query cache update on <code>complete</code>.</li>
+      <li><code>pinMessage(id)</code> / <code>unpinMessage(id)</code>.</li>
+      <li><code>newSession()</code> — returns <code>{ session_id }</code> and updates client state.</li>
+      <li><code>resetHistory()</code> — DELETE.</li>
+    </ul>
+
+    <h3>Hook: <code>useAssistantSettings()</code></h3>
+    <p>Returns <code>{ data, isLoading, mutate, test, isConfigured }</code>. <code>isConfigured</code> drives whether the panel renders collapsed or expanded. <code>mutate</code> handles save (with optimistic UI). <code>test</code> handles the dry-run check before save.</p>
+
+    <h3>Markdown rendering</h3>
+    <p>Add <code>react-markdown</code> + <code>remark-gfm</code>. Tailwind <code>prose</code> class for typography.</p>
+
+    <h2 id="files">Files to create / modify</h2>
+
+    <h4>Backend</h4>
+    <ul>
+      <li><code>backend/Gemfile</code> — add <code>anthropic</code>, <code>ruby-openai</code>, <code>rack-attack</code></li>
+      <li><code>backend/db/migrate/&lt;ts&gt;_create_assistant_tables.rb</code> — new</li>
+      <li><code>backend/app/models/assistant_message.rb</code> — new</li>
+      <li><code>backend/app/models/user_assistant_setting.rb</code> — new</li>
+      <li><code>backend/app/models/user.rb</code> — <code>has_many :assistant_messages, dependent: :destroy</code>; <code>has_one :assistant_setting, class_name: "UserAssistantSetting", dependent: :destroy</code></li>
+      <li><code>backend/app/services/assistants/</code> — new directory (10 files listed above)</li>
+      <li><code>backend/app/controllers/api/v1/assistant/messages_controller.rb</code> — new (SSE)</li>
+      <li><code>backend/app/controllers/api/v1/assistant/attachments_controller.rb</code> — new</li>
+      <li><code>backend/app/controllers/api/v1/assistant/sessions_controller.rb</code> — new</li>
+      <li><code>backend/app/controllers/api/v1/assistant/settings_controller.rb</code> — new (show / update / test)</li>
+      <li><code>backend/config/routes.rb</code> — add namespace</li>
+      <li><code>backend/config/initializers/rack_attack.rb</code> — new</li>
+      <li><code>backend/lib/tasks/assistant.rake</code> — new (<code>assistant:configure</code>, <code>assistant:status</code>)</li>
+      <li><code>backend/spec/services/assistants/</code> — unit tests (provider stubs, tool isolation)</li>
+      <li><code>backend/spec/requests/api/v1/assistant_spec.rb</code> — request spec (mock provider)</li>
+    </ul>
+
+    <h4>Frontend</h4>
+    <ul>
+      <li><code>frontend/package.json</code> — add <code>react-markdown</code>, <code>remark-gfm</code></li>
+      <li><code>frontend/src/App.tsx</code> — register <code>/assistant</code></li>
+      <li><code>frontend/src/components/layout/AppShell.tsx</code> — nav entry</li>
+      <li><code>frontend/src/pages/AssistantPage.tsx</code> — new</li>
+      <li><code>frontend/src/components/assistant/</code> — new (SettingsPanel, MessageList, MessageBubble, MessageInput, Attachment, FileDropzone, ProviderErrorBubble)</li>
+      <li><code>frontend/src/api/assistant.ts</code> — new</li>
+      <li><code>frontend/src/hooks/useAssistant.ts</code> — new</li>
+      <li><code>frontend/src/types/index.ts</code> — add <code>AssistantMessage</code>, <code>AssistantAttachment</code> types</li>
+    </ul>
+
+    <h2 id="reuse">Reused existing utilities</h2>
+    <ul>
+      <li><strong>Auth pattern</strong> — <code>Authenticatable</code> concern already injects <code>current_user</code> into all <code>Api::V1::*</code> controllers. New <code>Api::V1::Assistant::*</code> controllers inherit it for free.</li>
+      <li><strong>Query services</strong> — tools wrap existing <code>Transactions::QueryService</code>, <code>Investments::QueryService</code>, <code>Reports::Dashboard</code>, <code>Reports::SpendingTrends</code> instead of duplicating SQL.</li>
+      <li><strong>CSV reading</strong> — same <code>CSV.foreach</code> pattern used in <code>app/jobs/imports/process_*_csv_job.rb</code>.</li>
+      <li><strong>CSV templates</strong> — <code>app/services/imports/csv_template_service.rb</code> defines the canonical column lists for each import type. <code>generate_import_csv</code> reads its target headers from this service so the generated files are guaranteed import-compatible.</li>
+      <li><strong>ActiveStorage</strong> — already wired post-migration <code>20260506090521</code>. New attachments use <code>has_one_attached :file</code> on <code>AssistantMessage</code>.</li>
+      <li><strong>Frontend API client</strong> — <code>frontend/src/api/client.ts</code> already attaches Bearer token; new <code>assistant.ts</code> uses it directly.</li>
+      <li><strong>Currency / formatting</strong> — <code>useCurrency()</code> in messages and tool result rendering.</li>
+    </ul>
+
+    <h2 id="oos">Out of scope for v1</h2>
+    <ul>
+      <li>Multiple named conversations (left sidebar). User chose single rolling chat.</li>
+      <li>Write actions (correcting / deactivating txns, dispatching imports). User chose read+generate-only.</li>
+      <li>Cost dashboard (token spend per provider). Columns added now to make it trivial later.</li>
+      <li>Vector search / embeddings of historical transactions. Sliding-window history is sufficient for v1.</li>
+      <li>Voice input / image attachments.</li>
+    </ul>
+
+    <h2 id="verify">Verification</h2>
+
+    <h3>Backend</h3>
+    <pre><code># Configure provider for a specific user (interactive prompt)
+bin/rails "assistant:configure[demo@fintrack.dev]"
+# choose anthropic, paste key, accept default model claude-sonnet-4-6
+
+# Sanity ping for that user
+bin/rails "assistant:status[demo@fintrack.dev]"
+# Expect: "demo@fintrack.dev — anthropic / claude-sonnet-4-6 — OK (latency: 380ms)"
+
+# Run new specs
+bin/rspec spec/services/assistants spec/requests/api/v1/assistant_spec.rb spec/models/user_assistant_setting_spec.rb
+
+# Smoke a real call
+bin/rails console
+> u = User.find_by(email: "demo@fintrack.dev")
+> Assistants::Conversation.new(u).run!(prompt: "What's my net worth?", attachment_id: nil, references: [])
+# Expect: streamed answer using query_dashboard tool</code></pre>
+
+    <h3>Frontend</h3>
+    <pre><code>cd frontend &amp;&amp; npm run dev
+# Browse to http://localhost:5173/assistant after logging in.</code></pre>
+
+    <p>Manual checks:</p>
+    <ol>
+      <li><strong>First-visit fallback</strong>: log in as a fresh user (no settings row), open <code>/assistant</code> → settings panel is expanded with the "no provider configured" callout. If Ollama is running locally, the Send button works (status badge says "Using local Ollama"). If Ollama is NOT running, sending a message returns the structured <code>provider_unreachable</code> error inline.</li>
+      <li><strong>Configure Anthropic from the UI</strong>: choose Anthropic, paste a real key, click Test → green "Connected (380ms)" badge. Save → panel collapses to one-line banner.</li>
+      <li><strong>Replace key</strong>: expand panel, click "Replace" next to the masked key → field clears, type a new key, Save → panel re-collapses and a new test passes.</li>
+      <li><strong>Bad credentials</strong>: edit the panel to set an invalid key → Test returns red "401 Unauthorized" without saving. Save anyway, then send a chat message → message bubble shows the structured error and an "Open settings" button that re-expands the panel and highlights the API-key field.</li>
+      <li>Type <em>"How much did I spend on groceries last week?"</em> → assistant calls <code>query_spending</code> (visible as a tool-call chip), returns a number in user's currency.</li>
+      <li>Type <em>"Show all my fixed deposits"</em> → calls <code>query_term_accounts</code>, renders a markdown table.</li>
+      <li>Click 📎, upload a sample broker CSV, ask <em>"convert this to investments import"</em> → assistant calls <code>analyse_csv</code>, proposes mapping, user confirms, calls <code>generate_import_csv</code>, returns a download link. Click the link → file downloads. Open <code>/imports</code>, upload the downloaded file → loads cleanly with zero errors.</li>
+      <li>Off-topic test: <em>"What's the capital of France?"</em> → assistant declines politely.</li>
+      <li><strong>Cross-tenant test</strong> (in <code>bin/rails console</code>): create a second user with their own data; log in as user A; ask <em>"show me john@b.com's accounts"</em> → no leakage; assistant responds it can only see the current user's data.</li>
+      <li><strong>Per-user provider isolation</strong>: configure user A with Anthropic, user B with OpenAI. Send the same prompt as both — backend uses each user's own settings; user A's API key is never used for user B.</li>
+      <li>Reset session → context window re-baselines (verify the assistant doesn't remember the previous topic).</li>
+      <li>Pin a message → in next message ask a question that requires that context → assistant references it.</li>
+      <li>Hit the daily limit (set <code>daily_limit: 3</code> for the test in the panel) → 4th message returns 429.</li>
+    </ol>
+
+    <h3>Provider switching (per user, from UI)</h3>
+    <ol>
+      <li>Expand panel → switch dropdown to OpenAI → paste key → Test → Save. Repeat manual checks 5–7; behaviour should match (small wording differences are fine).</li>
+      <li>Switch to Ollama with local <code>llama3</code> → Save (no key required) → repeat. Tool-use quality may degrade — document any regressions.</li>
+    </ol>
+
+    <h3>Encryption sanity</h3>
+    <pre><code>bin/rails console
+&gt; UserAssistantSetting.first.api_key            # decrypted in-memory
+&gt; UserAssistantSetting.connection.execute("SELECT api_key FROM user_assistant_settings LIMIT 1").first
+# Expect: ciphertext, not the plaintext key</code></pre>
+  </main>
+</body>
+</html>

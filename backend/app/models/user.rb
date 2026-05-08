@@ -1,3 +1,23 @@
+# == Schema Information
+#
+# Table name: users
+#
+#  id              :bigint           not null, primary key
+#  currency_code   :string           default("INR"), not null
+#  currency_locale :string           default("en-IN"), not null
+#  email           :string           not null
+#  first_name      :string           not null
+#  is_active       :boolean          default(TRUE), not null
+#  is_superuser    :boolean          default(FALSE), not null
+#  last_name       :string           not null
+#  password_digest :string           not null
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#
+# Indexes
+#
+#  index_users_on_email  (email) UNIQUE
+#
 class User < ApplicationRecord
   has_secure_password
 
@@ -8,8 +28,16 @@ class User < ApplicationRecord
   has_many :instruments,       through: :user_instruments
   has_many :investments,       dependent: :destroy
   has_many :transactions,      dependent: :destroy
-  has_many :follios,           dependent: :destroy
+  has_many :holdings,          dependent: :destroy
+  has_many :folios,            -> { where(type: "Folio") },         class_name: "Folio",         foreign_key: :user_id
+  has_many :equity_holdings,   -> { where(type: "EquityHolding") }, class_name: "EquityHolding", foreign_key: :user_id
   has_many :import_batches,    dependent: :destroy
+  has_many :assistant_messages, dependent: :destroy
+  has_one  :assistant_setting,  class_name: "UserAssistantSetting", dependent: :destroy
+
+  def assistant_setting!
+    assistant_setting || build_assistant_setting
+  end
 
   validates :email,      presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, presence: true

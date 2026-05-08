@@ -55,10 +55,17 @@ export function InstrumentCombobox({ value, onChange, filterType }: Props) {
               {instruments.map(inst => (
                 <CommandItem key={inst.id} value={String(inst.id)} onSelect={() => { onChange(inst.id); setOpen(false) }}>
                   <Check size={14} className={cn('mr-2', value === inst.id ? 'opacity-100' : 'opacity-0')} />
-                  <span className="flex-1">{inst.name}</span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {inst.ticker_symbol && `${inst.ticker_symbol} · `}{INVESTMENT_TYPE_LABELS[inst.type]}
-                  </span>
+                  <div className="flex-1 min-w-0 flex flex-col leading-tight">
+                    <span className="truncate">{inst.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {inst.ticker_symbol && `${inst.ticker_symbol} · `}{INVESTMENT_TYPE_LABELS[inst.type]}
+                    </span>
+                  </div>
+                  {inst.last_price != null && (
+                    <span className="ml-3 shrink-0 font-mono text-xs tabular-nums">
+                      ₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(inst.last_price)}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

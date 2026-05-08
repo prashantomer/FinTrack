@@ -1,313 +1,336 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-FinTrack is a personal finance tracker built as a **monolith**: a single FastAPI process that serves both the REST API (`/api/v1/`) and the production-built React SPA. In development, Vite's dev server (port 5173) proxies `/api` calls to FastAPI (port 8000).
+FinTrack is a personal finance tracker. Two processes:
 
-## Runtime Versions (managed via version managers)
+- **Backend** — Rails 8.1 API on port 8000. Sidekiq workers for background jobs.
+- **Frontend** — Vite + React 19 SPA on port 5173. The Vite dev server proxies `/api` and `/rails` to the Rails app.
 
-| Runtime | Version | Manager | Pin file |
-|---------|---------|---------|----------|
-| Python | 3.13.5 | pyenv | `.python-version` |
-| Node.js | 24.15.0 LTS (Krypton) | nvm | `.nvmrc` |
-| npm | 11.12.1 | bundled with Node | — |
+There used to be a FastAPI backend under `backend_python/`; that tree has been removed. The current home of all server code is `backend/`.
+
+## Runtime Versions
+
+| Runtime    | Pin       | Manager       |
+|------------|-----------|---------------|
+| Ruby       | `3.3.4`   | rbenv / rvm (`.ruby-version`) |
+| Node.js    | `24.x` LTS | nvm (`.nvmrc`) |
+| PostgreSQL | 14+       | brew          |
+| Redis      | 7+        | brew          |
 
 ```bash
-# First-time setup: activate the correct runtimes
-pyenv install 3.13.5       # if not already installed
-source ~/.nvm/nvm.sh && nvm install  # reads .nvmrc automatically
+rvm use 3.3.4
+source ~/.nvm/nvm.sh && nvm install   # reads .nvmrc
+
+cd backend && bundle install
+cd ../frontend && npm install
 ```
 
 ## Common Commands
 
-### One-time database setup
+### One-time setup
 
 ```bash
-# Requires PostgreSQL running locally
+brew services start postgresql@16
+brew services start redis
+
 createdb fintrack_db
 createuser fintrack_user --pwprompt
 psql -c "GRANT ALL ON DATABASE fintrack_db TO fintrack_user;"
+psql -c "ALTER USER fintrack_user CREATEDB;"   # required for tests
+
+cd backend
+bin/rails db:setup            # create + migrate
+bin/rails banks:seed          # bank list
+bin/rails platforms:seed      # broker / MF platform list
+bin/rails users:create        # interactive — creates the first user
+
+# Wire the pre-push gate (one-time per clone)
+cd .. && bin/setup
 ```
 
 ### Creating a user
 
-There is no public registration endpoint. Users are created from the terminal only:
+No public registration — users are created from the CLI.
 
 ```bash
 cd backend
-
-# Interactive — prompts for email, full name, and password
-uv run python -m app.cli users create
-
-# Auto-generate a random password (printed on success)
-uv run python -m app.cli users create --generate
+bin/rails users:create        # interactive: email, name, password
+bin/rails users:wipe          # delete a user + all their data
+bin/rails users:list
 ```
 
-The CLI is grouped by domain:
-```bash
-uv run python -m app.cli --help
-```
-
-### Seeding banks and platforms
-
-Banks and platforms are admin-managed from the CLI only — there is no UI to create them.
+### Seeding banks, platforms, instruments
 
 ```bash
 cd backend
-
-# Seed banks from seeds/banks.csv (upsert by short_name, safe to re-run)
-uv run python -m app.cli banks seed
-
-# Seed 11 investment platforms (run once)
-uv run python -m app.cli platforms seed
-
-# List / add custom entries
-uv run python -m app.cli banks list
-uv run python -m app.cli banks create
-uv run python -m app.cli platforms list
-uv run python -m app.cli platforms create
+bin/rails banks:seed                       # idempotent upsert from db/seeds/banks.csv
+bin/rails platforms:seed                   # broker / MF platform list
+bin/rails instruments:fetch                # NSE EQ + AMFI scheme catalogue (one-time)
+bin/rails instruments:fetch_prices         # latest close prices into instruments.last_price + history
 ```
 
-### Backend
-
-```bash
-# Run dev server (hot-reload, docs at /docs)
-cd backend && uv run fastapi dev main.py
-
-# Run all tests
-cd backend && uv run pytest
-
-# Run a single test file / by name
-cd backend && uv run pytest tests/test_auth.py -v
-cd backend && uv run pytest tests/test_auth.py::test_register -v
-
-# Database migrations (datetime-stamped revision IDs — see alembic.ini)
-cd backend && uv run alembic revision --autogenerate -m "description"
-cd backend && uv run alembic upgrade head
-# No downgrade migrations — new migration required for any change
-```
-
-### Transaction admin (CLI only — no API)
+### Backend dev
 
 ```bash
 cd backend
+bin/rails server                           # http://localhost:8000
+bundle exec sidekiq                        # background workers — separate terminal
+# OR start backend + sidekiq + frontend together:
+foreman start -f Procfile.dev              # uses bin/dev under the hood
+```
 
-# Correct a transaction amount/type and recalculate account balance
-uv run python -m app.cli transactions correct <id>
+```bash
+# Tests
+cd backend
+bundle exec rspec                          # full suite
+bundle exec rspec spec/services            # one folder
+bundle exec rspec spec/models/user_spec.rb:42
 
-# Deactivate a transaction and reverse its balance impact
-uv run python -m app.cli transactions deactivate <id>
+# Migrations (datetime-stamped revision IDs)
+bin/rails g migration AddSomethingToSomething field:type
+bin/rails db:migrate
+RAILS_ENV=test bin/rails db:migrate
+
+# No downgrade migrations — write a new one for every change
+```
+
+### Transaction admin (CLI only)
+
+Transactions are immutable from the API — no PUT/DELETE endpoints. Use the rake tasks:
+
+```bash
+cd backend
+bin/rails transactions:correct ID=123      # update amount/type and reverse balance impact
+bin/rails transactions:deactivate ID=123   # soft-delete and reverse balance
+```
+
+### AI Assistant
+
+```bash
+cd backend
+bin/rails assistant:configure              # interactive: provider, model, api_key
+bin/rails assistant:status                 # ping configured provider
+```
+
+### Daily price fetch + P&L tracking
+
+```bash
+cd backend
+bin/rails daily:pnl                        # run synchronously
+bin/rails daily:status                     # last-run state per scheduled task
 ```
 
 ### Frontend
 
 ```bash
-# Ensure correct Node version
-source ~/.nvm/nvm.sh && nvm use
+cd frontend
+source ~/.nvm/nvm.sh && nvm use            # ensure Node 24
 
-# Dev server with HMR (proxies /api → localhost:8000)
-cd frontend && npm run dev
-
-# Production build (outputs to frontend/dist/)
-cd frontend && npm run build
-
-# Type checking
-cd frontend && npx tsc --noEmit
-
-# Lint
-cd frontend && npm run lint
-
-# Add a shadcn/ui component
-cd frontend && npx shadcn@latest add <component-name>
+npm run dev                                # http://localhost:5173 (proxies /api → 8000)
+npm run build                              # production build → frontend/dist/
+npx tsc --noEmit                           # typecheck
+npm run lint                               # ESLint
 ```
 
-### Production (monolith)
+### Pre-push gate
+
+`bin/pre-push-checks` runs every quality gate (rubocop, brakeman, bundler-audit, eslint, tsc, vite build, rspec) in parallel. Wired as a git hook via `.githooks/pre-push`; `bin/setup` plus the frontend `npm postinstall` arm `core.hooksPath` on a fresh clone, so manual `git push` always runs the gate. `--no-verify` bypasses for emergencies.
+
+### Production
 
 ```bash
-cd frontend && npm run build
-cd backend && uv run fastapi run main.py --host 0.0.0.0 --port 8000 --workers 4
-# Single origin at http://localhost:8000 serves both API and SPA
+cd frontend && npm run build               # outputs to frontend/dist/, served by Nginx in prod
+cd backend
+RAILS_ENV=production bin/rails db:migrate
+RAILS_ENV=production bin/rails server -p 8000
+RAILS_ENV=production bundle exec sidekiq   # separate process
 ```
 
 ## Architecture
 
 ### Backend (`backend/`)
 
-**Stack**: FastAPI 0.136 + SQLAlchemy 2.0 + Alembic + PostgreSQL via `psycopg[binary]` (psycopg3)
+**Stack**: Rails 8.1 + PostgreSQL via `pg` gem + Sidekiq (Redis) + Puma + JWT auth + `audited` for change history + Active Record encryption + ActiveStorage.
 
 ```
 backend/
 ├── app/
-│   ├── main.py            # FastAPI factory, router registration, SPA static serving
-│   ├── config.py          # pydantic-settings; reads backend/.env
-│   ├── database.py        # SQLAlchemy engine, SessionLocal, Base
-│   ├── dependencies.py    # get_db(), get_current_user() (shared FastAPI deps)
-│   ├── models/            # SQLAlchemy ORM models
-│   ├── schemas/           # Pydantic v2 request/response schemas
-│   ├── routers/           # Route handlers (thin; delegate to services)
-│   ├── services/          # Business logic and DB queries
-│   └── utils/             # Shared helpers (pagination, etc.)
-├── alembic/               # Migrations; env.py must import all models
-├── seeds/                 # CSV seed files (banks.csv, platforms.csv)
-└── tests/                 # pytest; uses httpx AsyncClient via conftest.py
+│   ├── controllers/api/v1/      # Thin controllers, render via serializers
+│   │   └── assistant/           # Assistant routes (messages, attachments, sessions, settings)
+│   ├── jobs/                    # Sidekiq jobs (Daily::PriceAndPnlSnapshotJob, Holdings::RefreshJob, Imports::*)
+│   ├── models/                  # ActiveRecord models (annotated by annotaterb)
+│   ├── serializers/             # Plain-Ruby serializers, no jbuilder
+│   └── services/                # Business logic — assistants, holdings, imports, reports, queries, ...
+├── config/
+│   ├── routes.rb
+│   ├── sidekiq.yml              # queue names + concurrency
+│   ├── sidekiq_cron.yml         # scheduled jobs (daily price + P&L snapshot)
+│   └── initializers/
+│       └── daily_pnl_catchup.rb # boot-time catch-up if 5 AM tick was missed
+├── db/migrate/                  # Datetime-stamped migrations
+├── lib/tasks/                   # Rake tasks (users, banks, platforms, instruments, daily, assistant)
+└── spec/                        # RSpec
 ```
 
-**Auth**: JWT (HS256, 7-day expiry) via `python-jose`. Passwords hashed with `passlib[bcrypt]`. `get_current_user` dependency in `dependencies.py` validates the Bearer token on protected routes.
+**Auth**: JWT (HS256, 7-day expiry) issued by `Api::V1::AuthController#login`. Passwords hashed with `bcrypt` via `has_secure_password`. The `Authenticatable` concern resolves `current_user` from the `Authorization: Bearer <token>` header on every protected route.
 
-**Transaction model** (see `models/transaction.py`):
-- `type`: `credit` | `debit` (PostgreSQL enum `transaction_type`)
-- `linked_account_type` + `linked_account_id`: polymorphic FK — no DB-level FK; resolved in service layer. `linked_account_type` is `account` (→ `accounts.id`) or `term_account` (→ `term_accounts.id`)
-- `tags`: `ARRAY(Text)`, nullable — free-form labels replacing the old `category` enum
-- `bank_ref`: `String(100)`, nullable — user-entered UTR/IMPS reference for credit transactions
-- `is_active`: `Boolean` — soft-delete; CLI `deactivate` sets this and reverses balance
-- Transactions are **immutable from the API** — no `PUT` or `DELETE` endpoints. Use CLI `transactions correct` / `deactivate` for admin corrections.
+**Transaction model** (`app/models/transaction.rb`):
 
-**Balance hooks** (`services/transaction_service.py → _apply_balance_delta`):
-- `create_transaction` auto-updates the linked account balance after flush
-- `credit` → `+amount`, `debit` → `-amount`
-- FD `term_account` links are **skipped** (FD balance tracks principal, not running balance)
-- CLI `correct` / `deactivate` reverses old delta and applies new
-- Seed data uses `bulk_save_objects` which **bypasses** service hooks — balances are not auto-updated in seed
+- `transaction_type`: `credit` | `debit`
+- `linked_account_type` + `linked_account_id`: polymorphic association — `Account` (savings) or `TermAccount` (FD/PPF). Resolved at the model level via `belongs_to :linked_account, polymorphic: true`.
+- `tags`: `string[]`, free-form labels.
+- `bank_ref`: UTR/IMPS reference for credit transactions.
+- `is_active`: soft-delete; rake task `transactions:deactivate` flips it and reverses balance impact.
+- **Immutable from the API** — no PUT/DELETE. Use the rake tasks for corrections.
 
-**Term accounts** (`models/term_account.py`, `services/term_account_service.py`):
-- STI table `term_accounts` with `type`: `fd` | `ppf`
-- FD creation: validates sufficient balance on parent savings account, creates paired savings-debit + FD-credit transactions (only savings balance updated)
-- PPF creation: no paired transactions on create; both balances update on PPF investment transactions
-- `maturity_date` / `maturity_amount`: auto-calculated on create (stored, not recomputed)
-- FD `maturity_amount` = `amount * (1 + rate/100 * tenure_days/365)`
-- PPF `maturity_date` = `open_date + 15 years`; `maturity_amount` is user-provided
+**Balance hooks** (`Transactions::CreateService`, rake tasks): `credit` adds, `debit` subtracts on the linked savings account. FD term accounts skip balance updates (FD balance tracks principal). The CLI `correct` flow reverses the old delta and applies the new one in a transaction.
 
-**Account closure** (`services/bank_service.py → close_account`): sets `closed_date` + `closed_amount` on `accounts` table. Term account closure (`close_term_account`) credits `closed_amount` back to parent savings account.
+**Term accounts** (`app/models/term_account.rb`, STI): `account_type` = `fd` | `ppf`. FD creation in `TermAccounts::CreateService` validates parent savings balance, creates paired savings-debit + FD-credit transactions, and stores `maturity_date` / `maturity_amount` (FD = `amount * (1 + rate/100 * tenure_days/365)`; PPF = `open_date + 15.years`, user-supplied amount).
 
-**Investment model** uses **single-table inheritance** — one `investments` table with nullable type-specific columns. The `type` enum discriminates rows: `stock`, `mutual_fund`, `fixed_deposit`, `gold`, `crypto`, `ppf`, `nps`, `real_estate`.
+**Holdings (STI cache)** — `app/models/holding.rb` with two subclasses:
 
-**Reference data** (admin-only, CLI-managed):
-- `banks` + `accounts` — global bank list; users create their own `accounts` via API. `Bank.short_name` is max 6 chars, unique, used as a display code.
-- `platforms` + `platform_accounts` — global investment platform list; users create `platform_accounts`.
-- `instruments` — global catalogue of investable securities. Both transactions and investments can link to `instrument_id`.
+- `Folio` — mutual-fund holdings (carries `folio_number`).
+- `EquityHolding` — stock holdings (no folio number).
 
-**`app/models/__init__.py`** imports all models — ensures mapper registry is fully populated before string-referenced relationships are resolved.
+Holdings cache aggregated stats per `(user_instrument × platform_account)` — `total_units`, `avg_buy_price`, `total_invested`, `current_value`, `unrealized_gain`, `realized_gain`, `long_term_units`, `short_term_units`. Refreshed by `Holdings::RefreshJob` after every Investment write (controlled by `Current.skip_holding_refresh` for bulk imports).
 
-**Database connection string**: `postgresql+psycopg://` (psycopg3 dialect, not `postgresql://`).
+**FIFO portfolio math** lives in `Holdings::PositionCalculator` — pure function, single source of truth for cost basis, realized + unrealized P&L, and the LT/ST 365-day split. Both `Holdings::RefreshService` (writes `Holding` cache) and `Reports::PortfolioService` (live snapshot) read from it.
 
-**Migrations**: Alembic revision IDs are datetime-stamped (`YYYYMMDDHHmmSS`) via a `process_revision_directives` hook in `alembic/env.py`. No downgrade migrations — new migration for every change. Sleep ≥2s between generating multiple migrations to avoid collisions.
+**Daily price + P&L snapshot** (`Daily::PriceAndPnlSnapshotJob`, fires at 05:00 IST via sidekiq-cron):
+
+1. `Instruments::PriceFetchService.call` — pulls NSE bhavcopy + AMFI NAVs into `instruments.last_price` and appends `instrument_price_history` rows (idempotent upsert).
+2. `Reports::HoldingSnapshotService.snapshot_all!` — refreshes every active holding and writes `holding_snapshots` rows for that date.
+3. Stamps `SystemTask("daily_pnl")` so `daily_pnl_catchup.rb` can detect a missed run on the next boot and enqueue catch-up.
+
+Same-day re-runs upsert in place: `created_at` survives, `updated_at` bumps, `update_only` is restricted to the stat columns.
+
+**Importer** (`Imports::Process*RowService` per type, kicked off by Sidekiq jobs):
+
+- Investment CSVs: `Imports::InvestmentFormatAdapters` auto-detects Zerodha Coin (`segment=MF`) and Kite (`segment=EQ`) tradebooks; everything else uses the `Default` adapter that expects FinTrack's canonical schema.
+- All three importers run a duplicate-detection ladder before insert. Per type:
+  - Investments → `trade_id` → `(order_id, purchase_date)` → structural `(user_instrument, platform_account, date, amount, side)`.
+  - Transactions → `bank_ref` → `(date, amount, type, linked_account)`.
+  - Term accounts → `(account_type, account_number)` → structural.
+- Duplicate rows write a `:skipped` `ImportRecord` whose `notes` cite the matched record (`"Duplicate of Investment #842 (trade_id 4089431)"`) and bump `import_batches.duplicate_rows`.
+- Files attach to `ImportBatch` via ActiveStorage (`has_one_attached :file`).
+
+**AI Assistant** (`app/services/assistants/`):
+
+- `Conversation.run!` orchestrates a single chat turn: builds context, calls the configured provider, executes any tool-use the provider returns, persists messages.
+- Provider abstraction: `Anthropic`, `OpenAI`, `Ollama` — selected per user via `UserAssistantSetting` (singleton row per user; `api_key` encrypted at rest via Active Record encryption).
+- Tools (`Assistants::Tools::*`) are user-scoped — every tool ctor takes `user`, the LLM never supplies a user id. Coverage: query_transactions, query_investments, query_holdings, query_term_accounts, query_dashboard, query_spending, lookup_instruments, analyse_csv, generate_import_csv, explain_portfolio_pnl.
+- Conversations are persisted as `AssistantMessage` rows with `role: user | assistant | tool`. Pinned messages always make it back into context.
+
+**Reference data** (admin-managed, CLI-only):
+
+- `banks` + `accounts` — global bank list; users create their own `accounts` via API. `Bank.short_name` is unique, max 6 chars.
+- `platforms` + `platform_accounts` — global broker / MF platform list; users create `platform_accounts`.
+- `instruments` — global catalogue of investable securities. Users add to their watchlist via `user_instruments`.
+
+**Database connection**: `pg` adapter, `DATABASE_URL=postgresql://…`. `database.yml` reads from env.
+
+**Migrations**: datetime-stamped revision IDs (`20260507175456_*`). No downgrade migrations — write a new one for every change. Sleep ≥1 s between generating two migrations to avoid timestamp collisions.
 
 ### Frontend (`frontend/`)
 
-**Stack**: React 19 + TypeScript 6 + Vite 8 + React Router v7 + TanStack Query v5 + react-hook-form + Zod v4 + Recharts 3 + shadcn/ui + Tailwind CSS v4
+**Stack**: React 19 + TypeScript 5 + Vite 8 + React Router v7 + TanStack Query v5 + base-ui + Tailwind v4 + Recharts 3 + lucide-react + sonner.
 
 ```
 frontend/src/
-├── api/           # Axios call functions per domain (not hooks — just fetch logic)
-│   ├── banks.ts        # listBanks, listAccounts, createAccount, updateAccount, closeAccount, deleteAccount
-│   ├── term_accounts.ts # listTermAccounts, createTermAccount, closeTermAccount
-│   └── transactions.ts  # listTransactions, createTransaction (no update/delete)
-├── components/    # ui/ (shadcn), layout/, auth/, transactions/, investments/, instruments/
-├── context/       # AuthContext — JWT storage in localStorage, login/logout
-├── hooks/         # React Query hooks
-│   ├── useBanks.ts       # useBanks, useAccounts, useCreateAccount, useUpdateAccount, useCloseAccount, useDeleteAccount
-│   ├── useTermAccounts.ts # useTermAccounts, useCreateTermAccount, useCloseTermAccount
-│   └── useTransactions.ts # useTransactions, useCreateTransaction
+├── api/           # Axios call functions per domain (banks, holdings, imports, …)
+├── components/    # ui/ (shadcn-style + base-ui), accounts/, assistant/, imports/, …
+├── context/       # AuthContext — JWT in localStorage
+├── hooks/         # React Query hooks — useHoldings, useInvestments, useAssistantChat, …
+├── lib/           # finance.ts, errors.ts, errorReporter.ts
 ├── pages/         # One file per route
-└── types/         # Shared TypeScript interfaces matching backend schemas
+└── types/         # Shared TS interfaces matching backend serializers
 ```
 
-**React Query keys**: `['banks']`, `['accounts']`, `['term-accounts']`, `['transactions', params]`, `['investments', params]`, `['platform-accounts']`, `['instruments']`, `['tracked-instruments']`, `['reports/dashboard']`, `['reports/spending-trends']`, `['reports/investment-summary']`
+**API client** (`api/client.ts`): single Axios instance, `baseURL: "/api/v1"`. Bearer-token request interceptor; 401 response interceptor clears the token and bounces to `/login`.
 
-**Mutation invalidation**: `useCreateTransaction` invalidates `accounts` + `term-accounts` (balance changes). `useCreateTermAccount` / `useCloseTermAccount` invalidate both `term-accounts` + `accounts`. `useCloseAccount` invalidates `accounts`.
+**Routing** (`App.tsx`): `/` is the public `LandingPage`; `/login` is public; everything else is wrapped in `ProtectedRoute → AppShell` (`/dashboard`, `/accounts`, `/transactions`, `/platform-accounts`, `/instruments`, `/holdings`, `/investments`, `/portfolio`, `/reports`, `/imports`, `/assistant`).
 
-**API client** (`api/client.ts`): single Axios instance with `baseURL: "/api/v1"`. Request interceptor attaches `Authorization: Bearer <token>` from localStorage. Response interceptor clears token and redirects to `/login` on 401.
+**TransactionForm**: create-only. Linked account select combines `accounts` + `term_accounts` under `"account:<id>"` / `"term_account:<id>"` polymorphic keys.
 
-**Routing**: `App.tsx` uses React Router v7. Public: `/login`. Protected: `/`, `/transactions`, `/investments`, `/accounts`, `/platform-accounts`, `/instruments`, `/reports`. All wrapped in `ProtectedRoute` → `AppShell`.
+**Holdings page**: active / closed split, click-through to a `PositionLotsSheet` showing every lot. MF folio numbers are inline-editable.
 
-**TransactionForm** (`components/transactions/TransactionForm.tsx`): create-only (no edit). Linked account select combines `accounts` + `term_accounts` under a single polymorphic key `"account:<id>"` / `"term_account:<id>"`. `bank_ref` field shown only when `type === 'credit'`. Tags as comma-separated text input → `string[]`.
+**State**: TanStack Query for all server state — no manual cache writes outside `useAssistantChat`'s mutation flow.
 
-**AccountsPage** (`pages/AccountsPage.tsx`): two sections — regular accounts table + term accounts (FD/PPF) table. No balance input on create (balance is transaction-driven). Account and term account close dialogs use `closed_date` + `closed_amount`.
+**Select component** (`components/ui/select.tsx`): wraps `@base-ui/react/select`, specialised to `string`. The wrapper exposes a clean `(value: string) => void` callback that collapses base-ui's `string | null` at the boundary.
 
-**InstrumentCombobox** (`components/instruments/InstrumentCombobox.tsx`): `@base-ui/react` Popover does **not** support `asChild` — style `PopoverTrigger` directly.
-
-**State**: TanStack Query manages all server state. No manual cache writes.
+**Important base-ui gotcha**: `@base-ui/react`'s `Popover` does **not** support `asChild` (unlike Radix). Style the `PopoverTrigger` directly. The `Button` wrapper uses base-ui's `render` prop instead — passing `asChild` nests elements and breaks layout.
 
 ## Design Documentation
 
-Detailed HLD/LLD lives in `docs/`:
-- [docs/backend-architecture.md](docs/backend-architecture.md) — full DB schema (SQL), request lifecycle, service patterns, auth flow, test strategy
-- [docs/frontend-architecture.md](docs/frontend-architecture.md) — routing, state management, Axios interceptors, form patterns, chart setup
-- [docs/dev-commands.md](docs/dev-commands.md) — auto-generated log of all Bash commands run (written by Claude Code hook)
+Detailed docs live in `docs/`:
 
-## Claude Code Hooks
-
-`.claude/settings.json` registers PostToolUse hooks that run automatically:
-- **Bash hook**: logs every command (with timestamp) to `docs/dev-commands.md`
-- **Edit/Write hook (backend)**: when a `.py` file under `backend/` changes, an agent checks whether the change is architecturally significant and surgically updates `docs/backend-architecture.md`
-- **Edit/Write hook (frontend)**: same for `.ts`/`.tsx` files under `frontend/src/` → `docs/frontend-architecture.md`
-
-Do not manually rewrite those doc files wholesale — the hooks maintain them incrementally.
+- [docs/backend-architecture.md](docs/backend-architecture.md) — full DB schema, request lifecycle, service patterns.
+- [docs/frontend-architecture.md](docs/frontend-architecture.md) — routing, state management, form patterns, chart setup.
+- [docs/dev-commands.md](docs/dev-commands.md) — scenario-grouped command reference.
 
 ## Code Review Graph
 
-A knowledge graph is indexed over the full codebase (686 nodes, 4235 edges). **Use MCP graph tools before reading files** to save tokens:
+A knowledge graph is indexed over the codebase. **Use MCP graph tools before reading files** to save tokens:
 
 ```
-# Find a function/class by name
 semantic_search_nodes_tool("create_term_account")
-
-# Understand callers/callees
-query_graph_tool(pattern="callers_of", node="create_transaction")
-query_graph_tool(pattern="callees_of", node="_apply_balance_delta")
-
-# Impact analysis before a change
-get_impact_radius_tool(node="Transaction")
-
-# Efficient review context
-get_review_context_tool(file="backend/app/services/transaction_service.py")
+query_graph_tool(pattern="callers_of", node="Holdings::RefreshService")
+get_impact_radius_tool(node="Investment")
+get_review_context_tool(file="backend/app/services/holdings/refresh_service.rb")
 ```
 
-Rebuild after significant changes:
-```bash
-# From project root — full rebuild
-# (use MCP tool: build_or_update_graph_tool with full_rebuild=true)
-```
+Rebuild after significant changes via `build_or_update_graph_tool` (the MCP tool, not a CLI).
 
 ## API Structure
 
 All endpoints under `/api/v1/`. Protected routes require `Authorization: Bearer <token>`.
 
-| Domain | Prefix | Key endpoints |
-|--------|--------|---------------|
-| Auth | `/auth` | POST `/login`, GET `/me`, PUT `/me` |
-| Transactions | `/transactions` | POST (create), GET (list + filters: type credit/debit, date range, pagination) — no PUT/DELETE |
-| Investments | `/investments` | Full CRUD + `?type=` multi-filter |
-| Reports | `/reports` | GET `/dashboard`, `/spending-trends`, `/investment-summary` |
-| Instruments | `/instruments` | Full CRUD; POST/DELETE `/{id}/track`; GET `/tracked` |
-| Banks | `/banks` | GET (read-only list) |
-| Accounts | `/accounts` | CRUD + POST `/{id}/close` |
-| Term Accounts | `/term-accounts` | GET (list), POST (create), GET `/{id}`, POST `/{id}/close` |
-| Platforms | `/platforms` | GET (read-only list) |
-| Platform Accounts | `/platform-accounts` | Full CRUD |
-| Follios | `/follios` | Full CRUD |
+| Domain            | Prefix                | Key endpoints |
+|-------------------|-----------------------|---------------|
+| Auth              | `/auth`               | POST `/login`, GET `/me`, PUT `/me` |
+| Transactions      | `/transactions`       | POST (create), GET (list with filters) — no PUT/DELETE |
+| Investments       | `/investments`        | Full CRUD with `?type=` / search / date filters |
+| Holdings          | `/holdings`           | GET (list with `?type=` `?status=`); POST `/refresh` |
+| Reports           | `/reports`            | GET `/dashboard`, `/spending-trends`, `/investment-summary`, `/portfolio` |
+| Instruments       | `/instruments`        | Full CRUD; POST/DELETE `/{id}/track`; GET `/tracked` |
+| Banks             | `/banks`              | GET (read-only) |
+| Accounts          | `/accounts`           | CRUD + POST `/{id}/close` + `/{id}/audit-logs` |
+| Term Accounts     | `/term-accounts`      | GET, POST, GET `/{id}`, POST `/{id}/close` + `/{id}/audit-logs` |
+| Platforms         | `/platforms`          | GET (read-only) |
+| Platform Accounts | `/platform-accounts`  | Full CRUD |
+| Imports           | `/imports`            | GET (list), POST (create), GET `/{id}`, GET `/template/{type}` |
+| Assistant         | `/assistant/...`      | `messages` (CRUD + pin/unpin), `attachments`, `sessions`, `setting` |
+| Errors            | `/errors`             | POST (client-side error reporter) |
+
+Sidekiq Web UI mounted at `/sidekiq` when `SIDEKIQ_USERNAME` and `SIDEKIQ_PASSWORD` are set in the env.
 
 ## Environment
 
 `backend/.env` (gitignored):
+
 ```
-DATABASE_URL=postgresql+psycopg://fintrack_user:password@localhost:5432/fintrack_db
-SECRET_KEY=<32-byte hex from secrets.token_hex(32)>
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=10080
-ENVIRONMENT=development
+DATABASE_URL=postgresql://fintrack_user:password@localhost:5432/fintrack_db
+REDIS_URL=redis://localhost:6379
+SECRET_KEY_BASE=<output of: bin/rails secret>
+ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=<bin/rails db:encryption:init>
+ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=<same>
+ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=<same>
+SIDEKIQ_USERNAME=admin
+SIDEKIQ_PASSWORD=fintrack-dev
 ```
+
+Per-user assistant API keys live in `user_assistant_settings.api_key` (encrypted at rest), not in env.
 
 ## Key Constraints
 
-- SQLAlchemy dialect must be `postgresql+psycopg://` (psycopg3), not `postgresql://` (psycopg2).
-- `alembic/env.py` must import all models so autogenerate detects schema changes. All models re-exported from `app/models/__init__.py`.
-- When a PostgreSQL enum type already exists (created in a prior migration), use `postgresql.ENUM(..., create_type=False)` from `sqlalchemy.dialects.postgresql` — not `sa.Enum(..., create_type=False)`.
-- The SPA catch-all route in `main.py` must be registered **after** all `/api/v1/` routers.
-- Alembic migration revision IDs are datetime-stamped; sleep ≥2s between generating multiple migrations or they collide.
-- No downgrade migrations — write a new migration for any schema change.
-- `bulk_save_objects` in seed bypasses service-layer balance hooks — seed transactions do not auto-update account balances.
-- Zod v4, Tailwind v4, React Router v7, Recharts v3, and TypeScript v6 all have breaking changes — check migration guides before upgrading.
-- `@base-ui/react` Popover does not support `asChild` (unlike Radix UI).
+- **Time zone**: app is `Asia/Kolkata`. Cron schedules and `Date.current` use IST.
+- **Migrations**: write a new one for every change — no downgrades. Sleep ≥1 s between generating two migrations or timestamps collide.
+- **Holdings refresh callback**: every `Investment` save fires `Holdings::RefreshJob`. Bulk loaders (CSV importer, future seeders) set `Current.skip_holding_refresh = true` and enqueue a single full-user sweep at the end. The skip flag is per-request via `ActiveSupport::CurrentAttributes`.
+- **`Holdings::RefreshService#persist_lot_pnl`** uses `update_columns` to bypass the after_save_commit callback — otherwise touching every lot would re-enqueue a refresh job and loop.
+- **Transactions are immutable from the API**. Corrections live in the rake tasks (`transactions:correct`, `transactions:deactivate`).
+- **base-ui**: no `asChild`. Use the component's `render` prop. Popover trigger styling goes on the trigger itself.
+- **Pre-push gate**: every `git push` runs `bin/pre-push-checks` (after `bin/setup` has wired the hookpath). Bypass once with `--no-verify`; do not weaken the script — fix the failures.
+- **Zod v4, Tailwind v4, React Router v7, Recharts v3** — breaking changes vs. previous majors; check migration guides before bumping.

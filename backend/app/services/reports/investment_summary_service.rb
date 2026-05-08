@@ -5,18 +5,17 @@ module Reports
     end
 
     def call
-      investments = @user.investments.all
-      by_type     = investments.group_by(&:investment_type)
+      # Delegate to PortfolioService for consistent cost-basis math (held shares
+      # only, not the original buy quantity at today's price).
+      portfolio = ::Reports::PortfolioService.new(@user).call
 
-      holdings = by_type.map do |inv_type, invs|
-        invested = invs.sum { |i| i.amount_invested.to_f }
-        current  = invs.sum { |i| (i.current_value || i.amount_invested).to_f }
+      holdings = portfolio[:positions].group_by { |p| p[:type] }.map do |inv_type, ps|
         {
           investment_type: inv_type,
-          total_invested:  invested,
-          current_value:   current,
-          unrealized_gain: current - invested,
-          count:           invs.count
+          total_invested:  ps.sum { |p| p[:total_invested] },
+          current_value:   ps.sum { |p| p[:current_value] },
+          unrealized_gain: ps.sum { |p| p[:unrealized_gain] },
+          count:           ps.size
         }
       end
 

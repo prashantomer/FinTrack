@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { afterAll, afterEach, beforeAll } from 'vitest'
 import { server } from './server'
 
 // Set a fake auth token so the Axios interceptor doesn't redirect to /login

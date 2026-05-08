@@ -4,7 +4,8 @@ module Api
       before_action :set_investment, only: [ :show, :update, :destroy ]
 
       def index
-        result = Investments::QueryService.new(current_user, query_params).call
+        filter = Investments::Filter.from_params(params)
+        result = Investments::QueryService.new(current_user, filter).call
         render_success(
           data:      result[:items],
           meta_data: { total: result[:total], page: result[:page], page_size: result[:page_size] }
@@ -29,22 +30,38 @@ module Api
         head :no_content
       end
 
+      # PATCH /api/v1/investments/folio
+      # Bulk-update folio_number for every investment of the user that belongs
+      # to the given user_instrument. Used to correct auto-generated folios on
+      # the Holdings page in one shot instead of editing each lot separately.
+      def update_folio
+        user_instrument_id = params.require(:user_instrument_id).to_i
+        folio_number       = params[:folio_number].to_s.strip.presence
+
+        scope   = current_user.investments.where(user_instrument_id: user_instrument_id)
+        updated = scope.update_all(folio_number: folio_number)
+
+        # `update_all` bypasses model callbacks — refresh the Holding cache
+        # manually so the Holdings page picks up the new folio_number.
+        Holdings::RefreshService.refresh_for_user_instrument(current_user, user_instrument_id)
+
+        render_success(data: {
+          user_instrument_id: user_instrument_id,
+          folio_number:       folio_number,
+          updated:            updated
+        })
+      end
+
       private
 
       def set_investment
         @investment = current_user.investments.includes(:user_instrument).find(params[:id])
       end
 
-      def query_params
-        p = params.permit(:page, :page_size, investment_type: [], type: [])
-        p[:investment_type] = p.delete(:type) if p[:type].present? && p[:investment_type].blank?
-        p
-      end
-
       def investment_params
-        p = params.permit(:investment_type, :type, :name, :amount_invested, :notes,
+        p = params.permit(:investment_type, :type, :trade_type, :name, :amount_invested, :notes,
                           :user_instrument_id, :platform_account_id,
-                          :quantity, :buy_price, :units, :nav_at_purchase, :folio_number,
+                          :quantity, :units, :price, :order_id, :trade_id, :folio_number,
                           :current_value, :purchase_date)
         p[:investment_type] ||= p.delete(:type)
         p

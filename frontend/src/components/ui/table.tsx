@@ -31,7 +31,10 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={cn(
+        "[&_tr:last-child]:border-0 [&>tr:nth-child(even)]:bg-muted/30",
+        className
+      )}
       {...props}
     />
   )
@@ -55,7 +58,14 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted divide-x divide-border",
+        // Hover + selection use `foreground/<alpha>` instead of `muted/<alpha>` so
+        // they layer cleanly over the zebra row tint and read in both light/dark.
+        // Selected rows also get an inset left bar (uses --ring so it picks up
+        // the theme's focus color).
+        "border-b transition-colors divide-x divide-border",
+        "hover:bg-foreground/[0.06] has-aria-expanded:bg-foreground/[0.06]",
+        "data-[state=selected]:bg-foreground/[0.09] data-[state=selected]:shadow-[inset_2px_0_0_var(--ring)]",
+        "focus-visible:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         className
       )}
       {...props}

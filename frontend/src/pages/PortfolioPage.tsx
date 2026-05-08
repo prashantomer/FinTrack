@@ -53,11 +53,7 @@ function LotRow({ lot }: { lot: LotRead }) {
         {lot.quantity != null ? `${lot.quantity} u` : lot.units != null ? `${lot.units} u` : '—'}
       </TableCell>
       <TableCell className="text-muted-foreground text-right font-mono">
-        {lot.buy_price != null
-          ? formatCurrency(lot.buy_price)
-          : lot.nav_at_purchase != null
-          ? formatCurrency(lot.nav_at_purchase)
-          : '—'}
+        {lot.price != null ? formatCurrency(lot.price) : '—'}
       </TableCell>
       <TableCell className="text-right font-mono">{formatCurrency(lot.amount_invested)}</TableCell>
       <TableCell className="text-right">
@@ -75,7 +71,7 @@ function PositionRow({ position }: { position: PortfolioPosition }) {
   return (
     <>
       <TableRow
-        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        className="cursor-pointer"
         onClick={() => setExpanded(e => !e)}
       >
         <TableCell className="font-medium">
@@ -118,8 +114,10 @@ export function PortfolioPage() {
 
   const empty = !data || data.positions.length === 0
 
-  const stocks = data?.positions.filter(p => p.type === 'stock') ?? []
-  const mfs = data?.positions.filter(p => p.type === 'mutual_fund') ?? []
+  // Hide fully-exited positions (zero net units) — they belong on Holdings, not the live Portfolio.
+  const open = data?.positions.filter(p => !p.is_closed) ?? []
+  const stocks = open.filter(p => p.type === 'stock')
+  const mfs = open.filter(p => p.type === 'mutual_fund')
 
   const gainPositive = (data?.unrealized_gain ?? 0) >= 0
 
@@ -184,16 +182,19 @@ export function PortfolioPage() {
                       innerRadius={55}
                       outerRadius={85}
                       paddingAngle={2}
-                      label={({ type, percent }) =>
-                        `${INVESTMENT_TYPE_LABELS[type as keyof typeof INVESTMENT_TYPE_LABELS]} ${(percent * 100).toFixed(0)}%`
-                      }
+                      label={(props) => {
+                        const type = (props as { type?: string }).type ?? ''
+                        const pct  = (props.percent ?? 0) * 100
+                        const label = INVESTMENT_TYPE_LABELS[type as keyof typeof INVESTMENT_TYPE_LABELS] ?? type
+                        return `${label} ${pct.toFixed(0)}%`
+                      }}
                       labelLine={false}
                     >
                       {data?.by_type.map(entry => (
                         <Cell key={entry.type} fill={TYPE_COLORS[entry.type] ?? '#94a3b8'} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -210,7 +211,7 @@ export function PortfolioPage() {
                   >
                     <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => formatCurrencyCompact(Number(v))} />
                     <YAxis type="category" dataKey="platform_name" tick={{ fontSize: 11 }} width={72} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                     <Legend />
                     <Bar dataKey="total_invested" name="Invested" fill="#94a3b8" radius={[0, 3, 3, 0]} />
                     <Bar dataKey="current_value" name="Current" fill="#6366f1" radius={[0, 3, 3, 0]} />

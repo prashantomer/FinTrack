@@ -1,14 +1,16 @@
 require "net/http"
 require "uri"
 require "csv"
+require "bigdecimal"
 
-NSE_URL  = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-AMFI_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
-LOG_PATH = Rails.root.join("../logs/instrument_fetch.log").cleanpath
+NSE_URL                  = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+NSE_BHAVCOPY_URL_FORMAT  = "https://archives.nseindia.com/products/content/sec_bhavdata_full_%s.csv"
+AMFI_URL                 = "https://www.amfiindia.com/spages/NAVAll.txt"
+LOG_PATH                 = Rails.root.join("../logs/instrument_fetch.log").cleanpath
 
-def fetch_url(url)
+def fetch_url(url, extra_headers: {})
   uri = URI(url)
-  headers = { "User-Agent" => "Mozilla/5.0 (compatible; FinTrack/1.0)" }
+  headers = { "User-Agent" => "Mozilla/5.0 (compatible; FinTrack/1.0)" }.merge(extra_headers)
 
   10.times do
     req = Net::HTTP::Get.new(uri, headers)
@@ -25,6 +27,24 @@ def fetch_url(url)
   end
 
   raise "Too many redirects for #{url}"
+end
+
+# Try the most recent business days; NSE bhavcopy is published once per trading day.
+def fetch_latest_nse_bhavcopy(log)
+  7.times do |i|
+    date = Date.current - i
+    next if date.saturday? || date.sunday?
+    url = format(NSE_BHAVCOPY_URL_FORMAT, date.strftime("%d%m%Y"))
+    log.info "Trying NSE bhavcopy for #{date} → #{url}"
+    begin
+      body = fetch_url(url, extra_headers: { "Referer" => "https://www.nseindia.com/" })
+      log.info "NSE bhavcopy found for #{date} (#{body.bytesize} bytes)"
+      return [ body, date ]
+    rescue => e
+      log.info "Not available: #{e.message}"
+    end
+  end
+  raise "No NSE bhavcopy available in the last 7 days"
 end
 
 def instrument_logger
@@ -162,5 +182,102 @@ namespace :instruments do
     puts "AMFI MFs:   +#{mf_added} added, #{mf_updated} updated, #{mf_skipped} skipped"
 
     log.info "===== instruments:fetch complete ====="
+  end
+
+  desc "Fetch current stock close prices (NSE bhavcopy) and mutual fund NAVs (AMFI) into instruments.last_price"
+  task fetch_prices: :environment do
+    log = instrument_logger
+    log.info "===== instruments:fetch_prices started ====="
+
+    # ── NSE stock close prices via bhavcopy ─────────────────────────────────
+    nse_csv, nse_date = fetch_latest_nse_bhavcopy(log)
+
+    by_ticker = Instrument.where(investment_type: "stock").where.not(ticker_symbol: nil)
+                          .index_by { |i| i.ticker_symbol.upcase }
+    log.info "Stocks indexed by ticker: #{by_ticker.size}"
+
+    nse_at = nse_date.in_time_zone.beginning_of_day
+    nse_updated = nse_unchanged = nse_unmatched = 0
+
+    CSV.parse(nse_csv, headers: true, header_converters: ->(h) { h.to_s.strip.downcase.to_sym }) do |row|
+      next unless row[:series]&.strip == "EQ"
+
+      ticker = row[:symbol]&.strip
+      close  = row[:close_price]&.strip
+      next if ticker.blank? || close.blank?
+
+      inst = by_ticker[ticker.upcase]
+      unless inst
+        nse_unmatched += 1
+        next
+      end
+
+      price = BigDecimal(close)
+      if inst.last_price == price && inst.last_price_at == nse_at
+        nse_unchanged += 1
+      else
+        inst.update_columns(last_price: price, last_price_at: nse_at)
+        nse_updated += 1
+      end
+    end
+
+    log.info "NSE done — updated=#{nse_updated} unchanged=#{nse_unchanged} unmatched_in_db=#{nse_unmatched}"
+    puts "NSE stocks: #{nse_updated} updated (#{nse_unchanged} unchanged) for #{nse_date}"
+
+    # ── AMFI mutual fund NAVs ───────────────────────────────────────────────
+    log.info "Fetching AMFI NAVAll from #{AMFI_URL}"
+    amfi_text = fetch_url(AMFI_URL)
+    log.info "Received #{amfi_text.bytesize} bytes"
+
+    by_isin = Instrument.where(investment_type: "mutual_fund").where.not(isin: nil).index_by(&:isin)
+    log.info "Mutual funds indexed by ISIN: #{by_isin.size}"
+
+    mf_updated = mf_unchanged = mf_unmatched = mf_invalid = 0
+
+    amfi_text.each_line do |raw|
+      line = raw.strip
+      next if line.empty?
+      next if line.start_with?("Scheme Code;")
+      next if line.start_with?("Open Ended", "Close Ended", "Interval")
+      next if line.exclude?(";")
+
+      parts = line.split(";")
+      next if parts.size < 6
+
+      isin1 = parts[1].strip
+      isin2 = parts[2].strip
+      nav   = parts[4].strip
+      date  = parts[5].strip
+
+      inst = by_isin[isin1] || by_isin[isin2]
+      unless inst
+        mf_unmatched += 1
+        next
+      end
+
+      if nav.blank? || nav.casecmp?("N.A.") || nav == "-"
+        mf_invalid += 1
+        next
+      end
+
+      price = (BigDecimal(nav) rescue nil)
+      nav_at = (Date.strptime(date, "%d-%b-%Y").in_time_zone.beginning_of_day rescue nil)
+      unless price && nav_at
+        mf_invalid += 1
+        next
+      end
+
+      if inst.last_price == price && inst.last_price_at == nav_at
+        mf_unchanged += 1
+      else
+        inst.update_columns(last_price: price, last_price_at: nav_at)
+        mf_updated += 1
+      end
+    end
+
+    log.info "AMFI done — updated=#{mf_updated} unchanged=#{mf_unchanged} unmatched_in_db=#{mf_unmatched} invalid=#{mf_invalid}"
+    puts "AMFI MFs:   #{mf_updated} updated (#{mf_unchanged} unchanged, #{mf_invalid} invalid)"
+
+    log.info "===== instruments:fetch_prices complete ====="
   end
 end

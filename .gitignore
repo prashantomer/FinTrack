@@ -42,3 +42,10 @@ pnpm-debug.log*
 # Claude Code runtime files
 .claude/scheduled_tasks.lock
 .claude/settings.json.bak
+
+# User broker exports / personal financial data — kept local only
+Imports/
+
+# Local archives of the deprecated Python backend — keep on disk, not in repo
+backend_python.zip
+*.zip

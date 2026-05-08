@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +29,7 @@ export function TransactionForm({ onSubmit, onCancel }: Props) {
   const { symbol: CURRENCY_SYMBOL } = useCurrency()
   const { data: accounts = [] } = useAccounts()
 
-  const { register, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, control, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {
       amount: 0,
       type: 'debit',
@@ -43,9 +43,9 @@ export function TransactionForm({ onSubmit, onCancel }: Props) {
     },
   })
 
-  const type = watch('type')
-  const linkedAccountType = watch('linked_account_type')
-  const linkedAccountId = watch('linked_account_id')
+  const type = useWatch({ control, name: 'type' })
+  const linkedAccountType = useWatch({ control, name: 'linked_account_type' })
+  const linkedAccountId = useWatch({ control, name: 'linked_account_id' })
 
   function buildLinkedAccountKey(lat: LinkedAccountType | '', laid: number | null) {
     if (!lat || !laid) return '__none__'

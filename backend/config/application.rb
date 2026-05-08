@@ -34,7 +34,7 @@ module Backend
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    config.time_zone = "Asia/Kolkata"
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Only loads a smaller set of middleware suitable for API only apps.
@@ -46,5 +46,15 @@ module Backend
     config.active_record.yaml_column_permitted_classes = [
       BigDecimal, Date, Time, DateTime, Symbol
     ]
+
+    config.middleware.use Rack::Attack
+
+    # Sidekiq::Web (mounted at /sidekiq) needs Rack session middleware for its
+    # CSRF protection. API-only Rails strips sessions/cookies by default — add
+    # them back. The Rails API itself uses JWT for auth, so this middleware is
+    # effectively only used by the Sidekiq dashboard.
+    config.session_store :cookie_store, key: "_fintrack_session", same_site: :lax
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use config.session_store, config.session_options
   end
 end

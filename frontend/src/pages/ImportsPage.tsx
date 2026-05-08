@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Upload } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ImportWizard } from '@/components/imports/ImportWizard'
-import { useImports } from '@/hooks/useImports'
+import { useInfiniteImports } from '@/hooks/useImports'
 import type { ImportBatch, ImportStatus } from '@/types'
 
 function statusVariant(status: ImportStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -26,7 +26,8 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
       </TableRow>
     )
   }
-  const errors = batch.import_records.filter(r => r.status === 'error')
+  const errors     = batch.import_records.filter(r => r.status === 'error')
+  const duplicates = batch.import_records.filter(r => r.status === 'skipped')
   return (
     <TableRow>
       <TableCell colSpan={7} className="bg-muted/30 p-3">
@@ -34,15 +35,24 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
           <span className="text-muted-foreground">
             <span className="font-medium text-green-600">{batch.import_records.filter(r => r.status === 'ok').length} ok</span>
             {' · '}
-            <span className="font-medium text-yellow-600">{batch.import_records.filter(r => r.status === 'skipped').length} skipped</span>
+            <span className="font-medium text-yellow-600">{duplicates.length} duplicate{duplicates.length === 1 ? '' : 's'}</span>
             {' · '}
-            <span className="font-medium text-destructive">{errors.length} errors</span>
+            <span className="font-medium text-destructive">{errors.length} error{errors.length === 1 ? '' : 's'}</span>
           </span>
         </div>
+        {duplicates.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {duplicates.map(r => (
+              <li key={`dup-${r.row_index}`} className="text-xs text-yellow-700 dark:text-yellow-500">
+                Row {r.row_index + 1}: <span>{r.notes ?? 'Duplicate row'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {errors.length > 0 && (
           <ul className="mt-2 space-y-1">
             {errors.map(r => (
-              <li key={r.row_index} className="text-xs text-destructive">
+              <li key={`err-${r.row_index}`} className="text-xs text-destructive">
                 Row {r.row_index + 1}: <span>{r.notes ?? 'Unknown error'}</span>
               </li>
             ))}
@@ -78,9 +88,23 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
           </Badge>
         </TableCell>
         <TableCell className="text-sm">
-          {batch.status === 'pending'
-            ? '—'
-            : `${batch.processed_rows} / ${batch.total_rows}`}
+          {batch.status === 'pending' ? (
+            '—'
+          ) : (
+            <span>
+              {batch.processed_rows} / {batch.total_rows}
+              {batch.duplicate_rows > 0 && (
+                <span className="ml-1.5 text-xs text-yellow-700 dark:text-yellow-500">
+                  ({batch.duplicate_rows} dup)
+                </span>
+              )}
+              {batch.failed_rows > 0 && (
+                <span className="ml-1.5 text-xs text-destructive">
+                  ({batch.failed_rows} err)
+                </span>
+              )}
+            </span>
+          )}
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
           {new Date(batch.created_at).toLocaleDateString()}
@@ -92,11 +116,32 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
 }
 
 export function ImportsPage() {
-  const [page, setPage] = useState(1)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const { data, isLoading } = useImports(page)
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteImports()
 
-  const totalPages = data ? Math.ceil(data.total / data.page_size) : 1
+  const items = data?.pages.flatMap(p => p.items) ?? []
+
+  // Native scroll-listener — matches the InstrumentsPage pattern. Triggers
+  // the next page when the bottom is within 300px of the viewport.
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container || !hasNextPage || isFetchingNextPage) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      if (scrollHeight - scrollTop - clientHeight < 300) fetchNextPage()
+    }
+    container.addEventListener('scroll', handleScroll)
+    handleScroll() // trigger immediately if content is shorter than the container
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -108,12 +153,12 @@ export function ImportsPage() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
             Loading…
           </div>
-        ) : !data?.items.length ? (
+        ) : !items.length ? (
           <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
             <Upload size={32} className="opacity-30" />
             <p className="text-sm">No imports yet. Click "New Import" to get started.</p>
@@ -133,32 +178,17 @@ export function ImportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.items.map(batch => (
+                {items.map(batch => (
                   <BatchRow key={batch.id} batch={batch} />
                 ))}
               </TableBody>
             </Table>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-end gap-2 mt-4">
-                <Button
-                  variant="outline" size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline" size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
+            {isFetchingNextPage && (
+              <div className="text-center text-xs text-muted-foreground py-4">Loading more…</div>
+            )}
+            {!hasNextPage && items.length > 0 && (
+              <div className="text-center text-xs text-muted-foreground py-4">— end —</div>
             )}
           </>
         )}

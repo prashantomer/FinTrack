@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  review:
+  copilot:
     name: Copilot Code Review
     runs-on: ubuntu-latest
     permissions:

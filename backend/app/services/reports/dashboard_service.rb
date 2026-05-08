@@ -38,18 +38,17 @@ module Reports
       cutoff   = @today + 90.days
       upcoming = active_term.select { |ta| ta.maturity_date <= cutoff }.sort_by(&:maturity_date)
 
-      investments = @user.investments.all
-      by_type     = investments.group_by(&:investment_type)
-      holdings    = by_type.map do |inv_type, invs|
-        invested = invs.sum { |i| i.amount_invested.to_f }
-        current  = invs.sum { |i| (i.current_value || i.amount_invested).to_f }
+      # Holdings breakdown: delegate position-level math to PortfolioService so
+      # cost-basis / current-value semantics stay consistent across the app.
+      portfolio = ::Reports::PortfolioService.new(@user).call
+      holdings  = portfolio[:positions].group_by { |p| p[:type] }.map do |inv_type, ps|
         {
           type:            inv_type,
           investment_type: inv_type,
-          total_invested:  invested,
-          current_value:   current,
-          unrealized_gain: current - invested,
-          count:           invs.count
+          total_invested:  ps.sum { |p| p[:total_invested] },
+          current_value:   ps.sum { |p| p[:current_value] },
+          unrealized_gain: ps.sum { |p| p[:unrealized_gain] },
+          count:           ps.size
         }
       end.sort_by { |h| -h[:current_value] }
 

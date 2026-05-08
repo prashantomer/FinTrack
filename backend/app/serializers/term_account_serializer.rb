@@ -1,3 +1,36 @@
+# == Schema Information
+#
+# Table name: term_accounts
+#
+#  id                :bigint           not null, primary key
+#  account_number    :string(100)
+#  account_type      :string           not null
+#  amount            :decimal(14, 2)   not null
+#  balance           :decimal(14, 2)   default(0.0), not null
+#  closed_amount     :decimal(14, 2)
+#  closed_date       :date
+#  interest_rate     :decimal(5, 2)    not null
+#  is_active         :boolean          default(TRUE), not null
+#  maturity_amount   :decimal(14, 2)   not null
+#  maturity_date     :date             not null
+#  notes             :text
+#  open_date         :date             not null
+#  tenure_days       :integer
+#  created_at        :datetime         not null
+#  updated_at        :datetime         not null
+#  parent_account_id :bigint           not null
+#  user_id           :bigint           not null
+#
+# Indexes
+#
+#  index_term_accounts_on_parent_account_id  (parent_account_id)
+#  index_term_accounts_on_user_id            (user_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (parent_account_id => accounts.id) ON DELETE => restrict
+#  fk_rails_...  (user_id => users.id) ON DELETE => cascade
+#
 class TermAccountSerializer < BaseSerializer
   def self.attributes(r)
     parent = assoc(r, :parent_account)

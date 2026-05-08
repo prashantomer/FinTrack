@@ -102,11 +102,12 @@ describe('ImportWizard – Step 3: Template', () => {
     await waitFor(() => expect(screen.getByText(/download sample csv/i)).toBeInTheDocument())
   }
 
-  it('shows investment column reference including "investment_type"', async () => {
+  it('shows investment column reference including "investment_type" and "trade_type"', async () => {
     const user = userEvent.setup()
     await goToStep3(user, 'Investments')
 
     expect(screen.getByText('investment_type')).toBeInTheDocument()
+    expect(screen.getByText('trade_type')).toBeInTheDocument()
   })
 
   it('shows transaction columns including "date" and "amount"', async () => {

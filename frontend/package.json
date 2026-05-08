@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "postinstall": "node -e \"const { execSync } = require('child_process'); try { const root = execSync('git rev-parse --show-toplevel', { stdio: ['ignore','pipe','ignore'] }).toString().trim(); execSync('git -C ' + JSON.stringify(root) + ' config core.hooksPath .githooks', { stdio: 'ignore' }); } catch (_) {}\""
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -24,8 +25,10 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.74.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1",
     "shadcn": "^4.5.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
@@ -34,25 +37,25 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.2.4",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.0.0",
-    "@vitest/ui": "^2.0.0",
-    "jsdom": "^26.0.0",
-    "msw": "^2.0.0",
-    "vitest": "^2.0.0",
-    "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/ui": "^2.0.0",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "jsdom": "^26.0.0",
+    "msw": "^2.0.0",
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^2.0.0"
   }
 }

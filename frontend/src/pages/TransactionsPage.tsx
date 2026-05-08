@@ -127,7 +127,7 @@ export function TransactionsPage() {
                     <TableCell>
                       {t.tags && t.tags.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {t.tags.map(tag => <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>)}
+                          {t.tags.map((tag, i) => <Badge key={`${tag}-${i}`} variant="secondary" className="text-xs">{tag}</Badge>)}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
