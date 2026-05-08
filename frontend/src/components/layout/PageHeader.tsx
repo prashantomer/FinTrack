@@ -11,10 +11,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, onRefresh, isRefreshing = false, children }: PageHeaderProps) {
   return (
-    <div className="shrink-0 min-h-14 border-b bg-background px-6 py-3 flex items-center justify-between">
-      <div className="min-w-0">
-        <h1 className="text-lg font-semibold leading-none">{title}</h1>
-        {description && <p className="text-xs text-muted-foreground mt-1 truncate">{description}</p>}
+    <div className="shrink-0 h-14 border-b bg-background px-6 flex items-center justify-between">
+      <div className="min-w-0 flex items-baseline gap-2">
+        <h1 className="text-lg font-semibold leading-none shrink-0">{title}</h1>
+        {description && (
+          <span className="text-xs text-muted-foreground truncate" title={description}>
+            <span className="text-muted-foreground/60 mr-1">·</span>{description}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Button
