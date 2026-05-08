@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { InvestmentForm } from '@/components/investments/InvestmentForm'
-import { useCreateInvestment, useDeleteInvestment, useFilteredInvestments, useUpdateInvestment } from '@/hooks/useInvestments'
+import { useCreateInvestment, useFilteredInvestments, useUpdateInvestment } from '@/hooks/useInvestments'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDebounce } from '@/hooks/useDebounce'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
@@ -49,7 +49,6 @@ export function InvestmentsPage() {
   }
   const createMutation = useCreateInvestment()
   const updateMutation = useUpdateInvestment()
-  const deleteMutation = useDeleteInvestment()
 
   const investments = data?.items ?? []
   const total = data?.total ?? 0
@@ -77,8 +76,8 @@ export function InvestmentsPage() {
         <Button onClick={() => { setEditing(null); setOpen(true) }}><Plus size={16} className="mr-1" />Add</Button>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="flex-1 min-h-0 px-6 py-6 flex flex-col gap-4 overflow-hidden">
+        <div className="flex flex-wrap items-end gap-3 shrink-0">
           <div className="relative flex-1 min-w-[260px] max-w-md">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -151,9 +150,9 @@ export function InvestmentsPage() {
         {isLoading ? (
           <div className="text-muted-foreground">Loading…</div>
         ) : (
-          <div className="rounded-lg border overflow-hidden">
+          <div className="flex-1 min-h-0 rounded-lg border overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/70 [&_th]:shadow-[inset_0_-1px_0_var(--border)]">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Trade</TableHead>
@@ -181,7 +180,17 @@ export function InvestmentsPage() {
                     <TableRow key={inv.id}>
                       <TableCell className="font-medium">
                         <div className="flex flex-col leading-tight">
-                          <span>{inv.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span>{inv.name}</span>
+                            {inv.source === 'imported' && (
+                              <span
+                                className="text-[9px] uppercase tracking-wide text-muted-foreground bg-muted px-1 py-0.5 rounded"
+                                title="Imported via CSV — read-only"
+                              >
+                                imp
+                              </span>
+                            )}
+                          </div>
                           {inv.instrument_last_price != null && (
                             <span className="text-[10px] text-muted-foreground font-mono">
                               LTP ₹{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(inv.instrument_last_price)}
@@ -222,8 +231,11 @@ export function InvestmentsPage() {
                         ) : '—'}
                       </TableCell>
                       <TableCell className="flex gap-1 justify-end">
-                        <Button size="icon" variant="ghost" onClick={() => { setEditing(inv); setOpen(true) }}><Pencil size={14} /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(inv.id)}><Trash2 size={14} /></Button>
+                        {inv.source === 'manual' && (
+                          <Button size="icon" variant="ghost" onClick={() => { setEditing(inv); setOpen(true) }} title="Edit notes">
+                            <Pencil size={14} />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   )
@@ -263,6 +275,7 @@ export function InvestmentsPage() {
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <InvestmentForm
               initial={editing ?? undefined}
+              notesOnly={!!editing}
               onSubmit={handleSubmit}
               onCancel={() => { setOpen(false); setEditing(null) }}
             />
