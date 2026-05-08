@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_175533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -215,6 +215,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
     t.decimal "last_price", precision: 15, scale: 4
     t.datetime "last_price_at"
     t.string "name", limit: 255, null: false
+    t.boolean "profile_enabled", default: false, null: false
     t.string "ticker_symbol", limit: 20
     t.datetime "updated_at", null: false
     t.index ["investment_type"], name: "index_instruments_on_investment_type"

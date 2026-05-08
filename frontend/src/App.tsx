@@ -13,6 +13,7 @@ import { AccountsPage } from '@/pages/AccountsPage'
 import { AssistantPage } from '@/pages/AssistantPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { HoldingsPage } from '@/pages/HoldingsPage'
+import { InstrumentProfilePage } from '@/pages/InstrumentProfilePage'
 import { InstrumentsPage } from '@/pages/InstrumentsPage'
 import { InvestmentsPage } from '@/pages/InvestmentsPage'
 import { LandingPage } from '@/pages/LandingPage'
@@ -47,6 +48,7 @@ function AppRoutes() {
                 <Route path="/transactions" element={<TransactionsPage />} />
                 <Route path="/platform-accounts" element={<PlatformAccountsPage />} />
                 <Route path="/instruments" element={<InstrumentsPage />} />
+                <Route path="/instruments/:id" element={<InstrumentProfilePage />} />
                 <Route path="/holdings" element={<HoldingsPage />} />
                 <Route path="/investments" element={<InvestmentsPage />} />
                 <Route path="/portfolio" element={<PortfolioPage />} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 // (useEffect kept for the BrowseSheet infinite-scroll listener below)
+import { Link } from 'react-router-dom'
 import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -134,7 +135,9 @@ function BrowseSheet({ open, onClose, trackedIds }: BrowseSheetProps) {
                 <TableBody>
                   {instruments.map(inst => (
                     <TableRow key={inst.id}>
-                      <TableCell className="font-medium">{inst.name}</TableCell>
+                      <TableCell className="font-medium">
+                  <Link to={`/instruments/${inst.id}`} className="hover:underline">{inst.name}</Link>
+                </TableCell>
                       <TableCell>
                         <Badge variant="outline">{INVESTMENT_TYPE_LABELS[inst.type]}</Badge>
                       </TableCell>
@@ -230,7 +233,9 @@ function TrackedTable({ instruments, emptyMessage, allowUntrack = false }: Track
           <TableBody>
             {instruments.map(inst => (
               <TableRow key={inst.id}>
-                <TableCell className="font-medium">{inst.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link to={`/instruments/${inst.id}`} className="hover:underline">{inst.name}</Link>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{INVESTMENT_TYPE_LABELS[inst.type]}</Badge>
                 </TableCell>

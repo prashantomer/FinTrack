@@ -1,4 +1,15 @@
-import type { ApiResponse, Instrument, InstrumentCreate, InstrumentPage, InvestmentType, UserInstrument } from '@/types'
+import type {
+  ApiResponse,
+  Instrument,
+  InstrumentCreate,
+  InstrumentPage,
+  InstrumentPositionSummary,
+  InstrumentPricePoint,
+  InvestmentType,
+  LotRead,
+  Transaction,
+  UserInstrument,
+} from '@/types'
 import client from './client'
 
 export async function listInstruments(
@@ -37,5 +48,33 @@ export async function untrackInstrument(id: number) {
 
 export async function listUserInstruments() {
   const res = await client.get<ApiResponse<UserInstrument[]>>('/instruments/user-instruments')
+  return res.data.data
+}
+
+// ── Profile endpoints ─────────────────────────────────────────────────────
+
+export async function getInstrumentPosition(id: number) {
+  const res = await client.get<ApiResponse<InstrumentPositionSummary>>(`/instruments/${id}/position`)
+  return res.data.data
+}
+
+export async function getInstrumentLots(id: number) {
+  const res = await client.get<ApiResponse<LotRead[]>>(`/instruments/${id}/lots`)
+  return res.data.data
+}
+
+export async function getInstrumentTransactions(id: number, limit = 50) {
+  const res = await client.get<ApiResponse<Transaction[]>>(
+    `/instruments/${id}/transactions`,
+    { params: { limit } },
+  )
+  return res.data.data
+}
+
+export async function getInstrumentPriceHistory(id: number, days = 90) {
+  const res = await client.get<ApiResponse<InstrumentPricePoint[]>>(
+    `/instruments/${id}/price-history`,
+    { params: { days } },
+  )
   return res.data.data
 }

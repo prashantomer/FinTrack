@@ -1,7 +1,9 @@
 module Api
   module V1
     class InstrumentsController < ApplicationController
-      before_action :set_instrument, only: [ :show, :update, :track, :untrack ]
+      before_action :set_instrument, only: [ :show, :update, :track, :untrack,
+                                             :position, :lots, :linked_transactions, :price_history ]
+      before_action :ensure_profile_allowed, only: [ :position, :lots, :linked_transactions, :price_history ]
 
       def index
         result = Instruments::BrowseService.new(browse_params).call
@@ -46,7 +48,39 @@ module Api
         head :no_content
       end
 
+      # ── Profile endpoints ────────────────────────────────────────────────
+      # Read-only. Render 404 (not 403) when the gate disallows so untracked
+      # profiles don't leak existence to the client.
+
+      def position
+        render_success(data: profile_service.position)
+      end
+
+      def lots
+        render_success(data: profile_service.lots)
+      end
+
+      def linked_transactions
+        limit = params[:limit].presence&.to_i || Instruments::ProfileService::DEFAULT_TX_LIMIT
+        render_success(data: profile_service.transactions(limit: limit))
+      end
+
+      def price_history
+        days = params[:days].presence&.to_i || Instruments::ProfileService::DEFAULT_HISTORY_DAYS
+        rows = profile_service.price_history(days: days)
+        render_success(data: rows.map { |r| { date: r.price_date.iso8601, price: r.price.to_f, source: r.source } })
+      end
+
       private
+
+      def profile_service
+        @profile_service ||= Instruments::ProfileService.new(current_user, @instrument)
+      end
+
+      def ensure_profile_allowed
+        return if Instruments::ProfileGate.allowed?(current_user, @instrument)
+        head :not_found
+      end
 
       def set_instrument
         @instrument = Instrument.find(params[:id])

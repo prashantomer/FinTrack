@@ -155,8 +155,9 @@ The instrument catalogue is huge (~5k stocks + ~1k MFs). Pull it once, refresh p
 |---------------------------------|-----------------------------------------------------------------------------------------------------------|
 | `bin/rails instruments:fetch`   | Pulls NSE EQ list + AMFI scheme list. **One-time** (or after big market shifts).                          |
 | `bin/rails instruments:fetch_prices` | Pulls today's close prices (NSE bhavcopy + AMFI NAVs) into `instruments.last_price` and `instrument_price_history`. Idempotent — safe to re-run. |
+| `DAYS=365 bin/rails instruments:backfill_prices` | Backfills daily price history for **tracked instruments only** over the last `DAYS` days (default 365, max 1825). Fans out via Sidekiq on the `:price_backfill` queue — one job per NSE trading day, one job per 30-day AMFI chunk. Idempotent. |
 
-> The Sidekiq job `Daily::PriceAndPnlSnapshotJob` runs this daily at 05:00 IST automatically. Use the rake tasks only for ad-hoc fetches.
+> The Sidekiq job `Daily::PriceAndPnlSnapshotJob` runs the *daily* fetch at 05:00 IST automatically. Use `instruments:fetch_prices` for ad-hoc same-day refreshes and `instruments:backfill_prices` to populate historical bars (needed before charts on `/instruments/:id` will look interesting on a new install).
 
 ---
 
@@ -226,9 +227,11 @@ cd backend && bundle exec sidekiq
 # Web UI (HTTP basic auth — uses SIDEKIQ_USERNAME / SIDEKIQ_PASSWORD)
 open http://localhost:8000/sidekiq
 
-# Queues defined in config/sidekiq.yml
-#   imports  — CSV import jobs
-#   default  — everything else (assistant, daily P&L, holding refresh)
+# Queues defined in config/sidekiq.yml (weighted: imports:default:price_backfill = 2:1:1)
+#   imports         — CSV import jobs (highest priority)
+#   default         — assistant, daily P&L, holding refresh
+#   price_backfill  — instruments:backfill_prices fan-out (NSE bhavcopy + AMFI history)
+#                     isolated so a 250+ job sweep doesn't squeeze the imports lane
 
 # Cron schedules (sidekiq-cron) — registered at server boot from
 # config/sidekiq_cron.yml. Visible in the web UI under "Cron".
@@ -308,6 +311,41 @@ Instruments::PriceFetchService.call
 
 # Just snapshot a single user
 Reports::HoldingSnapshotService.new(User.first, date: Date.current).call
+```
+
+### Backfilling historical prices (`instruments:backfill_prices`)
+
+The daily fetch only writes today's close. To populate a year (or more) of history — e.g. before showing the Instrument Profile price chart on a fresh install — fan out via Sidekiq:
+
+```bash
+# Smoke first — confirms both NSE and AMFI parsers actually work end-to-end
+DAYS=5 bin/rails instruments:backfill_prices
+
+# Full year. ~252 NSE jobs (one per trading day) + ~13 AMFI jobs (30-day chunks).
+# Default Sidekiq concurrency 5 → ~1-3 minutes for ~100 tracked instruments.
+DAYS=365 bin/rails instruments:backfill_prices
+
+# Watch progress
+open http://localhost:8000/sidekiq          # web UI, filter on price_backfill queue
+tail -f logs/instrument_fetch.log
+```
+
+Notes:
+- **Tracked only.** The task scopes to instruments in `user_instruments` — untracked catalogue rows are skipped. Adjust by editing the rake task if you ever need a fuller backfill.
+- **Idempotent.** Hits the `(instrument_id, price_date)` unique index. Re-running fills gaps without duplicating rows.
+- **Holidays.** NSE bhavcopy 404s for non-trading days; the job logs and silently no-ops for those dates. AMFI returns sparse data for debt/hybrid funds — expected.
+- **Sources.** Backfill writes use `source: "nse_bhavcopy"` / `"amfi_navhistory"`. The daily fetch writes `"nse_bhavcopy"` / `"amfi_navall"` — distinct strings let you tell at a glance which path produced any given row.
+- **Verifying coverage** (after the run):
+
+```ruby
+# Per-instrument coverage histogram in the last 365 days, tracked only
+tracked = UserInstrument.distinct.pluck(:instrument_id)
+hist    = InstrumentPriceHistory
+            .where(instrument_id: tracked, price_date: 365.days.ago..)
+            .group(:instrument_id).count
+hist.values.tally { |c| c >= 240 ? "full"    :
+                        c >= 150 ? "partial" :
+                        c >  0   ? "sparse"  : "missing" }
 ```
 
 ---
@@ -487,6 +525,19 @@ InstrumentPriceHistory.where("price_date = ? AND price IS NULL", Date.current)
 ```bash
 bin/rails runner 'Daily::PriceAndPnlSnapshotJob.perform_now("2026-05-06")'
 ```
+
+### "I want to backfill a year of price history (e.g. on a fresh install)"
+
+```bash
+# Make sure Sidekiq is running first
+bundle exec sidekiq                         # in another terminal
+
+DAYS=5   bin/rails instruments:backfill_prices   # smoke — confirms the parsers work
+DAYS=365 bin/rails instruments:backfill_prices   # full year, ~250 jobs on :price_backfill
+tail -f logs/instrument_fetch.log
+```
+
+Tracked instruments only; idempotent; safe to re-run to fill any gaps. See the [backfill section](#backfilling-historical-prices-instrumentsbackfill_prices) for verification queries.
 
 ### "I want to wipe a test user's data without nuking the DB"
 

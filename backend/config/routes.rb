@@ -51,6 +51,10 @@ Rails.application.routes.draw do
         member do
           post   :track
           delete :untrack
+          get :position
+          get :lots
+          get "transactions",   to: "instruments#linked_transactions"
+          get "price-history",  to: "instruments#price_history"
         end
       end
 

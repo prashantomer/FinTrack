@@ -69,6 +69,8 @@ class Investment < ApplicationRecord
   scope :buys,  -> { where(trade_type: "buy") }
   scope :sells, -> { where(trade_type: "sell") }
 
+  default_scope { order(purchase_date: :desc, id: :desc) }
+
   # Keep the cached Holding row in sync after every lot mutation. Runs in
   # Sidekiq so the request thread returns immediately. Bulk callers (CSV
   # import, API bulk endpoints) can set `Current.skip_holding_refresh = true`

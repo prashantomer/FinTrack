@@ -1,5 +1,3 @@
-require "net/http"
-require "uri"
 require "csv"
 require "bigdecimal"
 
@@ -79,13 +77,13 @@ module Instruments
         }
       end
 
-      inserted = upsert_history(history_rows)
+      inserted = PriceHistoryUpsert.call(history_rows)
       @log.info "[prices] NSE: updated=#{updated} history_rows=#{inserted} unmatched=#{unmatched}"
       { updated: updated, history_rows: inserted, unmatched: unmatched }
     end
 
     def fetch_amfi_navs
-      body = fetch_url(AMFI_URL)
+      body = HttpFetcher.get(AMFI_URL)
       by_isin = Instrument.where(investment_type: "mutual_fund").where.not(isin: nil).index_by(&:isin)
 
       updated = unmatched = invalid = 0
@@ -140,24 +138,9 @@ module Instruments
         }
       end
 
-      inserted = upsert_history(history_rows)
+      inserted = PriceHistoryUpsert.call(history_rows)
       @log.info "[prices] AMFI: updated=#{updated} history_rows=#{inserted} unmatched=#{unmatched} invalid=#{invalid}"
       { updated: updated, history_rows: inserted, unmatched: unmatched, invalid: invalid }
-    end
-
-    def upsert_history(rows)
-      return 0 if rows.empty?
-      rows.each_slice(1_000).sum do |chunk|
-        # ON CONFLICT (instrument_id, price_date) DO UPDATE — same-day re-runs
-        # overwrite the price; created_at survives (excluded from update_only)
-        # and updated_at is auto-bumped by Rails timestamp handling.
-        InstrumentPriceHistory.upsert_all(
-          chunk,
-          unique_by:   :uq_instr_price_history_per_day,
-          update_only: %i[price source]
-        )
-        chunk.size
-      end
     end
 
     def latest_nse_bhavcopy
@@ -167,30 +150,13 @@ module Instruments
         url = format(NSE_BHAVCOPY_URL_FORMAT, date.strftime("%d%m%Y"))
         @log.info "[prices] Trying NSE bhavcopy #{date}"
         begin
-          body = fetch_url(url, extra_headers: { "Referer" => "https://www.nseindia.com/" })
+          body = HttpFetcher.get(url, extra_headers: { "Referer" => "https://www.nseindia.com/" })
           return [ body, date ]
         rescue => e
           @log.info "[prices] Not available for #{date}: #{e.message}"
         end
       end
       raise "No NSE bhavcopy available in the last 7 days"
-    end
-
-    def fetch_url(url, extra_headers: {})
-      uri = URI(url)
-      headers = { "User-Agent" => "Mozilla/5.0 (compatible; FinTrack/1.0)" }.merge(extra_headers)
-
-      10.times do
-        req = Net::HTTP::Get.new(uri, headers)
-        res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") { |h| h.request(req) }
-
-        case res
-        when Net::HTTPSuccess     then return res.body
-        when Net::HTTPRedirection then uri = URI(res["location"])
-        else                           raise "HTTP #{res.code} from #{uri}"
-        end
-      end
-      raise "Too many redirects for #{url}"
     end
   end
 end

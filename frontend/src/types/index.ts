@@ -607,6 +607,21 @@ export interface PortfolioReport {
   positions: PortfolioPosition[]
 }
 
+// ── Instrument Profile ──────────────────────────────────────────────────────
+
+/**
+ * Position payload for the per-instrument profile page. Same shape as
+ * PortfolioPosition (returned by Reports::PortfolioService.build_position),
+ * but a position may be empty when the user holds no lots in this instrument.
+ */
+export type InstrumentPositionSummary = PortfolioPosition
+
+export interface InstrumentPricePoint {
+  date: string
+  price: number
+  source: string | null
+}
+
 // ── Performance / Trends ────────────────────────────────────────────────────
 
 export interface PerformanceTotals {

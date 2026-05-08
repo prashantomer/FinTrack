@@ -9,7 +9,7 @@ module Holdings
   #   Holdings::RefreshService.refresh_all_for(user)
   class RefreshService
     def self.refresh_all_for(user)
-      pairs = user.investments.distinct.pluck(:user_instrument_id, :platform_account_id)
+      pairs = user.investments.unscope(:order).distinct.pluck(:user_instrument_id, :platform_account_id)
       pairs.each do |ui_id, pa_id|
         next if ui_id.nil? || pa_id.nil?
         new(user, ui_id, pa_id).call
@@ -19,7 +19,7 @@ module Holdings
     # Refresh every holding that belongs to a single user_instrument across all
     # the user's platform accounts. Used after a folio_number bulk update.
     def self.refresh_for_user_instrument(user, user_instrument_id)
-      pa_ids = user.investments.where(user_instrument_id: user_instrument_id)
+      pa_ids = user.investments.unscope(:order).where(user_instrument_id: user_instrument_id)
                    .distinct.pluck(:platform_account_id).compact
       pa_ids.each { |pa_id| new(user, user_instrument_id, pa_id).call }
     end

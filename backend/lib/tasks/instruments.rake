@@ -280,4 +280,50 @@ namespace :instruments do
 
     log.info "===== instruments:fetch_prices complete ====="
   end
+
+  desc "Backfill daily price history for tracked instruments (DAYS=365 default, max 1825). Fans out via Sidekiq."
+  task backfill_prices: :environment do
+    days = Integer(ENV.fetch("DAYS", "365")).clamp(1, 1825)
+    end_date   = Date.current
+    start_date = end_date - days
+
+    # Tracked = anything the user has put on their watchlist. Investments
+    # always link through user_instruments, so this single query covers both
+    # held and previously-held instruments.
+    tracked_instrument_ids = UserInstrument.distinct.pluck(:instrument_id)
+
+    stocks = Instrument.where(id: tracked_instrument_ids, investment_type: "stock")
+                       .where.not(ticker_symbol: nil)
+    mfs    = Instrument.where(id: tracked_instrument_ids, investment_type: "mutual_fund")
+                       .where.not(isin: nil)
+
+    stock_ids = stocks.pluck(:id)
+    mf_isins  = mfs.pluck(:isin)
+
+    # NSE: one fetch per trading day. Skip weekends here so we don't enqueue
+    # 100+ jobs that would just no-op. Holidays still get enqueued and the
+    # service logs+returns silently when the archive 404s.
+    nse_jobs = 0
+    (start_date..end_date).each do |d|
+      next if d.saturday? || d.sunday?
+      Instruments::BackfillNsePricesJob.perform_later(d.iso8601, stock_ids)
+      nse_jobs += 1
+    end
+
+    # AMFI: chunk the window into 30-day spans so each request stays under
+    # the portal's date-range cap (empirically ~3 months).
+    amfi_jobs = 0
+    cursor = start_date
+    while cursor <= end_date
+      chunk_end = [ cursor + 29, end_date ].min
+      Instruments::BackfillAmfiNavsJob.perform_later(cursor.iso8601, chunk_end.iso8601, mf_isins)
+      cursor = chunk_end + 1
+      amfi_jobs += 1
+    end
+
+    puts "Window:   #{start_date} → #{end_date} (#{days} days)"
+    puts "Tracked:  #{stock_ids.size} stocks, #{mf_isins.size} mutual funds"
+    puts "Enqueued: #{nse_jobs} NSE day-jobs, #{amfi_jobs} AMFI range-jobs"
+    puts "Watch:    /sidekiq UI or tail logs/instrument_fetch.log"
+  end
 end

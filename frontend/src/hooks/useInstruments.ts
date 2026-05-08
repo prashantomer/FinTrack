@@ -2,6 +2,10 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner'
 import {
   createInstrument,
+  getInstrumentLots,
+  getInstrumentPosition,
+  getInstrumentPriceHistory,
+  getInstrumentTransactions,
   listInstrumentTypes,
   listInstruments,
   listTrackedInstruments,
@@ -78,5 +82,39 @@ export function useUserInstruments() {
   return useQuery({
     queryKey: ['instruments', 'user-instruments'],
     queryFn: listUserInstruments,
+  })
+}
+
+// ── Profile hooks ─────────────────────────────────────────────────────────
+
+export function useInstrumentPosition(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['instruments', 'profile', 'position', id],
+    queryFn: () => getInstrumentPosition(id as number),
+    enabled: id != null,
+  })
+}
+
+export function useInstrumentLots(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['instruments', 'profile', 'lots', id],
+    queryFn: () => getInstrumentLots(id as number),
+    enabled: id != null,
+  })
+}
+
+export function useInstrumentTransactions(id: number | null | undefined, limit = 50) {
+  return useQuery({
+    queryKey: ['instruments', 'profile', 'transactions', id, limit],
+    queryFn: () => getInstrumentTransactions(id as number, limit),
+    enabled: id != null,
+  })
+}
+
+export function useInstrumentPriceHistory(id: number | null | undefined, days = 90) {
+  return useQuery({
+    queryKey: ['instruments', 'profile', 'price-history', id, days],
+    queryFn: () => getInstrumentPriceHistory(id as number, days),
+    enabled: id != null,
   })
 }

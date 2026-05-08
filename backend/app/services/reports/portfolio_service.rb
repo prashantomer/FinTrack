@@ -14,7 +14,7 @@ module Reports
       positions = investments.group_by(&:user_instrument_id).map do |_ui_id, lots|
         instrument = lots.first.user_instrument&.instrument
         next nil unless instrument
-        position_for(instrument, lots)
+        self.class.build_position(instrument, lots)
       end.compact.sort_by { |p| [ p[:is_closed] ? 1 : 0, -p[:current_value] ] }
 
       total_invested  = positions.sum { |p| p[:total_invested] }
@@ -57,6 +57,13 @@ module Reports
         by_platform:           by_platform,
         positions:             positions
       }
+    end
+
+    # Public class methods so per-instrument callers (e.g. Instruments::ProfileService)
+    # can build the same position payload without going through the full portfolio
+    # aggregation. Pure: no DB writes, no @user state — caller filters lots first.
+    def self.build_position(instrument, lots)
+      new(nil).send(:position_for, instrument, lots)
     end
 
     private
@@ -104,7 +111,7 @@ module Reports
         realized_gain:         stats[:realized_gain],
         folio_number:          derive_folio_number(investment_type, lots),
         wavg:                  stats[:wavg],
-        lots:                  lots.sort_by(&:purchase_date).map { |i| lot_json(i, stats[:lot_pnl], stats[:lot_breakdown]) }
+        lots:                  lots.sort_by { |l| [ l.purchase_date, l.id ] }.reverse.map { |i| lot_json(i, stats[:lot_pnl], stats[:lot_breakdown]) }
       }
     end
 

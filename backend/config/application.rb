@@ -43,6 +43,15 @@ module Backend
     config.api_only = true
     config.active_job.queue_adapter = :sidekiq
 
+    # Gate for instrument-profile pages on instruments the user does NOT hold.
+    # Tracked profiles (anything in user_instruments or investments.instrument_id)
+    # always render; this only affects the long-tail catalogue rows.
+    #   off             — never render untracked profiles (default).
+    #   per_instrument  — render when instruments.profile_enabled is true.
+    #   on              — render every instrument (use sparingly: 6k+ rows).
+    config.x.fintrack ||= ActiveSupport::OrderedOptions.new
+    config.x.fintrack.untracked_profile_mode = ENV.fetch("UNTRACKED_PROFILE_MODE", "off")
+
     config.active_record.yaml_column_permitted_classes = [
       BigDecimal, Date, Time, DateTime, Symbol
     ]

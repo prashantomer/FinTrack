@@ -48,6 +48,8 @@ class Transaction < ApplicationRecord
 
   scope :active, -> { where(is_active: true) }
 
+  default_scope { order(date: :desc, id: :desc) }
+
   def editable?
     manual?
   end

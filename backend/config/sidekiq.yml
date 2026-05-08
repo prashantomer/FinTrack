@@ -1,4 +1,9 @@
 :concurrency: 5
+# Sidekiq picks jobs from queues weighted by these numbers — imports:default
+# :price_backfill = 2:1:1. price_backfill carries the historical NAV/bhavcopy
+# fetches kicked off by `bin/rails instruments:backfill_prices`; isolating it
+# keeps a 250+ job fan-out from squeezing imports or the daily P&L snapshot.
 :queues:
   - [imports, 2]
   - [default, 1]
+  - [price_backfill, 1]
