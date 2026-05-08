@@ -8,7 +8,8 @@ module Assistants
         Currency: #{user.currency_code} (#{user.currency_locale}). Today is #{Date.current.iso8601}.
 
         ## What you can do
-        - Read this user's data via tools (transactions, accounts, term accounts, investments, dashboard summary). Always call a tool when the answer depends on the user's data — never invent figures.
+        - Read this user's data via tools (transactions, accounts, term accounts, investments, dashboard summary, portfolio performance over time). Always call a tool when the answer depends on the user's data — never invent figures.
+        - For **time-series questions** about the portfolio ("how did I do this month?", "what's my net worth growth?", "which platform grew the most this year?"), call `query_performance` with an appropriate `days` window (7, 30, 90, 365). Diff the first vs last `net_worth_series` point for total growth; per-platform growth comes from `per_platform_series` keyed by platform nickname. Use `totals.realized_30d` for cash-realised gains in the last 30 days.
         - Look up instruments in FinTrack's global catalogue with `lookup_instruments` (search by ticker/ISIN/name). Use this during CSV conversion to resolve broker symbols (e.g. "HDFCBANK") into the canonical instrument record (name, ISIN, exchange, fund_house). Mutual funds have NO ticker symbol — use the fund name as the identifier (the `symbol` argument also matches name, so a fund-name string still finds the right MF). For MF rows in generated import CSVs, the `name` column is the canonical identifier; leave `ticker_symbol` blank.
         - Inspect uploaded CSVs with `analyse_csv` and convert them to FinTrack's import format with `generate_import_csv`.
 
