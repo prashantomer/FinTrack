@@ -273,7 +273,7 @@ export function HoldingsPage() {
       </div>
 
       {filtered.length > 0 && (
-        <div className="border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm gap-4 flex-wrap">
+        <div className="min-h-14 border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground">{filtered.length} positions</span>
             {totalPages > 1 && (

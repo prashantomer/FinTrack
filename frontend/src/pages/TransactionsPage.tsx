@@ -175,16 +175,20 @@ export function TransactionsPage() {
         )}
       </div>
 
-      {data && data.total > 20 && (
-        <div className="border-t px-6 py-3 flex items-center gap-3 shrink-0">
-          <span className="text-muted-foreground text-sm flex-1">{data.total} total</span>
-          <Button variant="outline" size="sm" disabled={filters.page === 1} onClick={() => filters.setPage(p => p - 1)}>
-            <ChevronLeft size={14} />Prev
-          </Button>
-          <span className="text-sm text-muted-foreground px-1">Page {filters.page}</span>
-          <Button variant="outline" size="sm" disabled={items.length < 20} onClick={() => filters.setPage(p => p + 1)}>
-            Next<ChevronRight size={14} />
-          </Button>
+      {data && data.total > 0 && (
+        <div className="min-h-14 border-t bg-background px-6 py-3 flex items-center gap-3 shrink-0">
+          <span className="text-muted-foreground text-sm flex-1">{data.total.toLocaleString()} total</span>
+          {data.total > 20 && (
+            <>
+              <Button variant="outline" size="sm" disabled={filters.page === 1} onClick={() => filters.setPage(p => p - 1)}>
+                <ChevronLeft size={14} />Prev
+              </Button>
+              <span className="text-sm text-muted-foreground px-1">Page {filters.page}</span>
+              <Button variant="outline" size="sm" disabled={items.length < 20} onClick={() => filters.setPage(p => p + 1)}>
+                Next<ChevronRight size={14} />
+              </Button>
+            </>
+          )}
         </div>
       )}
 

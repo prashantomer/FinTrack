@@ -145,8 +145,8 @@ export function ImportsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between border-b px-6 py-4 shrink-0">
-        <h1 className="text-lg font-semibold">Imports</h1>
+      <div className="flex items-center justify-between min-h-14 border-b px-6 py-3 shrink-0">
+        <h1 className="text-lg font-semibold leading-none">Imports</h1>
         <Button size="sm" onClick={() => setWizardOpen(true)}>
           <Upload size={14} className="mr-1.5" />
           New Import
