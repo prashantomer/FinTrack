@@ -18,6 +18,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { FinTrackMark } from '@/components/Logo'
+import { AssistantIllustration, HeroIllustration, ImportsIllustration } from '@/components/landing/Illustrations'
 import { useAuth } from '@/context/AuthContext'
 
 const trackables = [
@@ -51,10 +53,11 @@ function Nav() {
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <div className="flex size-6 items-center justify-center rounded-md bg-foreground text-background">
-            <PieChart className="size-3.5" />
-          </div>
-          FinTrack
+          <FinTrackMark size={24} />
+          <span>
+            <span>Fin</span>
+            <span className="text-muted-foreground">Track</span>
+          </span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <a href="#features" className="hover:text-foreground">Features</a>
@@ -126,8 +129,8 @@ function Hero() {
               </Button>
             </a>
           </div>
-          <div className="mt-12 w-full max-w-4xl">
-            <PreviewCard />
+          <div className="mt-12 w-full max-w-4xl text-foreground/90">
+            <HeroIllustration />
           </div>
         </div>
       </div>
@@ -144,70 +147,6 @@ function GridBg() {
   )
 }
 
-function PreviewCard() {
-  const stats = [
-    { label: 'Net Worth', value: '₹ 42,18,540', delta: '+₹ 12,300 today' },
-    { label: 'Investments', value: '₹ 28,40,120', delta: '8 platforms' },
-    { label: 'Cash & FDs', value: '₹ 13,78,420', delta: '5 accounts' },
-    { label: 'Unrealized P/L', value: '+₹ 3,02,180', delta: '+12.1%' },
-  ]
-  return (
-    <div className="rounded-xl border bg-card p-1 shadow-sm">
-      <div className="rounded-lg border bg-background p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="text-sm font-medium">Dashboard</div>
-          <div className="text-xs text-muted-foreground">Today · 7 May 2026</div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-md border bg-card p-3 text-left">
-              <div className="text-xs text-muted-foreground">{s.label}</div>
-              <div className="mt-1 text-lg font-semibold tabular-nums">{s.value}</div>
-              <div className="text-[11px] text-muted-foreground">{s.delta}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-card p-3 sm:col-span-2">
-            <div className="text-xs font-medium">Cash flow · last 6 months</div>
-            <FakeChart />
-          </div>
-          <div className="rounded-md border bg-card p-3">
-            <div className="text-xs font-medium">Top holdings</div>
-            <ul className="mt-2 space-y-1.5 text-xs">
-              {[
-                ['HDFCFLEXI', '+18.4%'],
-                ['INFY', '+9.1%'],
-                ['PARAGFLEXI', '+15.2%'],
-                ['SBIN', '−2.3%'],
-              ].map(([k, v]) => (
-                <li key={k} className="flex items-center justify-between">
-                  <span className="font-mono">{k}</span>
-                  <span className="tabular-nums text-muted-foreground">{v}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function FakeChart() {
-  const bars = [40, 62, 35, 78, 55, 90, 70, 85, 50, 72, 60, 95]
-  return (
-    <div className="mt-3 flex h-20 items-end gap-1">
-      {bars.map((h, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-sm bg-foreground/80"
-          style={{ height: `${h}%`, opacity: 0.3 + (i / bars.length) * 0.7 }}
-        />
-      ))}
-    </div>
-  )
-}
 
 function Trust() {
   return (
@@ -299,69 +238,22 @@ function AIAssistantSection() {
             <AccountButton size="sm" />
           </div>
         </div>
-        <ChatMock />
+        <div className="text-foreground/90">
+          <AssistantIllustration />
+        </div>
       </div>
     </section>
   )
 }
 
-function ChatMock() {
-  return (
-    <div className="rounded-xl border bg-card shadow-sm">
-      <div className="flex items-center gap-2 border-b px-4 py-2.5 text-xs text-muted-foreground">
-        <div className="flex size-5 items-center justify-center rounded-md bg-foreground text-background">
-          <Sparkles className="size-3" />
-        </div>
-        Your finance assistant
-      </div>
-      <div className="space-y-4 p-5 text-sm">
-        <UserBubble>How much did I invest in HDFC Flexi Cap last quarter?</UserBubble>
-        <ToolChip>
-          <Wallet className="size-3" /> Looking up your investments…
-        </ToolChip>
-        <AssistantBubble>
-          <p>You made <strong>3 SIP installments</strong> totaling <strong>₹ 30,000</strong> in HDFC Flexi Cap.</p>
-          <table className="mt-3 w-full text-xs">
-            <thead className="text-muted-foreground">
-              <tr>
-                <th className="py-1 text-left font-normal">Date</th>
-                <th className="py-1 text-right font-normal">Units</th>
-                <th className="py-1 text-right font-normal">NAV</th>
-                <th className="py-1 text-right font-normal">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono tabular-nums">
-              <tr className="border-t">
-                <td className="py-1">2026-01-05</td>
-                <td className="py-1 text-right">62.41</td>
-                <td className="py-1 text-right">160.21</td>
-                <td className="py-1 text-right">₹ 10,000</td>
-              </tr>
-              <tr className="border-t">
-                <td className="py-1">2026-02-05</td>
-                <td className="py-1 text-right">61.10</td>
-                <td className="py-1 text-right">163.66</td>
-                <td className="py-1 text-right">₹ 10,000</td>
-              </tr>
-              <tr className="border-t">
-                <td className="py-1">2026-03-05</td>
-                <td className="py-1 text-right">59.04</td>
-                <td className="py-1 text-right">169.38</td>
-                <td className="py-1 text-right">₹ 10,000</td>
-              </tr>
-            </tbody>
-          </table>
-        </AssistantBubble>
-      </div>
-    </div>
-  )
-}
 
 function ImportSection() {
   return (
     <section id="imports" className="border-b bg-muted/30">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center">
-        <ImportMock />
+        <div className="text-foreground/90">
+          <ImportsIllustration />
+        </div>
         <div>
           <Eyebrow icon={Upload}>CSV Imports</Eyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -392,63 +284,6 @@ function ImportSection() {
   )
 }
 
-function ImportMock() {
-  const rows = [
-    ['2026-04-08', 'BUY', 'HDFCFLEXI', '12.41', '₹ 5,000', 'OK'],
-    ['2026-04-15', 'BUY', 'PARAGFLEXI', '8.92', '₹ 5,000', 'OK'],
-    ['2026-04-22', 'SELL', 'AXISBLUECHIP', '14.30', '₹ 7,500', 'OK'],
-    ['2026-04-29', 'BUY', 'INFY', '3.00', '₹ 4,500', 'OK'],
-  ]
-  return (
-    <div className="rounded-xl border bg-card shadow-sm">
-      <div className="flex items-center justify-between border-b px-4 py-2.5 text-xs">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <FileSpreadsheet className="size-3.5" />
-          coin-mf-orders.csv
-        </div>
-        <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium">
-          411 rows · processed
-        </span>
-      </div>
-      <div className="p-4">
-        <table className="w-full text-xs">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="py-1.5 text-left font-normal">Date</th>
-              <th className="py-1.5 text-left font-normal">Side</th>
-              <th className="py-1.5 text-left font-normal">Instrument</th>
-              <th className="py-1.5 text-right font-normal">Units</th>
-              <th className="py-1.5 text-right font-normal">Amount</th>
-              <th className="py-1.5 text-right font-normal">Status</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono tabular-nums">
-            {rows.map((r) => (
-              <tr key={r[0]} className="border-t">
-                <td className="py-1.5">{r[0]}</td>
-                <td className="py-1.5">
-                  <span
-                    className={
-                      r[1] === 'BUY'
-                        ? 'rounded-sm bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium'
-                        : 'rounded-sm border px-1.5 py-0.5 text-[10px] font-medium'
-                    }
-                  >
-                    {r[1]}
-                  </span>
-                </td>
-                <td className="py-1.5">{r[2]}</td>
-                <td className="py-1.5 text-right">{r[3]}</td>
-                <td className="py-1.5 text-right">{r[4]}</td>
-                <td className="py-1.5 text-right text-muted-foreground">{r[5]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
 
 function BottomCTA() {
   return (
@@ -474,10 +309,10 @@ function Footer() {
     <footer className="bg-background">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-xs text-muted-foreground sm:flex-row">
         <div className="flex items-center gap-2">
-          <div className="flex size-5 items-center justify-center rounded bg-foreground text-background">
-            <PieChart className="size-3" />
-          </div>
-          FinTrack · all your money in one ledger
+          <FinTrackMark size={18} />
+          <span><span>Fin</span><span className="text-muted-foreground">Track</span></span>
+          <span className="text-muted-foreground/60">·</span>
+          <span>all your money in one ledger</span>
         </div>
         <div>Made for personal investors who want their own numbers.</div>
       </div>
@@ -514,32 +349,3 @@ function Eyebrow({ icon: Icon, children }: { icon: typeof Sparkles; children: Re
   )
 }
 
-function UserBubble({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex justify-end">
-      <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-foreground px-4 py-2 text-sm text-background">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function AssistantBubble({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[90%] rounded-2xl rounded-bl-sm border bg-background px-4 py-3 text-sm">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function ToolChip({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex justify-start">
-      <div className="inline-flex items-center gap-1.5 rounded-md border bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
-        {children}
-      </div>
-    </div>
-  )
-}

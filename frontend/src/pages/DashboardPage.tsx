@@ -303,8 +303,8 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-10 border-b bg-background px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <div className="sticky top-0 z-10 min-h-14 border-b bg-background px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-lg font-semibold leading-none">Dashboard</h1>
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Cache status */}

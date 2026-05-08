@@ -15,6 +15,7 @@
 #  price                 :decimal(14, 4)
 #  purchase_date         :date             not null
 #  quantity              :decimal(12, 4)
+#  source                :string           default("manual"), not null
 #  trade_type            :string           default("buy"), not null
 #  units                 :decimal(12, 4)
 #  created_at            :datetime         not null
@@ -52,6 +53,14 @@ class Investment < ApplicationRecord
 
   enum :investment_type, { stock: "stock", mutual_fund: "mutual_fund" }, validate: true
   enum :trade_type,      { buy:   "buy",   sell:        "sell" },        validate: true
+  # `manual` rows came from the API/UI and remain editable (notes only).
+  # `imported` rows came through Imports::* and are frozen — the importer is
+  # the source of truth so we don't let users diverge their copy from the CSV.
+  enum :source,          { manual: "manual", imported: "imported" },     validate: true
+
+  def editable?
+    manual?
+  end
 
   validates :name,            presence: true
   validates :amount_invested, presence: true, numericality: { greater_than_or_equal_to: 0 }

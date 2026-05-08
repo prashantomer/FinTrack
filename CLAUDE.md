@@ -99,7 +99,7 @@ RAILS_ENV=test bin/rails db:migrate
 
 ### Transaction admin (CLI only)
 
-Transactions are immutable from the API — no PUT/DELETE endpoints. Use the rake tasks:
+Structural changes to transactions (amount, type, linked account) and any deletion are CLI-only — no DELETE endpoint exists, and PUT only accepts `description` + `tags` on `source=manual` rows. Use the rake tasks for everything else:
 
 ```bash
 cd backend
@@ -184,7 +184,8 @@ backend/
 - `tags`: `string[]`, free-form labels.
 - `bank_ref`: UTR/IMPS reference for credit transactions.
 - `is_active`: soft-delete; rake task `transactions:deactivate` flips it and reverses balance impact.
-- **Immutable from the API** — no PUT/DELETE. Use the rake tasks for corrections.
+- `source`: `manual` | `imported`. Manual rows came from the API/UI; imported rows came through `Imports::*` and are frozen.
+- **No DELETE from the API** — corrections and soft-deletes live in the rake tasks. **PUT** is allowed only on `source=manual` rows and is whitelisted to `description` + `tags`; structural fields stay CLI-only.
 
 **Balance hooks** (`Transactions::CreateService`, rake tasks): `credit` adds, `debit` subtracts on the linked savings account. FD term accounts skip balance updates (FD balance tracks principal). The CLI `correct` flow reverses the old delta and applies the new one in a transaction.
 
@@ -291,8 +292,8 @@ All endpoints under `/api/v1/`. Protected routes require `Authorization: Bearer 
 | Domain            | Prefix                | Key endpoints |
 |-------------------|-----------------------|---------------|
 | Auth              | `/auth`               | POST `/login`, GET `/me`, PUT `/me` |
-| Transactions      | `/transactions`       | POST (create), GET (list with filters) — no PUT/DELETE |
-| Investments       | `/investments`        | Full CRUD with `?type=` / search / date filters |
+| Transactions      | `/transactions`       | GET (list), POST (create), PUT (manual only — `description`, `tags`). No DELETE. |
+| Investments       | `/investments`        | GET (list/show), POST, PUT (manual only — `notes`). No DELETE. |
 | Holdings          | `/holdings`           | GET (list with `?type=` `?status=`); POST `/refresh` |
 | Reports           | `/reports`            | GET `/dashboard`, `/spending-trends`, `/investment-summary`, `/portfolio` |
 | Instruments       | `/instruments`        | Full CRUD; POST/DELETE `/{id}/track`; GET `/tracked` |
@@ -330,7 +331,7 @@ Per-user assistant API keys live in `user_assistant_settings.api_key` (encrypted
 - **Migrations**: write a new one for every change — no downgrades. Sleep ≥1 s between generating two migrations or timestamps collide.
 - **Holdings refresh callback**: every `Investment` save fires `Holdings::RefreshJob`. Bulk loaders (CSV importer, future seeders) set `Current.skip_holding_refresh = true` and enqueue a single full-user sweep at the end. The skip flag is per-request via `ActiveSupport::CurrentAttributes`.
 - **`Holdings::RefreshService#persist_lot_pnl`** uses `update_columns` to bypass the after_save_commit callback — otherwise touching every lot would re-enqueue a refresh job and loop.
-- **Transactions are immutable from the API**. Corrections live in the rake tasks (`transactions:correct`, `transactions:deactivate`).
+- **Source-of-record gating**: `investments.source` and `transactions.source` distinguish manual UI entries from importer rows. `imported` rows are read-only via the API; `manual` rows accept narrow PUTs (`investments` → `notes`; `transactions` → `description`+`tags`). No DELETE endpoint exists for either; structural corrections and soft-deletes are CLI-only (`transactions:correct`, `transactions:deactivate`).
 - **base-ui**: no `asChild`. Use the component's `render` prop. Popover trigger styling goes on the trigger itself.
 - **Pre-push gate**: every `git push` runs `bin/pre-push-checks` (after `bin/setup` has wired the hookpath). Bypass once with `--no-verify`; do not weaken the script — fix the failures.
 - **Zod v4, Tailwind v4, React Router v7, Recharts v3** — breaking changes vs. previous majors; check migration guides before bumping.

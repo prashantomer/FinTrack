@@ -26,3 +26,16 @@ export async function createTransaction(data: TransactionCreate) {
   const res = await client.post<ApiResponse<Transaction>>('/transactions', data)
   return res.data.data
 }
+
+export interface TransactionEditableFields {
+  description?: string | null
+  tags?: string[]
+}
+
+// The server only accepts description + tags on manual rows; imported rows are
+// rejected with 403. The signature mirrors that contract on purpose so callers
+// can't accidentally send fields the server will silently drop.
+export async function updateTransaction(id: number, data: TransactionEditableFields) {
+  const res = await client.put<ApiResponse<Transaction>>(`/transactions/${id}`, data)
+  return res.data.data
+}

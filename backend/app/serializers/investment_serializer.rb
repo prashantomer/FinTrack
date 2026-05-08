@@ -15,6 +15,7 @@
 #  price                 :decimal(14, 4)
 #  purchase_date         :date             not null
 #  quantity              :decimal(12, 4)
+#  source                :string           default("manual"), not null
 #  trade_type            :string           default("buy"), not null
 #  units                 :decimal(12, 4)
 #  created_at            :datetime         not null
@@ -63,6 +64,7 @@ class InvestmentSerializer < BaseSerializer
 
     {
       id:                       r.id,
+      source:                   r.source,
       type:                     r.investment_type,
       investment_type:          r.investment_type,
       trade_type:               r.trade_type,

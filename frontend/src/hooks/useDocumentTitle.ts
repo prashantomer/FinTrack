@@ -39,6 +39,12 @@ function labelFor(pathname: string): string | null {
 export function useRouteDocumentTitle(): void {
   const { pathname } = useLocation()
   useEffect(() => {
+    // Landing page gets a brand-led tagline (FinTrack first, then descriptor)
+    // since it's the public-facing page where the brand name should lead.
+    if (pathname === '/') {
+      document.title = `${APP_NAME} · Personal Finance Tracker`
+      return
+    }
     const label = labelFor(pathname)
     document.title = label ? `${label} · ${APP_NAME}` : APP_NAME
   }, [pathname])

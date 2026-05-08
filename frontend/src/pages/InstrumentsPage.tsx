@@ -369,7 +369,7 @@ export function InstrumentsPage() {
       </div>
 
       {active.length > 0 && (
-        <div className="border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm gap-4">
+        <div className="min-h-14 border-t bg-background px-6 py-3 shrink-0 flex items-center justify-between text-sm gap-4">
           <span className="text-muted-foreground">
             {active.length} {active.length === 1 ? 'instrument' : 'instruments'}
           </span>

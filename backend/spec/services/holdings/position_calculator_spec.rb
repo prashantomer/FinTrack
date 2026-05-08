@@ -100,4 +100,70 @@ RSpec.describe Holdings::PositionCalculator do
       expect(stats[:unrealized_gain]).to  eq(100) # 10×110 − 10×100
     end
   end
+
+  describe "lot_breakdown (FIFO buy/sell register)" do
+    context "partial sell consuming the first of two buys" do
+      # Buy A: 10 @ 100, Buy B: 10 @ 200, Sell: 5 @ 250 → consumes 5 from A.
+      let(:buy_a)  { buy(qty: 10, price: 100, on: Date.current - 10.days) }
+      let(:buy_b)  { buy(qty: 10, price: 200, on: Date.current - 5.days) }
+      let(:sell_x) { sell(qty: 5, price: 250, on: Date.current - 1.day) }
+      let(:stats)  { described_class.call([ buy_a, buy_b, sell_x ], current_price: 300, investment_type: "stock") }
+
+      it "tracks consumed/remaining qty on each buy lot" do
+        a = stats[:lot_breakdown][buy_a.id]
+        b = stats[:lot_breakdown][buy_b.id]
+
+        expect(a).to include(original_qty: 10.0, consumed_qty: 5.0, remaining_qty: 5.0)
+        expect(b).to include(original_qty: 10.0, consumed_qty: 0.0, remaining_qty: 10.0)
+      end
+
+      it "records the FIFO match trail on the sell lot" do
+        match = stats[:lot_breakdown][sell_x.id][:consumed_from]
+        expect(match.size).to eq(1)
+        expect(match.first).to include(buy_id: buy_a.id, qty: 5.0, price: 100.0)
+        expect(match.first[:buy_date]).to eq(buy_a.purchase_date)
+      end
+    end
+
+    context "sell that spans two buys" do
+      # Buy A: 10 @ 100, Buy B: 10 @ 200, Sell: 15 @ 250 → consumes all of A + 5 of B.
+      let(:buy_a)  { buy(qty: 10, price: 100, on: Date.current - 10.days) }
+      let(:buy_b)  { buy(qty: 10, price: 200, on: Date.current - 5.days) }
+      let(:sell_x) { sell(qty: 15, price: 250, on: Date.current - 1.day) }
+      let(:stats)  { described_class.call([ buy_a, buy_b, sell_x ], current_price: 300, investment_type: "stock") }
+
+      it "fully consumes the first buy and partially consumes the second" do
+        a = stats[:lot_breakdown][buy_a.id]
+        b = stats[:lot_breakdown][buy_b.id]
+        expect(a[:remaining_qty]).to eq(0.0)
+        expect(b[:remaining_qty]).to eq(5.0)
+      end
+
+      it "match trail lists both buys in FIFO order" do
+        match = stats[:lot_breakdown][sell_x.id][:consumed_from]
+        expect(match.size).to eq(2)
+        expect(match.map { |m| m[:buy_id] }).to eq([ buy_a.id, buy_b.id ])
+        expect(match.map { |m| m[:qty]    }).to eq([ 10.0, 5.0 ])
+      end
+    end
+
+    context "fully closed position" do
+      let(:buy_a)  { buy(qty: 10, price: 100, on: Date.current - 10.days) }
+      let(:sell_x) { sell(qty: 10, price: 130, on: Date.current - 1.day) }
+      let(:stats)  { described_class.call([ buy_a, sell_x ], current_price: 200, investment_type: "stock") }
+
+      it "buy is fully consumed and remaining is exactly zero (no float drift)" do
+        expect(stats[:lot_breakdown][buy_a.id]).to include(consumed_qty: 10.0, remaining_qty: 0.0)
+      end
+    end
+
+    context "no sells" do
+      let(:buy_a) { buy(qty: 10, price: 100, on: Date.current - 5.days) }
+      let(:stats) { described_class.call([ buy_a ], current_price: 110, investment_type: "stock") }
+
+      it "buy lot is unchanged (consumed=0, remaining=original)" do
+        expect(stats[:lot_breakdown][buy_a.id]).to include(consumed_qty: 0.0, remaining_qty: 10.0)
+      end
+    end
+  end
 end

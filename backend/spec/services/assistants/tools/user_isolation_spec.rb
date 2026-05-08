@@ -42,6 +42,28 @@ RSpec.describe "Assistants::Tools user-isolation", type: :model do
     end
   end
 
+  describe Assistants::Tools::QueryPerformance do
+    it "wires through to PerformanceService scoped to the calling user" do
+      tool = described_class.new(alice)
+      expect(::Reports::PerformanceService).to receive(:new).with(alice, days: 30).and_call_original
+      result = tool.call("days" => 30)
+      expect(result).to include(:net_worth_series, :per_platform_series, :totals, :days)
+    end
+
+    it "defaults days to PerformanceService::DEFAULT_DAYS when not provided" do
+      tool = described_class.new(alice)
+      result = tool.call({})
+      expect(result[:days]).to eq(::Reports::PerformanceService::DEFAULT_DAYS)
+    end
+
+    it "ignores any user_id smuggled in args" do
+      tool = described_class.new(alice)
+      result = tool.call("days" => 7, "user_id" => bob.id)
+      # No data yet — empty arrays. The point is no exception, no cross-tenant leakage.
+      expect(result[:net_worth_series]).to eq([])
+    end
+  end
+
   describe Assistants::Tools::LookupInstruments do
     before do
       Instrument.create!(name: "HDFC Bank Ltd", ticker_symbol: "HDFCBANK", isin: "INE040A01034", investment_type: "stock", exchange: "NSE")

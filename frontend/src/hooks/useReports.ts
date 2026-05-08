@@ -3,6 +3,7 @@ import {
   getDashboard,
   getDashboardCacheStatus,
   getInvestmentSummary,
+  getPerformance,
   getPortfolio,
   getSpendingTrends,
   refreshDashboard,
@@ -54,5 +55,12 @@ export function usePortfolio() {
   return useQuery({
     queryKey: ['reports', 'portfolio'],
     queryFn: getPortfolio,
+  })
+}
+
+export function usePerformance(days = 90) {
+  return useQuery({
+    queryKey: ['reports', 'performance', days],
+    queryFn: () => getPerformance(days),
   })
 }

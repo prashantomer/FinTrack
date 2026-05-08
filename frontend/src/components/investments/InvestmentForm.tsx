@@ -32,11 +32,16 @@ type FormValues = {
 
 interface Props {
   initial?: Investment
+  /** When true, only the notes field is editable. The backend rejects edits to
+   * everything else on manual rows and refuses any edit to imported rows, so
+   * the form mirrors that contract instead of letting users type into fields
+   * the server will silently drop. */
+  notesOnly?: boolean
   onSubmit: (values: FormValues) => Promise<void>
   onCancel: () => void
 }
 
-export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
+export function InvestmentForm({ initial, notesOnly = false, onSubmit, onCancel }: Props) {
   const { symbol: CURRENCY_SYMBOL } = useCurrency()
   const { data: platformAccounts = [] } = usePlatformAccounts()
   const { data: userInstruments = [] } = useUserInstruments()
@@ -64,6 +69,27 @@ export function InvestmentForm({ initial, onSubmit, onCancel }: Props) {
   const tradeType = useWatch({ control, name: 'trade_type' })
   const platformAccountId = useWatch({ control, name: 'platform_account_id' })
   const userInstrumentId = useWatch({ control, name: 'user_instrument_id' })
+
+  if (notesOnly) {
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Manual investments can only have their notes edited. Amount, type, and
+          dates are locked once the row exists. Imported rows can't be edited.
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Notes</Label>
+          <Textarea {...register('notes')} rows={4} />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving…' : 'Update'}
+          </Button>
+        </div>
+      </form>
+    )
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">

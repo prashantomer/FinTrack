@@ -44,6 +44,13 @@ module Holdings
       cost_basis_of_sold = 0.0
       lot_pnl            = {}
 
+      # Per-lot bookkeeping for the buy/sell register the UI renders. Same
+      # FIFO walk; we just record what each sell consumed and how much each
+      # buy gave away.
+      original_qty_by_id  = buys_sorted.to_h { |i| [ i.id, qty_of.call(i) ] }
+      consumed_qty_by_id  = Hash.new(0.0)
+      sell_match_by_id    = Hash.new { |h, k| h[k] = [] }
+
       sells_sorted.each do |sell|
         remaining          = qty_of.call(sell)
         sale_consumed_cost = 0.0
@@ -52,6 +59,15 @@ module Holdings
           consumed = [ remaining, head[:qty] ].min
           cost_basis_of_sold += consumed * head[:price]
           sale_consumed_cost += consumed * head[:price]
+
+          consumed_qty_by_id[head[:id]] += consumed
+          sell_match_by_id[sell.id] << {
+            buy_id:   head[:id],
+            buy_date: head[:purchase_date],
+            qty:      consumed,
+            price:    head[:price]
+          }
+
           head[:qty] -= consumed
           remaining  -= consumed
           buy_queue.shift if head[:qty] <= QTY_EPSILON
@@ -61,6 +77,25 @@ module Holdings
         gain     = proceeds - sale_consumed_cost
         pct      = sale_consumed_cost.positive? ? (gain / sale_consumed_cost) * 100 : nil
         lot_pnl[sell.id] = { value: gain, pct: pct, label: "Realized (FIFO)" }
+      end
+
+      # Emit per-lot register: original/consumed/remaining for each buy lot,
+      # FIFO match trail for each sell lot. Consumers (UI, exports, assistant)
+      # can slice this directly without re-running FIFO.
+      lot_breakdown = {}
+      buys_sorted.each do |b|
+        orig = original_qty_by_id[b.id].to_f
+        cons = consumed_qty_by_id[b.id].to_f
+        rem  = (orig - cons)
+        rem  = 0.0 if rem.abs < QTY_EPSILON
+        lot_breakdown[b.id] = {
+          original_qty:  orig,
+          consumed_qty:  cons,
+          remaining_qty: rem
+        }
+      end
+      sells_sorted.each do |s|
+        lot_breakdown[s.id] = { consumed_from: sell_match_by_id[s.id] }
       end
 
       fifo_held_qty   = buy_queue.sum { |b| b[:qty] }
@@ -131,6 +166,7 @@ module Holdings
         realized_gain:     realized_fifo,
         net_cash_deployed: net_cash_deployed,
         lot_pnl:           lot_pnl,
+        lot_breakdown:     lot_breakdown,
         wavg: {
           avg_buy_price:   wavg_buy_price.positive? ? wavg_buy_price : nil,
           cost_basis_held: is_closed ? 0.0 : wavg_cost_basis_held,

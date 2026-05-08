@@ -43,10 +43,6 @@ export async function updateInvestment(id: number, data: Partial<Investment>) {
   return res.data.data
 }
 
-export async function deleteInvestment(id: number) {
-  await client.delete(`/investments/${id}`)
-}
-
 export interface FolioUpdateResult {
   user_instrument_id: number
   folio_number: string | null
