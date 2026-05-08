@@ -270,9 +270,14 @@ export type FolioUpdate = HoldingUpdate
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
+/** Provenance — `manual` rows are user-typed and editable on `description`/`tags`;
+ * `imported` rows came through the CSV importer and are read-only. */
+export type RecordSource = 'manual' | 'imported'
+
 export interface Transaction {
   id: number
   user_id: number
+  source: RecordSource
   amount: number
   type: TransactionType
   linked_account_type: LinkedAccountType | null
@@ -314,6 +319,7 @@ export type TradeType = 'buy' | 'sell'
 export interface Investment {
   id: number
   user_id: number
+  source: RecordSource
   type: InvestmentType
   trade_type: TradeType
   name: string
@@ -516,6 +522,13 @@ export interface LotPnl {
   label: string
 }
 
+export interface LotConsumedFromEntry {
+  buy_id: number
+  buy_date: string
+  qty: number
+  price: number
+}
+
 export interface LotRead {
   id: number
   trade_type: TradeType
@@ -531,6 +544,15 @@ export interface LotRead {
   /** Per-lot P&L, FIFO-based, computed by `Reports::PortfolioService`. May be null
    * for buy lots that have been fully consumed by FIFO sells. */
   pnl: LotPnl | null
+  // ── FIFO buy/sell register fields ───────────────────────────────────────
+  /** BUY lots only: original signed quantity at purchase. */
+  original_qty: number | null
+  /** BUY lots only: qty already consumed by later sells (FIFO). */
+  consumed_qty: number | null
+  /** BUY lots only: qty still held (= original − consumed). */
+  remaining_qty: number | null
+  /** SELL lots only: the FIFO match trail showing which buy lots this sell consumed. */
+  consumed_from: LotConsumedFromEntry[] | null
 }
 
 export interface PortfolioPosition {

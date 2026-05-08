@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { usePerformance, usePortfolio } from '@/hooks/useReports'
 import { useCurrency } from '@/hooks/useCurrency'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
-import type { LotRead, PortfolioPosition } from '@/types'
+import type { LotConsumedFromEntry, LotRead, PortfolioPosition } from '@/types'
 
 const TYPE_COLORS: Record<string, string> = {
   stock: '#6366f1',
@@ -61,25 +61,89 @@ function GainBadge({ value, pct }: { value: number; pct?: number }) {
   )
 }
 
+function fmtQty(value: number | null | undefined): string {
+  if (value == null) return '—'
+  // Trim trailing zeros: 10.0000 → "10", 10.5000 → "10.5"
+  return Number(value.toFixed(4)).toString()
+}
+
+/** Tiny "30/100" progress strip showing how much of a buy lot is still held. */
+function RemainingBar({ remaining, original }: { remaining: number; original: number }) {
+  const pct = original > 0 ? Math.max(0, Math.min(100, (remaining / original) * 100)) : 0
+  return (
+    <div className="inline-flex items-center gap-1.5 align-middle">
+      <span className="inline-block w-12 h-1.5 rounded-sm bg-muted overflow-hidden">
+        <span className="block h-full bg-primary/70" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="text-[10px] tabular-nums text-muted-foreground">
+        {fmtQty(remaining)}/{fmtQty(original)}
+      </span>
+    </div>
+  )
+}
+
+function ConsumedFromList({ entries }: { entries: LotConsumedFromEntry[] }) {
+  const { formatCurrency } = useCurrency()
+  if (!entries.length) return null
+  return (
+    <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+      {entries.map((e, i) => (
+        <li key={`${e.buy_id}-${i}`} className="flex items-baseline gap-1.5 font-mono">
+          <span className="text-muted-foreground/60">↳</span>
+          <span>from {e.buy_date}:</span>
+          <span>{fmtQty(e.qty)}u</span>
+          <span className="text-muted-foreground/60">@</span>
+          <span>{formatCurrency(e.price)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function LotRow({ lot }: { lot: LotRead }) {
   const { formatCurrency } = useCurrency()
-  const cv = lot.current_value ?? lot.amount_invested
-  const gain = cv - lot.amount_invested
+  const isBuy   = lot.trade_type === 'buy'
+  const qty     = lot.quantity ?? lot.units
+  const sideBadge = isBuy
+    ? <span className="text-[10px] uppercase tracking-wide text-primary/80 font-semibold mr-1">Buy</span>
+    : <span className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold mr-1">Sell</span>
+
+  const showRemaining = isBuy && lot.original_qty != null && lot.remaining_qty != null
+  const consumedFrom = !isBuy ? (lot.consumed_from ?? []) : []
+
+  // P&L: prefer the FIFO `pnl` field when set; fall back to per-row simple
+  // diff (covers older data that hasn't been refreshed yet).
+  const pnlValue = lot.pnl?.value ?? ((lot.current_value ?? lot.amount_invested) - lot.amount_invested)
+  const pnlPct   = lot.pnl?.pct ?? undefined
+
   return (
-    <TableRow className="bg-muted/30 text-xs border-l-2 border-l-primary/20">
-      <TableCell className="pl-10 text-muted-foreground">{lot.purchase_date}</TableCell>
+    <TableRow className="bg-muted/30 text-xs border-l-2 border-l-primary/20 align-top">
+      <TableCell className="pl-10 text-muted-foreground whitespace-nowrap">
+        {sideBadge}
+        {lot.purchase_date}
+      </TableCell>
       <TableCell className="text-muted-foreground">
         {lot.platform_account_nickname ?? '—'}
       </TableCell>
       <TableCell className="text-muted-foreground text-right font-mono">
-        {lot.quantity != null ? `${lot.quantity} u` : lot.units != null ? `${lot.units} u` : '—'}
+        <div className="inline-flex flex-col items-end gap-0.5">
+          <span>{fmtQty(qty)}u</span>
+          {showRemaining && (
+            <RemainingBar remaining={lot.remaining_qty!} original={lot.original_qty!} />
+          )}
+        </div>
+        {!isBuy && consumedFrom.length > 0 && (
+          <div className="text-left mt-1">
+            <ConsumedFromList entries={consumedFrom} />
+          </div>
+        )}
       </TableCell>
       <TableCell className="text-muted-foreground text-right font-mono">
         {lot.price != null ? formatCurrency(lot.price) : '—'}
       </TableCell>
       <TableCell className="text-right font-mono">{formatCurrency(lot.amount_invested)}</TableCell>
       <TableCell className="text-right">
-        <GainBadge value={gain} />
+        <GainBadge value={pnlValue} pct={pnlPct} />
       </TableCell>
       <TableCell />
     </TableRow>
@@ -134,6 +198,16 @@ export function PortfolioPage() {
   const { data: performance, isFetching: performanceFetching } = usePerformance(days)
   const { formatCurrency, formatCurrencyCompact } = useCurrency()
 
+  // X-axis domain reflects the selected window so the pills produce a visible
+  // shift even when snapshot history is sparse — otherwise the axis just hugs
+  // the 1-2 data points we have and every window looks identical. Capture
+  // `now` once at mount via a lazy initializer to keep render pure.
+  const [now] = useState(() => Date.now())
+  const xDomain = useMemo<[number, number]>(
+    () => [now - days * 24 * 60 * 60 * 1000, now],
+    [days, now],
+  )
+
   const platformNames = useMemo(() => {
     if (!performance?.per_platform_series.length) return [] as string[]
     const names = new Set<string>()
@@ -142,6 +216,16 @@ export function PortfolioPage() {
     })
     return Array.from(names).sort()
   }, [performance])
+
+  // Recharts needs numeric timestamps for a continuous, domain-driven X-axis.
+  const netWorthData = useMemo(
+    () => performance?.net_worth_series.map(p => ({ ...p, ts: new Date(p.date).getTime() })) ?? [],
+    [performance],
+  )
+  const platformData = useMemo(
+    () => performance?.per_platform_series.map(p => ({ ...p, ts: new Date(p.date as string).getTime() })) ?? [],
+    [performance],
+  )
 
   if (portfolioLoading) return <div className="text-muted-foreground">Loading…</div>
 
@@ -183,7 +267,7 @@ export function PortfolioPage() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-6">
         {/* Summary cards — current state + 30-day realised */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -237,15 +321,23 @@ export function PortfolioPage() {
                   </p>
                 ) : (
                   <ResponsiveContainer width="100%" height={240}>
-                    <LineChart data={performance.net_worth_series} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                    <LineChart data={netWorthData} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={fmtShortDate} minTickGap={24} />
+                      <XAxis
+                        dataKey="ts"
+                        type="number"
+                        domain={xDomain}
+                        scale="time"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => fmtShortDate(new Date(Number(v)).toISOString())}
+                        minTickGap={24}
+                      />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrencyCompact(Number(v))} width={64} />
                       <Tooltip
                         formatter={(v) => formatCurrency(Number(v))}
-                        labelFormatter={(label) => fmtShortDate(String(label))}
+                        labelFormatter={(label) => fmtShortDate(new Date(Number(label)).toISOString())}
                       />
-                      <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
@@ -295,13 +387,21 @@ export function PortfolioPage() {
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height={240}>
-                      <AreaChart data={performance?.per_platform_series ?? []} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                      <AreaChart data={platformData} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={fmtShortDate} minTickGap={24} />
+                        <XAxis
+                          dataKey="ts"
+                          type="number"
+                          domain={xDomain}
+                          scale="time"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => fmtShortDate(new Date(Number(v)).toISOString())}
+                          minTickGap={24}
+                        />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrencyCompact(Number(v))} width={64} />
                         <Tooltip
                           formatter={(v) => formatCurrency(Number(v))}
-                          labelFormatter={(label) => fmtShortDate(String(label))}
+                          labelFormatter={(label) => fmtShortDate(new Date(Number(label)).toISOString())}
                         />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         {platformNames.map((name, i) => (

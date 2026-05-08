@@ -104,7 +104,7 @@ module Reports
         realized_gain:         stats[:realized_gain],
         folio_number:          derive_folio_number(investment_type, lots),
         wavg:                  stats[:wavg],
-        lots:                  lots.sort_by(&:purchase_date).map { |i| lot_json(i, stats[:lot_pnl]) }
+        lots:                  lots.sort_by(&:purchase_date).map { |i| lot_json(i, stats[:lot_pnl], stats[:lot_breakdown]) }
       }
     end
 
@@ -118,7 +118,8 @@ module Reports
           &.folio_number
     end
 
-    def lot_json(inv, lot_pnl = {})
+    def lot_json(inv, lot_pnl = {}, lot_breakdown = {})
+      breakdown = lot_breakdown[inv.id] || {}
       {
         id:                          inv.id,
         trade_type:                  inv.trade_type,
@@ -131,7 +132,14 @@ module Reports
         folio_number:                inv.folio_number,
         platform_account_nickname:   inv.platform_account&.nickname,
         notes:                       inv.notes,
-        pnl:                         lot_pnl[inv.id]
+        pnl:                         lot_pnl[inv.id],
+        # FIFO register fields. For BUY lots: original/consumed/remaining qty.
+        # For SELL lots: the FIFO match trail showing which buys were consumed.
+        # Both omitted if the lot type has nothing to add.
+        original_qty:                breakdown[:original_qty],
+        consumed_qty:                breakdown[:consumed_qty],
+        remaining_qty:               breakdown[:remaining_qty],
+        consumed_from:               breakdown[:consumed_from]
       }
     end
   end
