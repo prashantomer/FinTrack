@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { createTransaction, listTransactions } from '@/api/transactions'
+import { createTransaction, listTransactions, updateTransaction, type TransactionEditableFields } from '@/api/transactions'
 import type { TransactionCreate, TransactionType } from '@/types'
 
 interface UseTransactionsParams {
@@ -27,6 +27,18 @@ export function useCreateTransaction() {
       qc.invalidateQueries({ queryKey: ['accounts'] })
       qc.invalidateQueries({ queryKey: ['term-accounts'] })
       toast.success('Transaction added')
+    },
+  })
+}
+
+export function useUpdateTransaction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: TransactionEditableFields }) =>
+      updateTransaction(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      toast.success('Transaction updated')
     },
   })
 }

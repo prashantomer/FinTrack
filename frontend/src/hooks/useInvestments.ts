@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   createInvestment,
-  deleteInvestment,
   listInvestments,
   updateInstrumentFolio,
   updateInvestment,
@@ -44,17 +43,6 @@ export function useUpdateInvestment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['investments'] })
       toast.success('Investment updated')
-    },
-  })
-}
-
-export function useDeleteInvestment() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => deleteInvestment(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['investments'] })
-      toast.success('Investment deleted')
     },
   })
 }

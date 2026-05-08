@@ -36,6 +36,7 @@ module Imports
 
       investment = Investment.create!(
         user:                @user,
+        source:              :imported,
         trade_type:          trade_type,
         investment_type:     investment_type,
         name:                instrument.name,

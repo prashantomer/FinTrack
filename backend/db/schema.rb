@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_175456) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -237,6 +237,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_175456) do
     t.decimal "price", precision: 14, scale: 4
     t.date "purchase_date", null: false
     t.decimal "quantity", precision: 12, scale: 4
+    t.string "source", default: "manual", null: false
     t.string "trade_id", limit: 64
     t.string "trade_type", default: "buy", null: false
     t.uuid "transaction_public_id"
@@ -320,6 +321,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_175456) do
     t.integer "linked_account_id"
     t.string "linked_account_type"
     t.uuid "public_id", default: -> { "gen_random_uuid()" }
+    t.string "source", default: "manual", null: false
     t.string "tags", array: true
     t.string "transaction_type", null: false
     t.datetime "updated_at", null: false

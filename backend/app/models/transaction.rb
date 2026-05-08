@@ -9,6 +9,7 @@
 #  description         :string(500)
 #  is_active           :boolean          default(TRUE), not null
 #  linked_account_type :string
+#  source              :string           default("manual"), not null
 #  tags                :string           is an Array
 #  transaction_type    :string           not null
 #  created_at          :datetime         not null
@@ -40,8 +41,16 @@ class Transaction < ApplicationRecord
   has_one :import_record, as: :importable, dependent: :nullify
 
   enum :transaction_type, { credit: "credit", debit: "debit" }, validate: true
+  # `manual` rows came from the API/UI and remain editable (description + tags
+  # only — never amount/type, which would desync the linked account balance).
+  # `imported` rows came through Imports::* and are frozen.
+  enum :source,           { manual: "manual", imported: "imported" }, validate: true
 
   scope :active, -> { where(is_active: true) }
+
+  def editable?
+    manual?
+  end
 
   validates :amount, presence: true, numericality: { greater_than: 0 }
   validates :date,   presence: true

@@ -1,22 +1,24 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Lock, Pencil, Plus, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import { useAccounts } from '@/hooks/useBanks'
 import { useTermAccounts } from '@/hooks/useTermAccounts'
-import { useCreateTransaction, useTransactions } from '@/hooks/useTransactions'
+import { useCreateTransaction, useTransactions, useUpdateTransaction } from '@/hooks/useTransactions'
 import { useTransactionFilters } from '@/hooks/useTransactionFilters'
 import { useCurrency } from '@/hooks/useCurrency'
 import { resolveAccountLabel } from '@/lib/finance'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/labels'
-import type { LinkedAccountType, TransactionCreate, TransactionType } from '@/types'
+import type { LinkedAccountType, Transaction, TransactionCreate, TransactionType } from '@/types'
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -25,6 +27,7 @@ export function TransactionsPage() {
   const qc = useQueryClient()
   const { formatCurrency } = useCurrency()
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<Transaction | null>(null)
 
   const filters = useTransactionFilters()
   const { data, isLoading, isFetching } = useTransactions(filters.params)
@@ -71,8 +74,8 @@ export function TransactionsPage() {
         <Button onClick={() => setOpen(true)}><Plus size={16} className="mr-1" />Add</Button>
       </PageHeader>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col gap-6">
-        <div className="flex flex-wrap gap-3">
+      <div className="flex-1 min-h-0 px-6 py-6 flex flex-col gap-4 overflow-hidden">
+        <div className="flex flex-wrap gap-3 shrink-0">
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -98,22 +101,33 @@ export function TransactionsPage() {
         {isLoading ? (
           <div className="text-muted-foreground">Loading…</div>
         ) : (
-          <div className="rounded-lg border overflow-hidden">
+          <div className="flex-1 min-h-0 rounded-lg border overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/70 [&_th]:shadow-[inset_0_-1px_0_var(--border)]">
                 <TableRow>
                   <TableHead>Date</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map(t => (
                   <TableRow key={t.id} className={t.is_active ? '' : 'opacity-40 line-through'}>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{fmtDate(t.date)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={t.source === 'imported' ? 'secondary' : 'outline'}
+                        className="text-[10px] uppercase tracking-wide gap-1"
+                      >
+                        {t.source === 'imported' && <Lock size={9} />}
+                        {t.source}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-sm whitespace-nowrap">
                       {resolveAccountLabel(t.linked_account_type, t.linked_account_id, accounts, termAccounts)}
                     </TableCell>
@@ -139,10 +153,21 @@ export function TransactionsPage() {
                     <TableCell className={`text-right font-mono font-medium ${t.type === 'credit' ? 'text-green-600' : 'text-red-500'}`}>
                       {t.type === 'credit' ? '+' : '-'}{formatCurrency(t.amount)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {t.source === 'manual' ? (
+                        <Button size="icon" variant="ghost" onClick={() => setEditing(t)} title="Edit description / tags">
+                          <Pencil size={14} />
+                        </Button>
+                      ) : (
+                        <Button size="icon" variant="ghost" disabled title="Imported rows are read-only">
+                          <Lock size={14} className="text-muted-foreground" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {items.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No transactions</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No transactions</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -169,6 +194,63 @@ export function TransactionsPage() {
           <TransactionForm onSubmit={handleSubmit} onCancel={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <EditTransactionDialog txn={editing} onClose={() => setEditing(null)} />
     </div>
+  )
+}
+
+// Narrow edit surface — description + tags only — matching the server's
+// editable_transaction_params whitelist. Anything else (amount, type, date)
+// would desync the linked-account balance and stays a CLI-only correction.
+function EditTransactionDialog({ txn, onClose }: { txn: Transaction | null; onClose: () => void }) {
+  return (
+    <Dialog open={!!txn} onOpenChange={v => { if (!v) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+        {/* Remount on txn change so the form's useState initializers re-run with
+         * the new row's data — avoids the setState-in-useEffect anti-pattern. */}
+        {txn && <EditForm key={txn.id} txn={txn} onClose={onClose} />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditForm({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
+  const update = useUpdateTransaction()
+  const [description, setDescription] = useState(txn.description ?? '')
+  const [tagsInput, setTagsInput] = useState((txn.tags ?? []).join(', '))
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+    await update.mutateAsync({
+      id: txn.id,
+      data: { description: description || null, tags },
+    })
+    onClose()
+  }
+
+  return (
+    <form onSubmit={save} className="flex flex-col gap-4">
+      <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        Only description and tags are editable. Amount, type, account, and date
+        are locked once a transaction exists.
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Description</Label>
+        <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Tags <span className="text-muted-foreground text-xs">(comma-separated)</span></Label>
+        <Input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="rent, utilities" />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={update.isPending}>
+          {update.isPending ? 'Saving…' : 'Update'}
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }

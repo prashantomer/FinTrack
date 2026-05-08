@@ -40,7 +40,7 @@ Rails.application.routes.draw do
 
       resources :platform_accounts, path: "platform-accounts"
 
-      resources :transactions, only: [ :index, :create ]
+      resources :transactions, only: [ :index, :create, :update ]
 
       resources :instruments do
         collection do
@@ -61,7 +61,7 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :investments do
+      resources :investments, only: [ :index, :show, :create, :update ] do
         collection do
           patch :folio, action: :update_folio
         end

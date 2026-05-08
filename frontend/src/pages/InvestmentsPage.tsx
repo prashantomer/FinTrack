@@ -250,22 +250,21 @@ export function InvestmentsPage() {
         )}
       </div>
 
-      {total > PAGE_SIZE && (
-        <div className="border-t px-6 py-3 flex items-center justify-between text-sm shrink-0">
-          <span className="text-muted-foreground">{total} total</span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-              <ChevronLeft size={14} />Prev
-            </Button>
-            <span className="text-muted-foreground px-1">Page {page}</span>
-            <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={investments.length < PAGE_SIZE}>
-              Next<ChevronRight size={14} />
-            </Button>
-          </div>
+      {total > 0 && (
+        <div className="shrink-0 min-h-14 border-t bg-background px-6 py-3 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{total.toLocaleString()} total</span>
+          {total > PAGE_SIZE && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+                <ChevronLeft size={14} />Prev
+              </Button>
+              <span className="text-muted-foreground px-1">Page {page}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={investments.length < PAGE_SIZE}>
+                Next<ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
         </div>
-      )}
-      {total > 0 && total <= PAGE_SIZE && (
-        <p className="text-center text-xs text-muted-foreground py-2 border-t shrink-0">{total} investments</p>
       )}
 
       <Sheet open={open} onOpenChange={setOpen}>

@@ -1,7 +1,7 @@
 module Api
   module V1
     class InvestmentsController < ApplicationController
-      before_action :set_investment, only: [ :show, :update, :destroy ]
+      before_action :set_investment, only: [ :show, :update ]
 
       def index
         filter = Investments::Filter.from_params(params)
@@ -20,14 +20,16 @@ module Api
         render_created(data: current_user.investments.create!(investment_params))
       end
 
+      # Manual investments are editable but only on free-text fields. Type,
+      # amounts, dates, and broker IDs would desync the holding cache and the
+      # paired bank transaction, so we don't let those drift after creation.
+      # Imported rows are fully frozen — the CSV is the source of truth.
       def update
-        @investment.update!(investment_params)
+        unless @investment.editable?
+          return render_error(message: "Imported investments cannot be edited", status: :forbidden)
+        end
+        @investment.update!(editable_investment_params)
         render_success(data: @investment)
-      end
-
-      def destroy
-        @investment.destroy
-        head :no_content
       end
 
       # PATCH /api/v1/investments/folio
@@ -65,6 +67,13 @@ module Api
                           :current_value, :purchase_date)
         p[:investment_type] ||= p.delete(:type)
         p
+      end
+
+      # Whitelist for #update on manual rows — notes only. Anything else is
+      # silently dropped rather than 422'd so a UI sending a full payload still
+      # succeeds without leaking which fields it tried to mutate.
+      def editable_investment_params
+        params.permit(:notes)
       end
     end
   end

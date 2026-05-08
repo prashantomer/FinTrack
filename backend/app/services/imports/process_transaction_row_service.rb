@@ -28,6 +28,7 @@ module Imports
 
       txn = Transaction.create!(
         user:                 @user,
+        source:               :imported,
         amount:               amount,
         transaction_type:     type,
         date:                 date,

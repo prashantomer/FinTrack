@@ -9,6 +9,7 @@
 #  description         :string(500)
 #  is_active           :boolean          default(TRUE), not null
 #  linked_account_type :string
+#  source              :string           default("manual"), not null
 #  tags                :string           is an Array
 #  transaction_type    :string           not null
 #  created_at          :datetime         not null
@@ -37,6 +38,7 @@ class TransactionSerializer < BaseSerializer
     {
       id:                  r.id,
       public_id:           r.public_id,
+      source:              r.source,
       amount:              r.amount,
       type:                r.transaction_type,
       transaction_type:    r.transaction_type,

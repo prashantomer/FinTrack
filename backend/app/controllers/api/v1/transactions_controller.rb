@@ -16,6 +16,19 @@ module Api
         render_error(message: e.message)
       end
 
+      # Manual transactions are editable but only on description + tags. Amount
+      # and type would silently desync the linked account balance (we apply the
+      # delta in after_create and don't reverse on update), so structural
+      # corrections still go through the rake task. Imported rows are frozen.
+      def update
+        txn = current_user.transactions.find(params[:id])
+        unless txn.editable?
+          return render_error(message: "Imported transactions cannot be edited", status: :forbidden)
+        end
+        txn.update!(editable_transaction_params)
+        render_success(data: txn)
+      end
+
       private
 
       def query_params
@@ -33,6 +46,10 @@ module Api
         p[:transaction_type] ||= p.delete(:type)
         p[:linked_account_type] = classify_linked_type(p[:linked_account_type])
         p
+      end
+
+      def editable_transaction_params
+        params.permit(:description, tags: [])
       end
 
       def classify_linked_type(value)
