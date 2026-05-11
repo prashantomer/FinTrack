@@ -52,10 +52,13 @@ module Api
             date:           Date.current,
             description:    "Import reconciliation (batch ##{batch.id})"
           ).call
-          batch.update!(status: :completed)
+          batch.update!(
+            status:         :completed,
+            result_message: "Resolved: created an adjustment transaction to match the file's expected balance (₹#{batch.expected_balance.to_f.round(2)})."
+          )
           render_success(data: batch.reload)
         when "abort"
-          Imports::AbortBatchService.new(batch).call
+          Imports::AbortBatchService.new(batch).call(reason: "Aborted by user from the reconciliation banner.")
           render_success(data: batch.reload)
         else
           render_error(message: "action_choice must be 'adjust' or 'abort'")

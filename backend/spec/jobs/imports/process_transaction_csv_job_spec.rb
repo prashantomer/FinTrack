@@ -67,7 +67,9 @@ RSpec.describe Imports::ProcessTransactionCsvJob, type: :job do
       expect(opening).to be_present
       expect(opening.amount.to_f).to eq(5000.00)
       expect(opening.transaction_type).to eq("credit")
-      expect(opening.date).to eq(blank_account.open_date)
+      # Seed is dated on the first imported row's date, not account.open_date.
+      # First file row in this fixture is 2026-04-01.
+      expect(opening.date).to eq(Date.new(2026, 4, 1))
       expect(blank_account.balance.to_f).to eq(5500.00)
       expect(batch.status).to eq("completed")
     end
@@ -101,6 +103,52 @@ RSpec.describe Imports::ProcessTransactionCsvJob, type: :job do
       expect(opening).to be_nil
       # Only the two imported rows applied, no opening seed.
       expect(blank_account.reload.balance.to_f).to eq(starting - 500 + 1000)
+    end
+  end
+
+  describe "reconciliation skip on full re-upload" do
+    # When every row dedups (no :ok rows land), the account balance reflects
+    # history beyond this single file — comparing it to the file's terminal
+    # balance is meaningless. Batch should close as `completed`, not
+    # `needs_reconciliation`.
+    it "marks the batch completed when zero rows actually landed" do
+      account = create(:account, user: user, nickname: "Acct A", balance: 0)
+
+      # Seed two prior txns that exactly match the rows we're about to upload.
+      # Predates batch.created_at so the new batch's dedup pool sees them.
+      [
+        { amount: 1_000, type: "credit", date: Date.new(2024, 1, 1), bank_ref: "REF-X" },
+        { amount: 500,   type: "debit",  date: Date.new(2024, 1, 2), bank_ref: "REF-Y" }
+      ].each do |attrs|
+        Transaction.create!(
+          user: user, source: "imported",
+          amount: attrs[:amount], transaction_type: attrs[:type], date: attrs[:date],
+          bank_ref: attrs[:bank_ref],
+          linked_account_type: "Account", linked_account_id: account.id,
+          created_at: 1.day.ago,
+        )
+      end
+
+      csv_text = <<~CSV
+        date,amount,type,linked_account_nickname,description,tags,bank_ref,balance_after
+        2024-01-01,1000.00,credit,Acct A,Salary,,REF-X,1000.00
+        2024-01-02,500.00,debit,Acct A,Coffee,,REF-Y,500.00
+      CSV
+      batch = create(:import_batch,
+                     user: user, import_type: "transactions",
+                     file_name: "redo.csv",
+                     linked_account_type: "Account", linked_account_id: account.id)
+      batch.file.attach(io: StringIO.new(csv_text), filename: "redo.csv", content_type: "text/csv")
+
+      described_class.new.perform(batch.id)
+
+      batch.reload
+      expect(batch.duplicate_rows).to eq(2)
+      expect(batch.import_records.where(status: "ok").count).to eq(0)
+      # The KEY assertion: no needs_reconciliation despite the gap between
+      # account.balance (still 0 — pre-existing seed rows live on a different
+      # account-creation timeline) and the file's expected_balance (500).
+      expect(batch.status).to eq("completed")
     end
   end
 

@@ -92,6 +92,8 @@ A match writes an `ImportRecord` with `status: :skipped` and `notes: "Duplicate 
 
 > **Why not just `bank_ref` when it's present?** That's what the ladder used to do. ICICI (and many banks) reuse remark strings across genuinely distinct rows — e.g. ten `Rev Sweep From 328713003095` entries spanning a year, each with different dates and amounts. Keying on `bank_ref` alone collapsed all ten into one transaction and left the account short by the sum of the merged rows. Including `(date, amount, type)` in the key fixes that without weakening the "genuine repeat UPI" guarantee, because real repeat UPIs have *different* `bank_ref`s.
 
+> **In-flight rows from the same batch are excluded from the dedup pool.** Some bank remarks don't carry a per-transaction sequence number — ICICI ATM cash-withdrawal entries (`NFS/MPZ08171/CASH WDL/15-06-23`) are a notable example, where two ₹10,000 withdrawals from the same ATM on the same day produce *identical* `bank_ref` strings. If both rows are present in one statement, the second one would collapse against the first that the loop just created. The dedup query therefore restricts to txns whose `created_at` is strictly before `batch.created_at`. Re-uploads of a prior statement still match (those rows belong to an earlier batch); intra-file twins stay distinct.
+
 ## End-of-import reconciliation
 
 If the source file carries a running balance, the job sets `expected_balance = last_row[:balance_after]` and compares it to `account.balance` after all rows are processed:

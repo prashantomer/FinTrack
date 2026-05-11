@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_11_065709) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_11_101147) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -179,6 +179,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_11_065709) do
     t.string "linked_account_type"
     t.string "on_balance_mismatch", default: "ask", null: false
     t.integer "processed_rows", default: 0, null: false
+    t.text "result_message"
     t.string "sidekiq_job_id"
     t.string "status", default: "pending", null: false
     t.integer "total_rows", default: 0, null: false

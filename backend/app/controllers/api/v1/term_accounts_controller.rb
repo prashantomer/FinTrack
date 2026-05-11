@@ -1,6 +1,7 @@
 module Api
   module V1
     class TermAccountsController < ApplicationController
+      include AuditPagination
       before_action :set_term_account, only: [ :show, :close, :audit_logs ]
 
       def index
@@ -27,11 +28,15 @@ module Api
       end
 
       def audit_logs
-        audits = Audited::Audit.where(auditable_type: "TermAccount", auditable_id: @term_account.id)
-                               .order(created_at: :desc)
-        txn_ids = audits.map { |a| a.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i }.compact.uniq
+        page, next_cursor = paginate_audits(
+          Audited::Audit.where(auditable_type: "TermAccount", auditable_id: @term_account.id)
+        )
+        txn_ids = page.map { |a| a.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i }.compact.uniq
         txns_by_id = current_user.transactions.where(id: txn_ids).index_by(&:id)
-        render_success(data: audits.map { |a| audit_log_json(a, txns_by_id) })
+        render_success(
+          data:      page.map { |a| audit_log_json(a, txns_by_id) },
+          meta_data: { next_cursor: next_cursor }
+        )
       end
 
       private

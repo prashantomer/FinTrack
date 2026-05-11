@@ -13,10 +13,18 @@ module Imports
     def call
       date   = parse_date!(@row[:date])
       amount = @row[:amount].to_f
-      raise "amount must be greater than 0" unless amount > 0
+      unless amount > 0
+        raise Imports::Error.new("amount must be greater than 0",
+                                 code: :amount_invalid,
+                                 context: { raw: @row[:amount] })
+      end
 
       type = @row[:type].to_s.strip.downcase
-      raise "type must be 'credit' or 'debit'" unless %w[credit debit].include?(type)
+      unless %w[credit debit].include?(type)
+        raise Imports::Error.new("type must be 'credit' or 'debit'",
+                                 code: :type_invalid,
+                                 context: { raw: @row[:type] })
+      end
 
       linked_account = resolve_linked_account
       tags           = parse_tags(@row[:tags])
@@ -57,7 +65,8 @@ module Imports
         amount:         amount,
         type:           type,
         linked_account: linked_account,
-        bank_ref:       bank_ref
+        bank_ref:       bank_ref,
+        batch:          @batch
       )
     end
 
@@ -79,7 +88,18 @@ module Imports
     # and still distinguishes genuine repeat UPIs (two ₹500 payments to
     # the same merchant on the same day have different UTRs → different
     # bank_refs → no false merge).
-    def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:)
+    #
+    # **`batch:` excludes in-flight rows from this same batch's run.** ICICI
+    # ATM cash-withdrawal remarks don't include a transaction sequence
+    # number, so two ₹10,000 withdrawals from the same ATM on the same day
+    # produce identical `bank_ref` strings (e.g. "ICICI:NFS/MPZ08171/CASH
+    # WDL/15-06-23"). With internal-batch rows in the dedup pool, the
+    # second withdrawal would collapse against the first one this loop
+    # just created — losing a real ₹10k debit and breaking end-balance
+    # reconciliation. Filtering to txns that existed BEFORE the batch
+    # started keeps both intra-file twins, while still catching re-uploads
+    # of a previously-imported statement (those match prior-batch rows).
+    def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:, batch: nil)
       scope = user.transactions.where(
         date:                date,
         amount:              amount,
@@ -88,6 +108,7 @@ module Imports
         linked_account_id:   linked_account&.id
       )
       scope = scope.where(bank_ref: bank_ref) if bank_ref
+      scope = scope.where("transactions.created_at < ?", batch.created_at) if batch
       scope.first
     end
 
@@ -136,7 +157,7 @@ module Imports
 
     def self.parse_date!(value)
       raw = value.to_s.strip
-      raise "date is required" if raw.blank?
+      raise Imports::Error.new("date is required", code: :date_invalid) if raw.blank?
 
       DATE_FORMATS.each do |fmt|
         parsed = Date.strptime(raw, fmt)
@@ -145,7 +166,10 @@ module Imports
         next
       end
 
-      raise "Invalid date: \"#{raw}\" — expected YYYY-MM-DD, DD/MM/YYYY, or DD-MM-YYYY"
+      raise Imports::Error.new(
+        "Invalid date: \"#{raw}\" — expected YYYY-MM-DD, DD/MM/YYYY, or DD-MM-YYYY",
+        code: :date_invalid, context: { raw: raw }
+      )
     end
   end
 end

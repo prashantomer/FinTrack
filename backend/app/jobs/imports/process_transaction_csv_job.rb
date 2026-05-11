@@ -34,15 +34,24 @@ module Imports
         batch.increment!(:duplicate_rows) if result == Imports::ProcessTransactionRowService::DUPLICATE
         batch.increment!(:processed_rows)
       rescue => e
+        wrapped = Imports::Error.wrap(e)
         batch.increment!(:failed_rows)
         batch.increment!(:processed_rows)
-        batch.import_records.create!(row_index: idx, status: :error, notes: e.message)
+        batch.import_records.create!(
+          row_index: idx,
+          status:    :error,
+          notes:     "[#{wrapped.code}] #{wrapped.message}"
+        )
       end
 
       finalize_with_reconciliation!(batch, expected_balance)
     rescue => e
-      Rails.logger.error("ImportBatch #{import_batch_id} (transactions) failed: #{e.message}")
-      ImportBatch.find_by(id: import_batch_id)&.update!(status: :failed)
+      wrapped = Imports::Error.wrap(e, code: :file_parse_failure)
+      Rails.logger.error("ImportBatch #{import_batch_id} (transactions) failed: [#{wrapped.code}] #{wrapped.message}")
+      ImportBatch.find_by(id: import_batch_id)&.update!(
+        status:         :failed,
+        result_message: "Import failed [#{wrapped.code}]: #{wrapped.message.truncate(280)}"
+      )
     end
 
     private
@@ -90,12 +99,35 @@ module Imports
         return
       end
 
+      # Date the seed on the same date as the first imported row, not on
+      # account.open_date. The two are commonly different: an account
+      # opened in 2016 might be receiving a 2022-23 statement, in which
+      # case dating the opening at 2016 misrepresents when the carried-
+      # forward balance was actually established. The seed represents
+      # "whatever balance existed just before this statement starts" —
+      # parking it on the first row's date keeps the ledger chronological
+      # and lets the seed sort directly above row 0 (same date, lower id).
+      #
+      # Fall back to account.open_date if the anchor row's date is missing
+      # or unparseable (shouldn't happen, but lets us stay defensive
+      # against a malformed adapter response).
+      anchor_date =
+        begin
+          seed.anchor_row && Imports::ProcessTransactionRowService.parse_date!(seed.anchor_row[:date])
+        rescue StandardError
+          nil
+        end
+      seed_date = anchor_date || account.open_date
+      # The validator forbids date < open_date — clamp up if the first row
+      # somehow predates the account's open_date.
+      seed_date = account.open_date if seed_date < account.open_date
+
       opening_txn = Transaction.create!(
         user:                account.user,
         source:              "manual",
         amount:              seed.amount,
         transaction_type:    "credit",
-        date:                account.open_date,
+        date:                seed_date,
         description:         "Opening balance (import ##{batch.id})",
         tags:                [ "adjustment", "opening" ],
         linked_account_type: "Account",
@@ -124,30 +156,67 @@ module Imports
                   id: batch.linked_account_id, user_id: batch.user_id
                 )
 
+      ok_rows   = batch.import_records.where(status: "ok").count
+      dup_rows  = batch.duplicate_rows.to_i
+      err_rows  = batch.failed_rows.to_i
+
       if expected_balance.nil? || account.nil?
-        batch.update!(status: :completed)
+        batch.update!(status: :completed, result_message: summary_message(ok_rows, dup_rows, err_rows))
         return
       end
 
       batch.update!(expected_balance: expected_balance)
+
+      # Re-upload of a previously-imported statement: every row dedups,
+      # nothing actually lands on the account. Comparing the account's
+      # current balance (which reflects ALL history — other years,
+      # adjustments, transfers) against this single file's running-balance
+      # terminus would always flag a "mismatch" because the two numbers
+      # describe different scopes. Mark completed and move on; there's
+      # nothing to reconcile.
+      if ok_rows.zero?
+        batch.update!(
+          status:         :completed,
+          result_message: "Re-upload detected: all #{dup_rows} rows already in your ledger from a prior import. No new transactions added."
+        )
+        return
+      end
+
       gap = (account.balance.to_f - expected_balance.to_f).round(2)
 
       if gap.abs < 0.01
-        batch.update!(status: :completed)
+        batch.update!(status: :completed, result_message: summary_message(ok_rows, dup_rows, err_rows))
         return
       end
+
+      gap_msg = "Final balance ₹#{account.balance.to_f.round(2)} differs from the file's expected ₹#{expected_balance.to_f.round(2)} (gap ₹#{gap})."
 
       case batch.on_balance_mismatch
       when "adjust"
         create_reconciliation_adjustment!(batch, account, expected_balance)
-        batch.update!(status: :completed)
+        batch.update!(
+          status:         :completed,
+          result_message: "#{summary_message(ok_rows, dup_rows, err_rows)} #{gap_msg} Auto-resolved by creating an adjustment transaction."
+        )
       when "fail"
-        Imports::AbortBatchService.new(batch).call
+        Imports::AbortBatchService.new(batch).call(reason: "Balance mismatch: #{gap_msg}")
       else # "ask"
         # Leave txns + balance in place; the UI shows the gap and lets the
         # user resolve it via POST /imports/:id/resolve.
-        batch.update!(status: :needs_reconciliation)
+        batch.update!(
+          status:         :needs_reconciliation,
+          result_message: "#{gap_msg} Choose how to resolve."
+        )
       end
+    end
+
+    # Compose a short success line summarising what changed.
+    def summary_message(ok_rows, dup_rows, err_rows)
+      parts = []
+      parts << "#{ok_rows} new transaction#{'s' unless ok_rows == 1} imported"
+      parts << "#{dup_rows} duplicate#{'s' unless dup_rows == 1} skipped" if dup_rows > 0
+      parts << "#{err_rows} row#{'s' unless err_rows == 1} failed"        if err_rows > 0
+      "#{parts.join(', ')}."
     end
 
     def create_reconciliation_adjustment!(batch, account, target_balance)

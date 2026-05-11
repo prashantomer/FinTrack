@@ -403,6 +403,8 @@ export interface ImportBatch {
   // do when it disagrees with the computed account.balance.
   on_balance_mismatch?: ReconciliationMode
   expected_balance?:    number | null
+  /** Human-readable outcome line stamped by the job/abort flow. */
+  result_message?:      string | null
 }
 
 export interface ImportListResponse {

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { listAccountAuditLogs, listTermAccountAuditLogs } from '@/api/audit'
 
 export type AuditTarget = {
@@ -9,12 +9,14 @@ export type AuditTarget = {
 } | null
 
 export function useAuditLogs(target: AuditTarget) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['audit-logs', target?.type, target?.id],
-    queryFn: () =>
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) =>
       target!.type === 'account'
-        ? listAccountAuditLogs(target!.id)
-        : listTermAccountAuditLogs(target!.id),
+        ? listAccountAuditLogs(target!.id, { cursor: pageParam })
+        : listTermAccountAuditLogs(target!.id, { cursor: pageParam }),
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
     enabled: target !== null,
   })
 }

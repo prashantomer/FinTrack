@@ -1,4 +1,4 @@
-import { History, Pencil, SlidersHorizontal, XCircle } from 'lucide-react'
+import { CalendarRange, History, Pencil, SlidersHorizontal, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -41,7 +41,19 @@ export function AccountsTable({ accounts, formatCurrency, onEdit, onClose, onAdj
                 <Badge variant="outline">{ACCOUNT_TYPE_LABELS[a.account_type]}</Badge>
               </TableCell>
               <TableCell className="text-muted-foreground font-mono text-sm">{a.account_number || '—'}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">{a.open_date || '—'}</TableCell>
+              <TableCell>
+                {a.open_date ? (
+                  <span
+                    title="Cutoff date — transactions before this date are folded into the opening balance"
+                    className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900"
+                  >
+                    <CalendarRange size={11} />
+                    {a.open_date}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-sm">—</span>
+                )}
+              </TableCell>
               <TableCell className={`text-right font-mono font-medium ${(a.balance ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                 {formatCurrency(a.balance ?? 0)}
               </TableCell>
