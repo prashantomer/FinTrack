@@ -110,8 +110,9 @@ function ReconciliationRow({ batch }: { batch: ImportBatch }) {
 
 function BatchRow({ batch }: { batch: ImportBatch }) {
   const [expanded, setExpanded] = useState(false)
-  const canExpand = batch.status === 'completed' || batch.status === 'failed'
   const needsReconcile = batch.status === 'needs_reconciliation'
+  const canExpand =
+    batch.status === 'completed' || batch.status === 'failed' || needsReconcile
   return (
     <>
       <TableRow
@@ -157,8 +158,8 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
           {new Date(batch.created_at).toLocaleDateString()}
         </TableCell>
       </TableRow>
-      {expanded && <ExpandedRows batch={batch} />}
-      {needsReconcile && <ReconciliationRow batch={batch} />}
+      {expanded && needsReconcile && <ReconciliationRow batch={batch} />}
+      {expanded && !needsReconcile && <ExpandedRows batch={batch} />}
     </>
   )
 }
@@ -234,9 +235,6 @@ export function ImportsPage() {
 
             {isFetchingNextPage && (
               <div className="text-center text-xs text-muted-foreground py-4">Loading more…</div>
-            )}
-            {!hasNextPage && items.length > 0 && (
-              <div className="text-center text-xs text-muted-foreground py-4">— end —</div>
             )}
           </>
         )}

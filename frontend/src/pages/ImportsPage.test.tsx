@@ -106,7 +106,7 @@ describe('ImportsPage', () => {
     )
   })
 
-  it('shows the resolve/abort banner inline for needs_reconciliation batches', async () => {
+  it('reveals the resolve/abort banner when a needs_reconciliation row is clicked', async () => {
     server.use(
       http.get('/api/v1/imports', () =>
         HttpResponse.json({
@@ -135,9 +135,16 @@ describe('ImportsPage', () => {
       ),
     )
 
+    const user = userEvent.setup()
     renderWithProviders(<ImportsPage />)
 
-    // Banner copy + both action buttons should be visible without any row click.
+    // Row is collapsed by default — banner copy must not be visible yet.
+    await waitFor(() => expect(screen.getByText('statement.xls')).toBeInTheDocument())
+    expect(screen.queryByText(/balance mismatch/i)).not.toBeInTheDocument()
+
+    // Click the row to expand.
+    await user.click(screen.getByText('statement.xls'))
+
     await waitFor(() => expect(screen.getByText(/balance mismatch/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /create adjustment/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^abort$/i })).toBeInTheDocument()
