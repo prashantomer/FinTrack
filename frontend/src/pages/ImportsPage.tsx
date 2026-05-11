@@ -9,10 +9,11 @@ import type { ImportBatch, ImportStatus } from '@/types'
 
 function statusVariant(status: ImportStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
-    case 'completed':  return 'default'
-    case 'processing': return 'secondary'
-    case 'pending':    return 'outline'
-    case 'failed':     return 'destructive'
+    case 'completed':            return 'default'
+    case 'processing':           return 'secondary'
+    case 'pending':              return 'outline'
+    case 'failed':               return 'destructive'
+    case 'needs_reconciliation': return 'secondary'
   }
 }
 
@@ -77,8 +78,9 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
             ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)
             : null}
         </TableCell>
-        <TableCell className="font-mono text-xs text-muted-foreground">
-          v{batch.import_version}
+        <TableCell className="font-mono text-xs">
+          <span className="text-foreground">#{batch.import_number}</span>
+          <span className="text-muted-foreground/60 ml-1.5">v{batch.import_version}</span>
         </TableCell>
         <TableCell className="capitalize">{batch.import_type}</TableCell>
         <TableCell className="max-w-[200px] truncate text-sm">{batch.file_name}</TableCell>
@@ -169,7 +171,7 @@ export function ImportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8" />
-                  <TableHead>Version</TableHead>
+                  <TableHead>Import #</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>File</TableHead>
                   <TableHead>Status</TableHead>

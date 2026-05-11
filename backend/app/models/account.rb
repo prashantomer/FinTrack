@@ -9,7 +9,7 @@
 #  closed_amount  :decimal(14, 2)
 #  closed_date    :date
 #  nickname       :string(100)      not null
-#  open_date      :date
+#  open_date      :date             not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
 #  bank_id        :bigint           not null
@@ -44,7 +44,12 @@ class Account < ApplicationRecord
   scope :open,   -> { where(closed_date: nil) }
   scope :closed, -> { where.not(closed_date: nil) }
 
-  validates :nickname, presence: true
+  validates :nickname,  presence: true
+  # `open_date` is the immutable cutoff: anything before it is folded into
+  # the user-supplied opening transaction (a regular credit dated on that
+  # day). The DB column is NOT NULL so this presence validation is belt
+  # + braces.
+  validates :open_date, presence: true
 
   def closed?
     closed_date.present?

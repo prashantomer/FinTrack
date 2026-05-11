@@ -54,10 +54,23 @@ class Transaction < ApplicationRecord
 
   validates :amount, presence: true, numericality: { greater_than: 0 }
   validates :date,   presence: true
+  validate  :date_after_account_open_date
 
   after_create :apply_balance_delta
 
   private
+
+  # `open_date` is a hard cutoff. Anything prior to it must be folded into the
+  # opening deposit (a regular credit dated on the open date). Transactions
+  # dated before the open date are rejected at validation time.
+  def date_after_account_open_date
+    return unless date.present?
+    return unless linked_account.is_a?(Account)
+    return unless linked_account.open_date.present?
+    return unless date < linked_account.open_date
+
+    errors.add(:date, "is before account open date (#{linked_account.open_date})")
+  end
 
   def apply_balance_delta
     return unless linked_account.present?
@@ -65,6 +78,14 @@ class Transaction < ApplicationRecord
     return if linked_account.is_a?(TermAccount) && linked_account.fd?
 
     delta = credit? ? amount : -amount
-    linked_account.increment!(:balance, delta)
+    # `update!` (not `increment!`) so the `audited` gem captures the before/
+    # after balance. `increment!` does an atomic SQL bump and skips callbacks,
+    # so the audit log would stay empty for every imported / manual txn.
+    # `audit_comment` carries the source txn id so the Account audit-log UI
+    # can show "Bank transfer · ₹5,000 · UTR123".
+    Audited.audit_class.as_user(user) do
+      linked_account.audit_comment = "txn:#{id}"
+      linked_account.update!(balance: linked_account.balance + delta)
+    end
   end
 end

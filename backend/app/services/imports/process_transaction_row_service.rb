@@ -51,12 +51,16 @@ module Imports
     private
 
     # Dedupe ladder:
-    #   1. bank_ref — UTR/IMPS reference is unique per credit/transfer
-    #   2. (date, amount, type, linked_account) — exact structural match
+    #   1. If bank_ref is supplied, that IS the uniqueness key — exact match
+    #      or nothing. Structural match is intentionally NOT a fallback here:
+    #      ICICI emits a unique bank_ref per row, but multiple genuine UPIs
+    #      can share (date, amount, type, account), so falling back to
+    #      structural would collapse legitimate repeat payments.
+    #   2. Without bank_ref (legacy canonical CSV with the column blank),
+    #      fall back to structural (date, amount, type, linked_account).
     def find_duplicate(date, amount, type, linked_account, bank_ref)
       if bank_ref
-        existing = @user.transactions.find_by(bank_ref: bank_ref)
-        return existing if existing
+        return @user.transactions.find_by(bank_ref: bank_ref)
       end
 
       scope = @user.transactions.where(
@@ -86,13 +90,21 @@ module Imports
       DUPLICATE
     end
 
+    # Two paths:
+    # 1. Canonical CSV — each row carries a nickname, look it up per-row.
+    # 2. Bank-format Excel (ICICI) — rows don't carry account info, so the
+    #    user picked the target account when creating the import batch and
+    #    it's stored on the batch itself.
     def resolve_linked_account
       nickname = @row[:linked_account_nickname].presence
-      return nil unless nickname
+      if nickname
+        return @user.accounts
+                   .where("LOWER(nickname) = ?", nickname.downcase)
+                   .first
+      end
 
-      @user.accounts
-           .where("LOWER(nickname) = ?", nickname.downcase)
-           .first
+      return nil unless @batch.linked_account_type && @batch.linked_account_id
+      @batch.linked_account_type.safe_constantize&.find_by(id: @batch.linked_account_id, user_id: @user.id)
     end
 
     def parse_tags(raw)

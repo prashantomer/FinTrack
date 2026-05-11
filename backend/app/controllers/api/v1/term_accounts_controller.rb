@@ -29,7 +29,9 @@ module Api
       def audit_logs
         audits = Audited::Audit.where(auditable_type: "TermAccount", auditable_id: @term_account.id)
                                .order(created_at: :desc)
-        render_success(data: audits.map { |a| audit_log_json(a) })
+        txn_ids = audits.map { |a| a.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i }.compact.uniq
+        txns_by_id = current_user.transactions.where(id: txn_ids).index_by(&:id)
+        render_success(data: audits.map { |a| audit_log_json(a, txns_by_id) })
       end
 
       private
@@ -50,9 +52,21 @@ module Api
         params.permit(:closed_date, :closed_amount)
       end
 
-      def audit_log_json(audit)
+      def audit_log_json(audit, txns_by_id = {})
         raw = audit.audited_changes["balance"]
         old_val, new_val = raw.is_a?(Array) ? [ raw[0], raw[1] ] : [ nil, raw ]
+
+        txn_id = audit.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i
+        txn    = txn_id && txns_by_id[txn_id]
+        txn_json = txn && {
+          id:          txn.id,
+          date:        txn.date,
+          amount:      txn.amount.to_f,
+          type:        txn.transaction_type,
+          description: txn.description,
+          bank_ref:    txn.bank_ref
+        }
+
         {
           id:          audit.id,
           table_name:  "term_account",
@@ -61,7 +75,8 @@ module Api
           old_value:   old_val&.to_s,
           new_value:   new_val&.to_s,
           changed_at:  audit.created_at,
-          transaction: nil
+          comment:     audit.comment,
+          transaction: txn_json
         }
       end
     end

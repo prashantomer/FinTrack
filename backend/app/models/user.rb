@@ -8,6 +8,7 @@
 #  email           :string           not null
 #  first_name      :string           not null
 #  is_active       :boolean          default(TRUE), not null
+#  is_dummy        :boolean          default(FALSE), not null
 #  is_superuser    :boolean          default(FALSE), not null
 #  last_name       :string           not null
 #  password_digest :string           not null
@@ -16,7 +17,8 @@
 #
 # Indexes
 #
-#  index_users_on_email  (email) UNIQUE
+#  index_users_on_email     (email) UNIQUE
+#  index_users_on_is_dummy  (is_dummy)
 #
 class User < ApplicationRecord
   has_secure_password
@@ -42,6 +44,11 @@ class User < ApplicationRecord
   validates :email,      presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :first_name, presence: true
   validates :last_name,  presence: true
+
+  # `is_dummy = true` marks demo / seed / smoke-test accounts so reports and
+  # admin counts can filter them out. Real users get the default (false).
+  scope :real,  -> { where(is_dummy: false) }
+  scope :dummy, -> { where(is_dummy: true) }
 
   def full_name
     "#{first_name} #{last_name}"

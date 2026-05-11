@@ -7,10 +7,10 @@ module Investments
     end
 
     def call
-      base  = @user.investments.includes(user_instrument: :instrument)
+      base  = @user.investments.unscope(:order).includes(user_instrument: :instrument)
       scope = @filter.apply(base)
       total = scope.count
-      items = scope.order(purchase_date: :desc, id: :desc)
+      items = scope.reorder(@filter.order_clause)
                    .offset(@filter.offset)
                    .limit(@filter.page_size)
 

@@ -28,7 +28,7 @@ module Api
       private
 
       def user_update_params
-        params.permit(:full_name, :email, :password, :currency_code, :currency_locale)
+        params.permit(:full_name, :email, :password, :currency_code, :currency_locale, :is_dummy)
       end
     end
   end

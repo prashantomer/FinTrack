@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { createImport, getImport, listImports } from '@/api/imports'
+import { createImport, getImport, listImports, resolveImport } from '@/api/imports'
 import type { ImportType } from '@/types'
 
 export function useImports(page = 1) {
@@ -38,11 +38,30 @@ export function useImport(id: number | null) {
 export function useCreateImport() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ importType, file }: { importType: ImportType; file: File }) =>
-      createImport(importType, file),
+    mutationFn: ({ importType, file, linkedAccount, onBalanceMismatch }: {
+      importType: ImportType
+      file:       File
+      linkedAccount?: string
+      onBalanceMismatch?: 'ask' | 'adjust' | 'fail'
+    }) =>
+      createImport(importType, file, { linkedAccount, onBalanceMismatch }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['imports'] })
     },
     onError: () => toast.error('Failed to start import'),
+  })
+}
+
+export function useResolveImport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ importId, action }: { importId: number; action: 'adjust' | 'abort' }) =>
+      resolveImport(importId, action),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['imports'] })
+      qc.invalidateQueries({ queryKey: ['accounts'] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+    },
+    onError: () => toast.error('Failed to resolve import'),
   })
 }

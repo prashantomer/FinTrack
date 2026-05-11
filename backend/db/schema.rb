@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_11_065709) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -24,7 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
     t.date "closed_date"
     t.datetime "created_at", null: false
     t.string "nickname", limit: 100, null: false
-    t.date "open_date"
+    t.date "open_date", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["bank_id"], name: "index_accounts_on_bank_id"
@@ -169,16 +169,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
   create_table "import_batches", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "duplicate_rows", default: 0, null: false
+    t.decimal "expected_balance", precision: 14, scale: 2
     t.integer "failed_rows", default: 0, null: false
     t.string "file_name", null: false
+    t.integer "import_number", null: false
     t.string "import_type", null: false
     t.integer "import_version", default: 1, null: false
+    t.bigint "linked_account_id"
+    t.string "linked_account_type"
+    t.string "on_balance_mismatch", default: "ask", null: false
     t.integer "processed_rows", default: 0, null: false
     t.string "sidekiq_job_id"
     t.string "status", default: "pending", null: false
     t.integer "total_rows", default: 0, null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["user_id", "import_number"], name: "idx_import_batches_user_id_import_number", unique: true
     t.index ["user_id", "import_type", "import_version"], name: "idx_import_batches_version", unique: true
     t.index ["user_id"], name: "index_import_batches_on_user_id"
   end
@@ -215,6 +221,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
     t.decimal "last_price", precision: 15, scale: 4
     t.datetime "last_price_at"
     t.string "name", limit: 255, null: false
+    t.boolean "profile_enabled", default: false, null: false
     t.string "ticker_symbol", limit: 20
     t.datetime "updated_at", null: false
     t.index ["investment_type"], name: "index_instruments_on_investment_type"
@@ -365,11 +372,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
     t.string "email", null: false
     t.string "first_name", null: false
     t.boolean "is_active", default: true, null: false
+    t.boolean "is_dummy", default: false, null: false
     t.boolean "is_superuser", default: false, null: false
     t.string "last_name", null: false
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["is_dummy"], name: "index_users_on_is_dummy"
   end
 
   add_foreign_key "accounts", "banks", on_delete: :restrict

@@ -8,6 +8,7 @@
 #  email           :string           not null
 #  first_name      :string           not null
 #  is_active       :boolean          default(TRUE), not null
+#  is_dummy        :boolean          default(FALSE), not null
 #  is_superuser    :boolean          default(FALSE), not null
 #  last_name       :string           not null
 #  password_digest :string           not null
@@ -16,7 +17,8 @@
 #
 # Indexes
 #
-#  index_users_on_email  (email) UNIQUE
+#  index_users_on_email     (email) UNIQUE
+#  index_users_on_is_dummy  (is_dummy)
 #
 FactoryBot.define do
   sequence(:user_email) { |n| "user#{n}@example.com" }

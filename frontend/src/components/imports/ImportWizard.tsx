@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { downloadTemplate } from '@/api/imports'
-import { useCreateImport, useImport } from '@/hooks/useImports'
+import { useCreateImport, useImport, useResolveImport } from '@/hooks/useImports'
 import { useAccounts } from '@/hooks/useBanks'
 import { usePlatformAccounts } from '@/hooks/usePlatforms'
 import type { Account, ImportType } from '@/types'
@@ -122,6 +122,7 @@ interface ImportConfig {
   autoCreatePlatforms:      boolean
   matchTransactions:        boolean
   defaultLinkedAccountId:   string
+  onBalanceMismatch:        'ask' | 'adjust' | 'fail'
 }
 
 function StepContext({
@@ -226,7 +227,31 @@ function StepContext({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                If set, every transaction will be linked to this account and its balance will be updated automatically.
+                Required for bank-statement Excel uploads (ICICI, etc.) — those files don't carry per-row account info.
+                Optional for canonical CSV (use the <code>linked_account_nickname</code> column instead).
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">
+                Balance reconciliation
+              </label>
+              <Select
+                value={config.onBalanceMismatch}
+                onValueChange={v => setConfig({ ...config, onBalanceMismatch: v as 'ask' | 'adjust' | 'fail' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ask">Ask me if there is a mismatch</SelectItem>
+                  <SelectItem value="adjust">Auto-create an adjustment transaction</SelectItem>
+                  <SelectItem value="fail">Fail the import if balance doesn&apos;t match</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                When the source file (e.g., ICICI xls) carries a running balance per row, we compare it with the
+                computed balance after import. "Ask" pauses for your choice; "Adjust" silently records a
+                balancing transaction; "Fail" rolls back the whole batch.
               </p>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
@@ -318,9 +343,18 @@ function StepUpload({
   const [dragging, setDragging] = useState(false)
 
   function handleFile(f: File) {
-    if (!f.name.endsWith('.csv') && !f.type.includes('csv')) return
+    const ext = f.name.toLowerCase().slice(f.name.lastIndexOf('.'))
+    if (![ '.csv', '.xls', '.xlsx' ].includes(ext)) return
     if (f.size > 5 * 1024 * 1024) return
     setFile(f)
+
+    // Preview only CSV — Excel needs a server-side parser; we just confirm
+    // the file is accepted and let the upload step take over.
+    if (ext !== '.csv') {
+      setHeaders([])
+      setPreview([])
+      return
+    }
     const reader = new FileReader()
     reader.onload = e => {
       const text  = e.target?.result as string
@@ -345,10 +379,13 @@ function StepUpload({
           onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
         >
           <Upload size={24} className="mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm font-medium">Drag &amp; drop CSV here or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-1">CSV only · max 5 MB</p>
+          <p className="text-sm font-medium">Drag &amp; drop your file here or click to browse</p>
+          <p className="text-xs text-muted-foreground mt-1">CSV · XLS · XLSX · max 5 MB</p>
           <input
-            ref={inputRef} type="file" accept=".csv,text/csv" className="hidden"
+            ref={inputRef}
+            type="file"
+            accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
           />
         </div>
@@ -400,13 +437,16 @@ function StepUpload({
 
 // ── Step 5: Processing ─────────────────────────────────────────────────────────
 function StepProcessing({
-  importType, file, onDone,
+  importType, file, linkedAccount, onBalanceMismatch, onDone,
 }: {
-  importType: ImportType
-  file:       File
-  onDone:     () => void
+  importType:    ImportType
+  file:          File
+  linkedAccount: string | undefined
+  onBalanceMismatch: 'ask' | 'adjust' | 'fail' | undefined
+  onDone:        () => void
 }) {
-  const createMutation = useCreateImport()
+  const createMutation  = useCreateImport()
+  const resolveMutation = useResolveImport()
   const [batchId, setBatchId] = useState<number | null>(null)
   const startedRef = useRef(false)
   const { data: batch } = useImport(batchId)
@@ -414,7 +454,7 @@ function StepProcessing({
   useEffect(() => {
     if (startedRef.current) return
     startedRef.current = true
-    createMutation.mutateAsync({ importType, file })
+    createMutation.mutateAsync({ importType, file, linkedAccount, onBalanceMismatch })
       .then(b => setBatchId(b.id))
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -422,8 +462,14 @@ function StepProcessing({
   const status       = batch?.status ?? 'pending'
   const pct          = batch?.progress_pct ?? 0
   const isProcessing = status === 'pending' || status === 'processing'
+  const needsReconcile = status === 'needs_reconciliation'
   const isDone       = status === 'completed' || status === 'failed'
   const errors       = batch?.import_records.filter(r => r.status === 'error') ?? []
+
+  function resolve(action: 'adjust' | 'abort') {
+    if (!batchId) return
+    resolveMutation.mutate({ importId: batchId, action })
+  }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -434,7 +480,15 @@ function StepProcessing({
           {status === 'failed'    && <XCircle      size={18} className="text-red-500" />}
           <div>
             <p className="font-semibold text-sm capitalize">{status === 'pending' ? 'Starting…' : status}</p>
-            {batch && <p className="text-xs text-muted-foreground">{batch.file_name} · v{batch.import_version}</p>}
+            {batch && (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono text-foreground">#{batch.import_number}</span>
+                <span className="mx-1.5 text-muted-foreground/40">·</span>
+                {batch.file_name}
+                <span className="mx-1.5 text-muted-foreground/40">·</span>
+                v{batch.import_version}
+              </p>
+            )}
           </div>
         </div>
 
@@ -470,6 +524,26 @@ function StepProcessing({
           </div>
         )}
 
+        {needsReconcile && batch && batch.expected_balance != null && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex flex-col gap-3 text-sm">
+            <div>
+              <p className="font-semibold text-amber-900">Balance mismatch</p>
+              <p className="text-xs text-amber-800 mt-1">
+                The source file says the account should end at <strong>₹{batch.expected_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>,
+                but applying every transaction lands at a different balance. Choose how to resolve.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => resolve('adjust')} disabled={resolveMutation.isPending}>
+                Create adjustment transaction
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => resolve('abort')} disabled={resolveMutation.isPending}>
+                Abort this import
+              </Button>
+            </div>
+          </div>
+        )}
+
         {errors.length > 0 && (
           <div className="flex flex-col gap-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Errors</p>
@@ -486,7 +560,7 @@ function StepProcessing({
       </div>
 
       <div className="border-t px-6 py-4 flex justify-end shrink-0">
-        <Button onClick={onDone} disabled={isProcessing}>Done ✓</Button>
+        <Button onClick={onDone} disabled={isProcessing || needsReconcile}>Done ✓</Button>
       </div>
     </div>
   )
@@ -503,6 +577,7 @@ const DEFAULT_CONFIG: ImportConfig = {
   autoCreatePlatforms:      true,
   matchTransactions:        true,
   defaultLinkedAccountId:   '',
+  onBalanceMismatch:        'ask',
 }
 
 export function ImportWizard({ open, onClose }: Props) {
@@ -554,7 +629,17 @@ export function ImportWizard({ open, onClose }: Props) {
           />
         )}
         {step === 5 && file && (
-          <StepProcessing importType={importType} file={file} onDone={handleDone} />
+          <StepProcessing
+            importType={importType}
+            file={file}
+            linkedAccount={
+              importType === 'transactions' && config.defaultLinkedAccountId
+                ? `account:${config.defaultLinkedAccountId}`
+                : undefined
+            }
+            onBalanceMismatch={importType === 'transactions' ? config.onBalanceMismatch : undefined}
+            onDone={handleDone}
+          />
         )}
       </SheetContent>
     </Sheet>

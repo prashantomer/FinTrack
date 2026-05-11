@@ -18,13 +18,42 @@ export async function getImport(id: number): Promise<ImportBatch> {
   return res.data.data
 }
 
-export async function createImport(importType: ImportType, file: File): Promise<ImportBatch> {
+export interface CreateImportOptions {
+  /**
+   * For bank-statement Excel uploads (ICICI, etc.) where the file does not
+   * carry per-row account info. Format: "account:<id>" or "term_account:<id>".
+   */
+  linkedAccount?: string
+  /**
+   * Policy for what to do when the source file's last running balance
+   * disagrees with the computed account.balance after import. Defaults to
+   * "ask" (pause and surface the gap in the UI for manual resolution).
+   */
+  onBalanceMismatch?: 'ask' | 'adjust' | 'fail'
+}
+
+export async function createImport(
+  importType: ImportType,
+  file: File,
+  opts: CreateImportOptions = {},
+): Promise<ImportBatch> {
   const form = new FormData()
   form.append('import_type', importType)
   form.append('file', file)
+  if (opts.linkedAccount) form.append('linked_account', opts.linkedAccount)
+  if (opts.onBalanceMismatch) form.append('on_balance_mismatch', opts.onBalanceMismatch)
   const res = await client.post<ApiResponse<ImportBatch>>('/imports', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+  return res.data.data
+}
+
+export async function resolveImport(
+  importId: number,
+  actionChoice: 'adjust' | 'abort',
+): Promise<ImportBatch> {
+  const res = await client.post<ApiResponse<ImportBatch>>(`/imports/${importId}/resolve`,
+    { action_choice: actionChoice })
   return res.data.data
 }
 

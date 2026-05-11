@@ -11,6 +11,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { getErrorMessage } from '@/lib/errors'
 import { AccountsPage } from '@/pages/AccountsPage'
 import { AssistantPage } from '@/pages/AssistantPage'
+import { CleanupPage } from '@/pages/CleanupPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { HoldingsPage } from '@/pages/HoldingsPage'
 import { InstrumentsPage } from '@/pages/InstrumentsPage'
@@ -53,6 +54,7 @@ function AppRoutes() {
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/imports" element={<ImportsPage />} />
                 <Route path="/assistant" element={<AssistantPage />} />
+                <Route path="/cleanup" element={<CleanupPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </AppShell>

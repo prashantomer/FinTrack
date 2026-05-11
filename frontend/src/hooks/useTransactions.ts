@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createTransaction, listTransactions, updateTransaction, type TransactionEditableFields } from '@/api/transactions'
-import type { TransactionCreate, TransactionType } from '@/types'
+import type { RecordSource, TransactionCreate, TransactionType } from '@/types'
 
 interface UseTransactionsParams {
   page?: number
@@ -9,6 +9,12 @@ interface UseTransactionsParams {
   type?: TransactionType
   date_from?: string
   date_to?: string
+  search?: string
+  source?: RecordSource
+  linked_account_type?: 'Account' | 'TermAccount'
+  linked_account_id?: number
+  sort_by?: 'date' | 'account'
+  sort_dir?: 'asc' | 'desc'
 }
 
 export function useTransactions(params: UseTransactionsParams = {}) {

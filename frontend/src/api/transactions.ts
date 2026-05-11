@@ -9,6 +9,11 @@ interface ListParams {
   date_to?: string
   search?: string
   cursor?: string
+  source?: 'manual' | 'imported'
+  linked_account_type?: 'Account' | 'TermAccount'
+  linked_account_id?: number
+  sort_by?: 'date' | 'account'
+  sort_dir?: 'asc' | 'desc'
 }
 
 export async function listTransactions(params: ListParams = {}): Promise<TransactionListResponse> {

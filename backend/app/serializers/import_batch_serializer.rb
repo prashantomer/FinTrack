@@ -2,24 +2,30 @@
 #
 # Table name: import_batches
 #
-#  id             :bigint           not null, primary key
-#  duplicate_rows :integer          default(0), not null
-#  failed_rows    :integer          default(0), not null
-#  file_name      :string           not null
-#  import_type    :string           not null
-#  import_version :integer          default(1), not null
-#  processed_rows :integer          default(0), not null
-#  status         :string           default("pending"), not null
-#  total_rows     :integer          default(0), not null
-#  created_at     :datetime         not null
-#  updated_at     :datetime         not null
-#  sidekiq_job_id :string
-#  user_id        :bigint           not null
+#  id                  :bigint           not null, primary key
+#  duplicate_rows      :integer          default(0), not null
+#  expected_balance    :decimal(14, 2)
+#  failed_rows         :integer          default(0), not null
+#  file_name           :string           not null
+#  import_number       :integer          not null
+#  import_type         :string           not null
+#  import_version      :integer          default(1), not null
+#  linked_account_type :string
+#  on_balance_mismatch :string           default("ask"), not null
+#  processed_rows      :integer          default(0), not null
+#  status              :string           default("pending"), not null
+#  total_rows          :integer          default(0), not null
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  linked_account_id   :bigint
+#  sidekiq_job_id      :string
+#  user_id             :bigint           not null
 #
 # Indexes
 #
-#  idx_import_batches_version       (user_id,import_type,import_version) UNIQUE
-#  index_import_batches_on_user_id  (user_id)
+#  idx_import_batches_user_id_import_number  (user_id,import_number) UNIQUE
+#  idx_import_batches_version                (user_id,import_type,import_version) UNIQUE
+#  index_import_batches_on_user_id           (user_id)
 #
 # Foreign Keys
 #
@@ -29,6 +35,7 @@ class ImportBatchSerializer < BaseSerializer
   def self.attributes(r)
     {
       id:             r.id,
+      import_number:  r.import_number,
       import_type:    r.import_type,
       status:         r.status,
       file_name:      r.file_name,
@@ -38,6 +45,10 @@ class ImportBatchSerializer < BaseSerializer
       duplicate_rows: r.duplicate_rows,
       import_version: r.import_version,
       progress_pct:   r.progress_pct,
+      linked_account_type: r.linked_account_type,
+      linked_account_id:   r.linked_account_id,
+      on_balance_mismatch: r.on_balance_mismatch,
+      expected_balance:    r.expected_balance&.to_f,
       import_records: r.association(:import_records).loaded? ? import_records_data(r) : [],
       created_at:     r.created_at
     }
