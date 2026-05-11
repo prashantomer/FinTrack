@@ -128,14 +128,14 @@ describe('ImportWizard – Step 4: Upload', () => {
     await user.click(screen.getByRole('button', { name: /next/i }))
     await waitFor(() => expect(screen.getByText(/download sample csv/i)).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: /next/i }))
-    await waitFor(() => expect(screen.getByText(/drag.*drop csv/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/drag.*drop your file/i)).toBeInTheDocument())
   }
 
   it('shows the file upload drop zone', async () => {
     const user = userEvent.setup()
     await goToStep4(user)
 
-    expect(screen.getByText(/drag.*drop csv/i)).toBeInTheDocument()
+    expect(screen.getByText(/drag.*drop your file/i)).toBeInTheDocument()
   })
 })
 
