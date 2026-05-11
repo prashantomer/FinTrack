@@ -129,7 +129,7 @@ TransactionFormatAdapters::Default.opening_balance(rows)
 TransactionFormatAdapters::Icici.opening_balance(rows)
 ```
 
-Both currently delegate to a shared helper that back-calculates from row 1:
+Both currently delegate to a shared helper that back-calculates from row 1 (bank statements are chronological ascending by contract):
 
 ```
 opening = first_row.balance_after − signed_first_delta

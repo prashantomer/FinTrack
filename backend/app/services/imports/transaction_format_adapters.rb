@@ -40,9 +40,10 @@ module Imports
     # Common helper: back-calculate the opening from the first row's
     # `balance_after`. Shared by adapters whose source files carry a
     # running balance column (canonical CSV with the optional column,
-    # ICICI .xls, and most future bank formats). Returns nil if the
-    # first row doesn't have a balance_after, the math is degenerate,
-    # or the implied opening isn't positive.
+    # ICICI .xls, and most future bank formats). Bank statements are
+    # chronological ascending by contract, so the first row is the
+    # earliest txn. Returns nil if the row doesn't have a balance_after,
+    # the math is degenerate, or the implied opening isn't positive.
     def self.back_calc_from_first_row(normalised_rows)
       first = normalised_rows&.first
       return nil unless first && first[:balance_after].present?
