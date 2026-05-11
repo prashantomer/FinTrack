@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Release a new FinTrack version.
+#
+# Rules (enforced, not advisory):
+#   • runs only against `main`
+#   • working tree must be clean
+#   • local main must match `origin/main` (no unpushed / un-fetched commits)
+#   • the target commit must be reachable from `main` (so feature branches
+#     cannot accidentally seed a release)
+#
+# Usage:
+#   bin/release                          # patch bump, release HEAD now
+#   bin/release --minor                  # minor bump from latest tag
+#   bin/release --major                  # major bump from latest tag
+#   bin/release --version v1.2.3         # exact version
+#   bin/release --ref <sha>              # release a specific commit on main
+#   bin/release --at 2026-06-01          # schedule: creates a draft tagged
+#                                        # with "Publish-At: 2026-06-01" so
+#                                        # release-publisher.yml picks it up
+#                                        # on that date.
+#   bin/release --draft                  # create as draft (publish manually later)
+#   bin/release --dry-run                # show what would happen, do nothing
+#
+# Flags combine: `--ref <sha> --at 2026-06-01` ⇒ schedule a release of the
+# given past commit for that date.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# ── Parse args ────────────────────────────────────────────────────────────
+BUMP="patch"
+VERSION=""
+REF="HEAD"
+AT=""
+DRAFT=false
+DRY_RUN=false
+ASSUME_YES=false
+
+usage() {
+  sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --major)   BUMP="major" ;;
+    --minor)   BUMP="minor" ;;
+    --patch)   BUMP="patch" ;;
+    --version) shift; VERSION="$1" ;;
+    --ref)     shift; REF="$1" ;;
+    --at)      shift; AT="$1" ;;
+    --draft)   DRAFT=true ;;
+    --dry-run) DRY_RUN=true ;;
+    --yes|-y)  ASSUME_YES=true ;;
+    -h|--help) usage 0 ;;
+    *) echo "✗ unknown flag: $1" >&2; usage 1 ;;
+  esac
+  shift
+done
+
+# ── Guards ────────────────────────────────────────────────────────────────
+abort() { echo "✗ $*" >&2; exit 1; }
+say()   { echo "▸ $*"; }
+
+[ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] \
+  || abort "Releases only happen from main (you're on '$(git rev-parse --abbrev-ref HEAD)')."
+
+[ -z "$(git status --porcelain)" ] \
+  || abort "Working tree is dirty. Commit or stash before releasing."
+
+git fetch --quiet --tags origin main
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+  abort "Local main is out of sync with origin/main. Pull/push first."
+fi
+
+# Resolve the target commit and verify it's on main.
+TARGET_SHA="$(git rev-parse --verify "$REF^{commit}")" \
+  || abort "Could not resolve ref '$REF' to a commit."
+git merge-base --is-ancestor "$TARGET_SHA" main \
+  || abort "Commit $TARGET_SHA is not reachable from main."
+
+# ── Compute the next version ──────────────────────────────────────────────
+LAST_TAG="$(git tag --sort=-v:refname --list 'v*' | head -n1)"
+LAST_VER="${LAST_TAG#v}"
+LAST_VER="${LAST_VER:-0.0.0}"
+
+if [ -n "$VERSION" ]; then
+  NEXT_VER="${VERSION#v}"
+else
+  IFS='.' read -r MAJ MIN PAT <<<"$LAST_VER"
+  case "$BUMP" in
+    major) MAJ=$((MAJ + 1)); MIN=0; PAT=0 ;;
+    minor) MIN=$((MIN + 1)); PAT=0 ;;
+    patch) PAT=$((PAT + 1)) ;;
+  esac
+  NEXT_VER="$MAJ.$MIN.$PAT"
+fi
+NEXT_TAG="v$NEXT_VER"
+
+git rev-parse -q --verify "refs/tags/$NEXT_TAG" >/dev/null 2>&1 \
+  && abort "Tag $NEXT_TAG already exists."
+
+# Validate --at date format (YYYY-MM-DD, in the future).
+if [ -n "$AT" ]; then
+  echo "$AT" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' \
+    || abort "--at expects YYYY-MM-DD (got '$AT')."
+  TODAY="$(date -u +%Y-%m-%d)"
+  [ "$AT" \> "$TODAY" ] || abort "--at date must be in the future (got $AT, today is $TODAY)."
+fi
+
+# ── Plan summary ──────────────────────────────────────────────────────────
+echo
+echo "Release plan"
+echo "─────────────"
+printf "  %-14s %s\n" "version"   "$LAST_VER → $NEXT_VER"
+printf "  %-14s %s\n" "tag"       "$NEXT_TAG"
+printf "  %-14s %s\n" "commit"    "$TARGET_SHA  ($(git log -1 --format='%s' "$TARGET_SHA"))"
+printf "  %-14s %s\n" "draft"     "$($DRAFT && echo yes || echo no)"
+printf "  %-14s %s\n" "scheduled" "${AT:-no — publish now}"
+echo
+
+if $DRY_RUN; then
+  say "Dry run — no changes made."
+  exit 0
+fi
+
+if ! $ASSUME_YES; then
+  read -r -p "Proceed? [y/N]: " ans
+  case "$ans" in
+    y|Y|yes|YES) : ;;
+    *) abort "Cancelled." ;;
+  esac
+fi
+
+# ── Bump VERSION on main ──────────────────────────────────────────────────
+# Done as a separate commit on top of main so the tag points at a commit
+# whose VERSION file matches the tag name. If the target was a past commit
+# (--ref), we still bump on main HEAD but tag the chosen commit.
+echo "$NEXT_VER" > VERSION
+git add VERSION
+git commit --no-verify -m "Release $NEXT_TAG" >/dev/null
+
+# If the user asked for a past --ref, the tag should sit on that commit and
+# the VERSION-bump commit becomes a no-op on history. To keep things simple
+# we still ship the bump commit (so VERSION on main always reflects the
+# latest tag) and place the tag on the user-chosen ref.
+TAG_SHA="$TARGET_SHA"
+if [ "$REF" = "HEAD" ]; then
+  TAG_SHA="$(git rev-parse HEAD)"
+fi
+
+# ── Tag + push ────────────────────────────────────────────────────────────
+git tag -a "$NEXT_TAG" "$TAG_SHA" -m "Release $NEXT_TAG"
+git push origin main "$NEXT_TAG"
+
+# ── Build release notes + GitHub release ─────────────────────────────────
+NOTES_TARGET="$NEXT_TAG"
+RELEASE_FLAGS=( "--generate-notes" "--target" "$TAG_SHA" )
+if $DRAFT || [ -n "$AT" ]; then
+  RELEASE_FLAGS+=( "--draft" )
+fi
+
+# When scheduling, embed the publish date in the body so a separate
+# `release-publisher` workflow can flip the draft on the right day.
+BODY_NOTE=""
+if [ -n "$AT" ]; then
+  BODY_NOTE="Publish-At: $AT"$'\n\n'"This release is scheduled for publication on $AT. \
+The release-publisher GitHub Action will publish it automatically on that date."
+fi
+
+if [ -n "$BODY_NOTE" ]; then
+  gh release create "$NEXT_TAG" "${RELEASE_FLAGS[@]}" --notes "$BODY_NOTE" --title "$NEXT_TAG"
+else
+  gh release create "$NEXT_TAG" "${RELEASE_FLAGS[@]}" --title "$NEXT_TAG"
+fi
+
+echo
+say "Done. $NOTES_TARGET tagged at $TAG_SHA."
+if [ -n "$AT" ]; then
+  say "Draft release created. Will be published automatically on $AT."
+elif $DRAFT; then
+  say "Draft release created. Publish it manually when ready: gh release edit $NEXT_TAG --draft=false"
+else
+  say "Release published."
+fi

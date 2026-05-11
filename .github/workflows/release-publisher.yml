@@ -1,0 +1,46 @@
+name: Release Publisher
+
+# Publishes any draft release whose body starts with "Publish-At: YYYY-MM-DD"
+# matching today's UTC date. Driven by `bin/release --at YYYY-MM-DD`, which
+# creates the draft and stamps the date into the body.
+#
+# Runs daily and on-demand. Idempotent — re-running on the same day after a
+# successful publish is a no-op (the release is no longer a draft).
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 04:00 UTC daily ≈ 09:30 IST
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish drafts whose Publish-At matches today
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO:  ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TODAY="$(date -u +%Y-%m-%d)"
+          echo "Today (UTC): $TODAY"
+
+          # List draft releases, filter by Publish-At marker in the body.
+          drafts=$(gh release list --limit 50 --json tagName,isDraft,body \
+            --jq ".[] | select(.isDraft == true) | select(.body | test(\"Publish-At: $TODAY\"; \"m\")) | .tagName")
+
+          if [ -z "$drafts" ]; then
+            echo "Nothing scheduled for today."
+            exit 0
+          fi
+
+          echo "Publishing:"
+          echo "$drafts"
+
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            gh release edit "$tag" --draft=false
+            echo "  ✓ $tag published"
+          done <<< "$drafts"
