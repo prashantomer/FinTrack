@@ -72,18 +72,22 @@ RSpec.describe Imports::ProcessTransactionCsvJob, type: :job do
       expect(batch.status).to eq("completed")
     end
 
-    it "skips seeding when the first row's bank_ref is already a duplicate elsewhere" do
-      other_account = create(:account, user: user, nickname: "Other", balance: 0)
-      create(:transaction, user: user, linked_account: other_account,
+    it "skips seeding when the first row would be a duplicate ON THE TARGET account" do
+      # The anchor-dup check defends against re-importing the same statement
+      # into the same account: if row 1 already exists on that account by the
+      # full dedup tuple, the seed would land but the row wouldn't, leaving
+      # the ledger off by that row's delta.
+      create(:transaction, user: user, linked_account: blank_account,
              transaction_type: "debit", amount: 500, date: Date.new(2026, 4, 1),
-             bank_ref: "REF-A")
+             bank_ref: "REF-A", source: "imported")
 
       described_class.new.perform(batch.id)
 
       opening = user.transactions.where("'opening' = ANY(tags)").first
       expect(opening).to be_nil
-      # Row 1 is a duplicate (skipped), row 2 creates a credit on the blank account.
-      expect(blank_account.reload.balance.to_f).to eq(1000.00)
+      # Pre-existing row stays; row 1 in the file dedups; row 2 lands on top.
+      # Balance: 0 (start) - 500 (pre-existing) + 1000 (row 2) = 500.
+      expect(blank_account.reload.balance.to_f).to eq(500.00)
     end
 
     it "skips seeding when the account already has transactions" do

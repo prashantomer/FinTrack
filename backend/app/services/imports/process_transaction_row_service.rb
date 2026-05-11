@@ -66,25 +66,29 @@ module Imports
     # "would this row be treated as a duplicate?" without instantiating
     # the service or constructing a partial ImportRecord side-effect.
     #
-    #   1. If bank_ref is supplied, that IS the uniqueness key — exact match
-    #      or nothing. Structural match is intentionally NOT a fallback here:
-    #      ICICI emits a unique bank_ref per row, but multiple genuine UPIs
-    #      can share (date, amount, type, account), so falling back to
-    #      structural would collapse legitimate repeat payments.
-    #   2. Without bank_ref (legacy canonical CSV with the column blank),
-    #      fall back to structural (date, amount, type, linked_account).
+    # The uniqueness key is always the full tuple
+    # `(date, amount, type, linked_account, bank_ref)` — bank_ref alone is
+    # NOT sufficient. ICICI (and many banks) reuse the same remark string
+    # across genuinely distinct sweep / closure / interest entries dated
+    # different days for different amounts; collapsing on `bank_ref` alone
+    # would drop ~12% of a typical year's statement and leave the account
+    # short by the sum of the merged rows.
+    #
+    # Adding `(date, amount, type)` to the key still catches every real
+    # duplicate (a re-uploaded statement matches all four fields exactly)
+    # and still distinguishes genuine repeat UPIs (two ₹500 payments to
+    # the same merchant on the same day have different UTRs → different
+    # bank_refs → no false merge).
     def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:)
-      if bank_ref
-        return user.transactions.find_by(bank_ref: bank_ref)
-      end
-
-      user.transactions.where(
+      scope = user.transactions.where(
         date:                date,
         amount:              amount,
         transaction_type:    type,
         linked_account_type: linked_account ? linked_account.class.name : nil,
         linked_account_id:   linked_account&.id
-      ).first
+      )
+      scope = scope.where(bank_ref: bank_ref) if bank_ref
+      scope.first
     end
 
     def register_duplicate(existing)

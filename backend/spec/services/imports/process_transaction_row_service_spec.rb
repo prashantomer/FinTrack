@@ -149,23 +149,37 @@ RSpec.describe Imports::ProcessTransactionRowService, type: :service do
     end
 
     describe "duplicate detection" do
-      it "skips when bank_ref matches an existing transaction" do
-        call_service(bank_ref: "UTR-123")
+      it "skips when (date, amount, type, account, bank_ref) all match" do
+        call_service(bank_ref: "UTR-123", linked_account_nickname: "My Savings")
         expect {
-          call_service(idx: 1, bank_ref: "UTR-123", amount: "9999")
+          call_service(idx: 1, bank_ref: "UTR-123", linked_account_nickname: "My Savings")
         }.not_to change(Transaction, :count)
       end
 
+      it "does NOT skip when bank_ref matches but amount/date differ" do
+        # ICICI (and many banks) reuse the same remark string across genuinely
+        # distinct sweep / closure / interest entries dated different days for
+        # different amounts. Keying dedup on bank_ref alone collapsed those
+        # rows and left the account short. The fix: bank_ref is part of the
+        # uniqueness tuple, not the whole tuple.
+        call_service(bank_ref: "ICICI:Rev Sweep From", amount: "1000", date: "2024-03-01",
+                     linked_account_nickname: "My Savings")
+        expect {
+          call_service(idx: 1, bank_ref: "ICICI:Rev Sweep From", amount: "2500", date: "2024-04-05",
+                       linked_account_nickname: "My Savings")
+        }.to change(Transaction, :count).by(1)
+      end
+
       it "returns the DUPLICATE sentinel and creates a :skipped ImportRecord with reference" do
-        first = call_service(bank_ref: "UTR-123")
-        result = call_service(idx: 1, bank_ref: "UTR-123")
+        first = call_service(bank_ref: "UTR-123", linked_account_nickname: "My Savings")
+        result = call_service(idx: 1, bank_ref: "UTR-123", linked_account_nickname: "My Savings")
         expect(result).to eq(described_class::DUPLICATE)
         ir = ImportRecord.where(status: "skipped").last
         expect(ir.importable).to eq(first)
         expect(ir.notes).to include("Duplicate of Transaction ##{first.id}").and include("bank_ref UTR-123")
       end
 
-      it "falls back to (date, amount, type, account) when bank_ref is absent" do
+      it "still dedups on (date, amount, type, account) when bank_ref is absent" do
         call_service(bank_ref: nil, linked_account_nickname: "My Savings")
         expect {
           call_service(idx: 1, bank_ref: nil, linked_account_nickname: "My Savings")

@@ -81,10 +81,16 @@ flowchart TD
 
 Lives in `ProcessTransactionRowService.duplicate_for` — class method, reusable from anywhere.
 
-1. **`bank_ref` present** → exact match by `bank_ref` is the answer. No structural fallback (multiple genuine UPIs can share `(date, amount, type, account)` — falling back would collapse legitimate repeat payments).
-2. **`bank_ref` absent** → structural match on `(date, amount, type, linked_account)`.
+The uniqueness tuple is always `(date, amount, type, linked_account, bank_ref?)` — `bank_ref` is *part* of the key when present, not the whole key:
+
+- A row dedups if every populated field matches an existing transaction for this user.
+- Two ₹500 UPIs to the same merchant on the same day stay distinct (different UTR → different `bank_ref`).
+- Recurring ICICI sweep / closure / interest entries that reuse the same remark string across different dates and amounts stay distinct too.
+- A re-uploaded statement matches on all four/five fields, so it cleanly dedups.
 
 A match writes an `ImportRecord` with `status: :skipped` and `notes: "Duplicate of Transaction #N (bank_ref … | date, ₹amount type)"`, and bumps `import_batches.duplicate_rows`.
+
+> **Why not just `bank_ref` when it's present?** That's what the ladder used to do. ICICI (and many banks) reuse remark strings across genuinely distinct rows — e.g. ten `Rev Sweep From 328713003095` entries spanning a year, each with different dates and amounts. Keying on `bank_ref` alone collapsed all ten into one transaction and left the account short by the sum of the merged rows. Including `(date, amount, type)` in the key fixes that without weakening the "genuine repeat UPI" guarantee, because real repeat UPIs have *different* `bank_ref`s.
 
 ## End-of-import reconciliation
 
