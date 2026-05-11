@@ -50,7 +50,22 @@ module Imports
 
     private
 
-    # Dedupe ladder:
+    def find_duplicate(date, amount, type, linked_account, bank_ref)
+      self.class.duplicate_for(
+        user:           @user,
+        date:           date,
+        amount:         amount,
+        type:           type,
+        linked_account: linked_account,
+        bank_ref:       bank_ref
+      )
+    end
+
+    # Dedupe ladder — class method so callers other than the row-processor
+    # (e.g. the opening-balance seed in ProcessTransactionCsvJob) can ask
+    # "would this row be treated as a duplicate?" without instantiating
+    # the service or constructing a partial ImportRecord side-effect.
+    #
     #   1. If bank_ref is supplied, that IS the uniqueness key — exact match
     #      or nothing. Structural match is intentionally NOT a fallback here:
     #      ICICI emits a unique bank_ref per row, but multiple genuine UPIs
@@ -58,19 +73,18 @@ module Imports
     #      structural would collapse legitimate repeat payments.
     #   2. Without bank_ref (legacy canonical CSV with the column blank),
     #      fall back to structural (date, amount, type, linked_account).
-    def find_duplicate(date, amount, type, linked_account, bank_ref)
+    def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:)
       if bank_ref
-        return @user.transactions.find_by(bank_ref: bank_ref)
+        return user.transactions.find_by(bank_ref: bank_ref)
       end
 
-      scope = @user.transactions.where(
+      user.transactions.where(
         date:                date,
         amount:              amount,
         transaction_type:    type,
         linked_account_type: linked_account ? linked_account.class.name : nil,
         linked_account_id:   linked_account&.id
-      )
-      scope.first
+      ).first
     end
 
     def register_duplicate(existing)
@@ -113,6 +127,10 @@ module Imports
     end
 
     def parse_date!(value)
+      self.class.parse_date!(value)
+    end
+
+    def self.parse_date!(value)
       raw = value.to_s.strip
       raise "date is required" if raw.blank?
 

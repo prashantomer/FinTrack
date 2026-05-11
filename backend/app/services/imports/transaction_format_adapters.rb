@@ -19,12 +19,60 @@ module Imports
       Default
     end
 
+    # Opening-balance seed contract.
+    #
+    # Each adapter implements `.opening_balance(normalised_rows)` returning
+    # either `nil` (no seed possible / not applicable for this format) or
+    # an OpeningSeed struct:
+    #
+    #   amount      — Numeric, the implied opening balance (> 0).
+    #   anchor_row  — Hash (normalised row) or nil. When set, the seed was
+    #                 back-calculated from this row, and that row must
+    #                 actually land in the ledger for the seed to be safe.
+    #                 The job runs the anchor through the same dedup ladder
+    #                 used during row processing (Imports::ProcessTransactionRow\
+    #                 Service.duplicate_for). nil means the opening came
+    #                 from an explicit source (e.g. a header row in the
+    #                 statement, an attribute on the batch) and no anchor
+    #                 dedup check is required.
+    OpeningSeed = Struct.new(:amount, :anchor_row, keyword_init: true)
+
+    # Common helper: back-calculate the opening from the first row's
+    # `balance_after`. Shared by adapters whose source files carry a
+    # running balance column (canonical CSV with the optional column,
+    # ICICI .xls, and most future bank formats). Returns nil if the
+    # first row doesn't have a balance_after, the math is degenerate,
+    # or the implied opening isn't positive.
+    def self.back_calc_from_first_row(normalised_rows)
+      first = normalised_rows&.first
+      return nil unless first && first[:balance_after].present?
+
+      amount = first[:amount].to_f
+      return nil unless amount > 0
+      type   = first[:type].to_s.downcase
+      return nil unless %w[credit debit].include?(type)
+
+      delta   = type == "credit" ? amount : -amount
+      opening = (first[:balance_after].to_f - delta).round(2)
+      return nil if opening <= 0
+
+      OpeningSeed.new(amount: opening, anchor_row: first)
+    end
+
     # Canonical CSV format — fields already match the ProcessTransactionRow
     # contract, so transform is a no-op aside from defensive symbolisation.
     module Default
       def self.transform(row, batch: nil)
         h = row.respond_to?(:to_h) ? row.to_h : row
         h.transform_keys { |k| k.to_s.strip.downcase.to_sym }
+      end
+
+      # Canonical CSV doesn't require a running balance column, but
+      # accepts an optional `balance_after` if the producer chose to
+      # include it. When present, derive the opening the same way the
+      # bank-specific adapters do.
+      def self.opening_balance(normalised_rows)
+        TransactionFormatAdapters.back_calc_from_first_row(normalised_rows)
       end
     end
 
@@ -86,6 +134,11 @@ module Imports
 
       def self.parse_amount(raw)
         raw.to_s.strip.delete(",").to_f
+      end
+
+      # ICICI's Balance(INR) column makes back-calculation straightforward.
+      def self.opening_balance(normalised_rows)
+        TransactionFormatAdapters.back_calc_from_first_row(normalised_rows)
       end
     end
   end

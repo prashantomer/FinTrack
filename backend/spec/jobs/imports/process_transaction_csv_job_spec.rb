@@ -31,6 +31,75 @@ RSpec.describe Imports::ProcessTransactionCsvJob, type: :job do
     end
   end
 
+  describe "blank-account opening balance seed" do
+    let(:blank_account) { create(:account, user: user, nickname: "ICICI Blank", balance: 0, open_date: Date.new(2026, 3, 1)) }
+
+    let(:csv_text) do
+      # First row's balance_after is 4,500 after a 500 debit → opening 5,000.
+      # Then a 1,000 credit takes it to 5,500.
+      <<~CSV
+        date,amount,type,linked_account_nickname,description,tags,bank_ref,balance_after
+        2026-04-01,500.00,debit,ICICI Blank,Coffee,,REF-A,4500.00
+        2026-04-02,1000.00,credit,ICICI Blank,Refund,,REF-B,5500.00
+      CSV
+    end
+
+    let(:batch) do
+      b = create(:import_batch,
+                 user:                user,
+                 import_type:         "transactions",
+                 file_name:           "blank.csv",
+                 linked_account_type: "Account",
+                 linked_account_id:   blank_account.id)
+      b.file.attach(io: StringIO.new(csv_text), filename: "blank.csv", content_type: "text/csv")
+      b
+    end
+
+    it "seeds an opening Transaction and leaves the account reconciled" do
+      described_class.new.perform(batch.id)
+      batch.reload
+      blank_account.reload
+
+      opening = blank_account.user.transactions
+                             .where(linked_account_type: "Account", linked_account_id: blank_account.id)
+                             .where("'opening' = ANY(tags)")
+                             .first
+      expect(opening).to be_present
+      expect(opening.amount.to_f).to eq(5000.00)
+      expect(opening.transaction_type).to eq("credit")
+      expect(opening.date).to eq(blank_account.open_date)
+      expect(blank_account.balance.to_f).to eq(5500.00)
+      expect(batch.status).to eq("completed")
+    end
+
+    it "skips seeding when the first row's bank_ref is already a duplicate elsewhere" do
+      other_account = create(:account, user: user, nickname: "Other", balance: 0)
+      create(:transaction, user: user, linked_account: other_account,
+             transaction_type: "debit", amount: 500, date: Date.new(2026, 4, 1),
+             bank_ref: "REF-A")
+
+      described_class.new.perform(batch.id)
+
+      opening = user.transactions.where("'opening' = ANY(tags)").first
+      expect(opening).to be_nil
+      # Row 1 is a duplicate (skipped), row 2 creates a credit on the blank account.
+      expect(blank_account.reload.balance.to_f).to eq(1000.00)
+    end
+
+    it "skips seeding when the account already has transactions" do
+      create(:transaction, user: user, linked_account: blank_account,
+             transaction_type: "credit", amount: 100, date: Date.new(2026, 3, 15))
+      starting = blank_account.reload.balance.to_f
+
+      described_class.new.perform(batch.id)
+
+      opening = user.transactions.where("'opening' = ANY(tags)").first
+      expect(opening).to be_nil
+      # Only the two imported rows applied, no opening seed.
+      expect(blank_account.reload.balance.to_f).to eq(starting - 500 + 1000)
+    end
+  end
+
   # Note: ICICI-format .xls coverage lives elsewhere (or pending a synthetic
   # fixture). We deliberately don't commit a real bank-statement file to the
   # repo. The canonical CSV path above covers the rest of the job behaviour
