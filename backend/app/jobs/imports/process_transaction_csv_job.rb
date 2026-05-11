@@ -9,6 +9,11 @@ module Imports
   class ProcessTransactionCsvJob < ApplicationJob
     queue_as :imports
 
+    # Anything within this rupee threshold of `expected_balance` is treated
+    # as a perfect match. Lower than this is sub-paisa floating-point noise
+    # that can creep in from the bank file's decimal serialisation.
+    BALANCE_GAP_TOLERANCE = 0.01
+
     def perform(import_batch_id)
       batch = ImportBatch.find(import_batch_id)
       batch.update!(status: :processing)
@@ -56,70 +61,33 @@ module Imports
 
     private
 
-    # Run the anchor row through the same dedup ladder used during row
-    # processing, so the seed check stays consistent with whatever the
-    # adapter's format calls a duplicate. Returns false if the anchor's
-    # date/type/amount are malformed — the row will then fail in the
-    # main loop with a clear error, but seeding shouldn't pre-empt that.
-    def anchor_is_duplicate?(batch, account, anchor_row)
-      date = Imports::ProcessTransactionRowService.parse_date!(anchor_row[:date])
-      Imports::ProcessTransactionRowService.duplicate_for(
-        user:           batch.user,
-        date:           date,
-        amount:         anchor_row[:amount].to_f,
-        type:           anchor_row[:type].to_s.downcase,
-        linked_account: account,
-        bank_ref:       anchor_row[:bank_ref].presence
-      ).present?
-    rescue
-      false
-    end
-
     def seed_opening_balance_if_blank!(batch, adapter, normalised_rows)
-      return unless batch.linked_account_type == "Account" && batch.linked_account_id
-      account = Account.find_by(id: batch.linked_account_id, user_id: batch.user_id)
+      account = resolve_blank_seed_target(batch)
       return unless account
-      return unless account.balance.to_f.zero?
-      return if Transaction.exists?(
-        linked_account_type: "Account",
-        linked_account_id:   account.id
-      )
 
       seed = adapter.opening_balance(normalised_rows)
       return unless seed && seed.amount.to_f > 0
 
-      # If the adapter back-calculated the opening from an anchor row, that
+      anchor_date = parse_anchor_date(seed.anchor_row)
+
+      # If the adapter back-calculated the opening from an anchor row, the
       # row must actually land in the ledger. Run it through the same dedup
-      # ladder the row-processor uses — however the active adapter's format
-      # identifies a duplicate (bank_ref for ICICI, structural fallback for
-      # canonical CSV, future bank conventions) — and bail if it would be
-      # treated as a duplicate. Otherwise the row gets :skipped while the
-      # seed is applied and the ledger ends up off by that delta.
-      if seed.anchor_row && anchor_is_duplicate?(batch, account, seed.anchor_row)
+      # ladder the row-processor uses, so the seed check stays consistent
+      # however the active adapter identifies duplicates. If the row would
+      # be skipped, applying the seed would leave the account off by its
+      # delta — bail out.
+      if seed.anchor_row && anchor_date && anchor_is_duplicate?(batch, account, seed.anchor_row, anchor_date)
         return
       end
 
-      # Date the seed on the same date as the first imported row, not on
-      # account.open_date. The two are commonly different: an account
-      # opened in 2016 might be receiving a 2022-23 statement, in which
-      # case dating the opening at 2016 misrepresents when the carried-
-      # forward balance was actually established. The seed represents
-      # "whatever balance existed just before this statement starts" —
-      # parking it on the first row's date keeps the ledger chronological
-      # and lets the seed sort directly above row 0 (same date, lower id).
-      #
-      # Fall back to account.open_date if the anchor row's date is missing
-      # or unparseable (shouldn't happen, but lets us stay defensive
-      # against a malformed adapter response).
-      anchor_date =
-        begin
-          seed.anchor_row && Imports::ProcessTransactionRowService.parse_date!(seed.anchor_row[:date])
-        rescue StandardError
-          nil
-        end
+      # Park the seed on the first imported row's date (not account.open_date
+      # — they're commonly different, e.g. an account opened in 2016
+      # receiving a 2022-23 statement). The seed represents "whatever
+      # balance existed just before this statement starts", so dating it
+      # on row 0's date keeps the ledger chronological. The model
+      # validator forbids date < open_date, so clamp up if the file's
+      # earliest row somehow predates the account.
       seed_date = anchor_date || account.open_date
-      # The validator forbids date < open_date — clamp up if the first row
-      # somehow predates the account's open_date.
       seed_date = account.open_date if seed_date < account.open_date
 
       opening_txn = Transaction.create!(
@@ -144,6 +112,36 @@ module Imports
         status:     :ok,
         notes:      "Opening balance seed (back-calculated from first row)"
       )
+    end
+
+    # Returns the Account eligible for an opening-balance seed, or nil if
+    # the batch isn't seedable (wrong target type, account missing,
+    # account already has balance, or pre-existing transactions).
+    def resolve_blank_seed_target(batch)
+      return nil unless batch.linked_account_type == "Account" && batch.linked_account_id
+      account = Account.find_by(id: batch.linked_account_id, user_id: batch.user_id)
+      return nil unless account
+      return nil unless account.balance.to_f.zero?
+      return nil if Transaction.exists?(linked_account_type: "Account", linked_account_id: account.id)
+      account
+    end
+
+    def parse_anchor_date(anchor_row)
+      return nil unless anchor_row
+      Imports::ProcessTransactionRowService.parse_date!(anchor_row[:date])
+    rescue Imports::Error
+      nil
+    end
+
+    def anchor_is_duplicate?(batch, account, anchor_row, anchor_date)
+      Imports::ProcessTransactionRowService.duplicate_for(
+        user:           batch.user,
+        date:           anchor_date,
+        amount:         anchor_row[:amount].to_f,
+        type:           anchor_row[:type].to_s.downcase,
+        linked_account: account,
+        bank_ref:       anchor_row[:bank_ref].presence
+      ).present?
     end
 
     # After all rows have been processed, compare the computed account balance
@@ -184,7 +182,7 @@ module Imports
 
       gap = (account.balance.to_f - expected_balance.to_f).round(2)
 
-      if gap.abs < 0.01
+      if gap.abs < BALANCE_GAP_TOLERANCE
         batch.update!(status: :completed, result_message: summary_message(ok_rows, dup_rows, err_rows))
         return
       end
