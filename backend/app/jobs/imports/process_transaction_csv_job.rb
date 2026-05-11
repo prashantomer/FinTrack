@@ -90,7 +90,7 @@ module Imports
         return
       end
 
-      Transaction.create!(
+      opening_txn = Transaction.create!(
         user:                account.user,
         source:              "manual",
         amount:              seed.amount,
@@ -100,6 +100,17 @@ module Imports
         tags:                [ "adjustment", "opening" ],
         linked_account_type: "Account",
         linked_account_id:   account.id
+      )
+
+      # Tie the seed to the batch via ImportRecord so AbortBatchService
+      # walks it on rollback. row_index -1 distinguishes it from real
+      # file rows (which are 0-indexed); the notes line keeps it obvious
+      # in the UI's import detail view.
+      batch.import_records.create!(
+        importable: opening_txn,
+        row_index:  -1,
+        status:     :ok,
+        notes:      "Opening balance seed (back-calculated from first row)"
       )
     end
 
