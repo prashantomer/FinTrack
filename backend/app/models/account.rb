@@ -55,14 +55,22 @@ class Account < ApplicationRecord
     closed_date.present?
   end
 
-  def debit!(amount)
+  # Direct credit/debit (not driven by a Transaction). Callers MUST pass
+  # `source:` so the audit row records what caused the change — e.g.
+  # `account.credit!(amount, source: "close:term_account_#{ta.id}")`.
+  # Without a source the audit log shows an anonymous "Balance update",
+  # which is what we used to do — and which made past mysteries hard to
+  # trace back to their cause.
+  def debit!(amount, source: nil)
     raise Error, "Account '#{nickname}' is closed" if closed?
     raise Error, "Insufficient balance in '#{nickname}' (available: #{balance}, required: #{amount})" if balance < amount
+    self.audit_comment = source if source
     update!(balance: balance - amount)
   end
 
-  def credit!(amount)
+  def credit!(amount, source: nil)
     raise Error, "Account '#{nickname}' is closed" if closed?
+    self.audit_comment = source if source
     update!(balance: balance + amount)
   end
 end
