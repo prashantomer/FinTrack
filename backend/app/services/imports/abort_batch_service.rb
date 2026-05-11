@@ -15,13 +15,10 @@ module Imports
     def call
       ActiveRecord::Base.transaction do
         txns = @batch.import_records.where(importable_type: "Transaction").includes(:importable)
-        txns.each do |rec|
-          txn = rec.importable
-          next unless txn
-
-          reverse_balance!(txn)
-          txn.destroy
-        end
+        # `txn.destroy` fires Transaction#before_destroy → reverse_balance_delta,
+        # which already restores the account balance + writes an audit row
+        # ("revert:txn_N"). We just need to walk through and destroy.
+        txns.each { |rec| rec.importable&.destroy }
         @batch.import_records.delete_all
         @batch.update!(
           status:          :failed,
@@ -31,23 +28,6 @@ module Imports
         )
       end
       @batch
-    end
-
-    private
-
-    # Restores the account balance to what it was before this transaction
-    # ran. Uses the same `audit_comment` pattern as the original write so
-    # the audit log shows a clean pair: "txn:N" (apply) → "abort:N" (undo).
-    def reverse_balance!(txn)
-      acct = txn.linked_account
-      return if acct.nil?
-      return if acct.is_a?(TermAccount) && acct.fd?
-
-      delta = txn.credit? ? -txn.amount.to_f : txn.amount.to_f
-      Audited.audit_class.as_user(txn.user) do
-        acct.audit_comment = "abort:txn_#{txn.id}"
-        acct.update!(balance: acct.balance.to_f + delta)
-      end
     end
   end
 end

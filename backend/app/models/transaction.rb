@@ -56,9 +56,29 @@ class Transaction < ApplicationRecord
   validates :date,   presence: true
   validate  :date_after_account_open_date
 
-  after_create :apply_balance_delta
+  after_create   :apply_balance_delta
+  before_destroy :reverse_balance_delta
 
   private
+
+  # Mirror of `apply_balance_delta`: if a transaction is destroyed, undo
+  # its effect on the linked account so balance stays consistent with the
+  # remaining transactions. Skips FD term accounts (their balance is
+  # principal-based, never derived from txns).
+  #
+  # `before_destroy` runs *before* the row is deleted so `audit_comment`
+  # can still reference the soon-to-vanish transaction id for traceability
+  # ("revert:txn_N" tells the audit log it's a reversal, not a real spend).
+  def reverse_balance_delta
+    return unless linked_account.present?
+    return if linked_account.is_a?(TermAccount) && linked_account.fd?
+
+    delta = credit? ? -amount.to_f : amount.to_f
+    Audited.audit_class.as_user(user) do
+      linked_account.audit_comment = "revert:txn_#{id}"
+      linked_account.update!(balance: linked_account.balance.to_f + delta)
+    end
+  end
 
   # `open_date` is a hard cutoff. Anything prior to it must be folded into the
   # opening deposit (a regular credit dated on the open date). Transactions
