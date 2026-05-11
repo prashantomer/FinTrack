@@ -105,4 +105,42 @@ describe('ImportsPage', () => {
       expect(screen.getByText('Invalid amount')).toBeInTheDocument(),
     )
   })
+
+  it('shows the resolve/abort banner inline for needs_reconciliation batches', async () => {
+    server.use(
+      http.get('/api/v1/imports', () =>
+        HttpResponse.json({
+          success: true,
+          code: 200,
+          request_id: 'test',
+          data: [
+            {
+              id: 11,
+              import_type: 'transactions',
+              status: 'needs_reconciliation',
+              file_name: 'statement.xls',
+              total_rows: 410,
+              processed_rows: 410,
+              failed_rows: 0,
+              duplicate_rows: 48,
+              import_version: 1,
+              progress_pct: 100,
+              import_records: [],
+              expected_balance: 337707.06,
+              created_at: '2026-05-11T00:00:00Z',
+            },
+          ],
+          meta_data: { total: 1, page: 1, page_size: 20 },
+        }),
+      ),
+    )
+
+    renderWithProviders(<ImportsPage />)
+
+    // Banner copy + both action buttons should be visible without any row click.
+    await waitFor(() => expect(screen.getByText(/balance mismatch/i)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /create adjustment/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^abort$/i })).toBeInTheDocument()
+    expect(screen.getByText(/3,37,707\.06/)).toBeInTheDocument()
+  })
 })

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ImportWizard } from '@/components/imports/ImportWizard'
-import { useInfiniteImports } from '@/hooks/useImports'
+import { useInfiniteImports, useResolveImport } from '@/hooks/useImports'
 import type { ImportBatch, ImportStatus } from '@/types'
 
 function statusVariant(status: ImportStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -64,9 +64,54 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
   )
 }
 
+// Inline resolution panel for batches stuck at `needs_reconciliation`.
+// Mirrors the banner in ImportWizard so the same actions are available from
+// the list view after a page reload (otherwise the wizard's banner is the
+// only entry point and a refreshed user has no way to resolve the batch).
+function ReconciliationRow({ batch }: { batch: ImportBatch }) {
+  const resolveMutation = useResolveImport()
+  const resolve = (action: 'adjust' | 'abort') =>
+    resolveMutation.mutate({ importId: batch.id, action })
+
+  return (
+    <TableRow>
+      <TableCell colSpan={7} className="bg-amber-50 dark:bg-amber-950/30 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-amber-900 dark:text-amber-200">Balance mismatch</p>
+            {batch.expected_balance != null && (
+              <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">
+                The source file says the account should end at{' '}
+                <strong>
+                  ₹{batch.expected_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </strong>
+                , but applying every transaction lands at a different balance. Choose how to resolve.
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" onClick={() => resolve('adjust')} disabled={resolveMutation.isPending}>
+              Create adjustment
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => resolve('abort')}
+              disabled={resolveMutation.isPending}
+            >
+              Abort
+            </Button>
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
 function BatchRow({ batch }: { batch: ImportBatch }) {
   const [expanded, setExpanded] = useState(false)
   const canExpand = batch.status === 'completed' || batch.status === 'failed'
+  const needsReconcile = batch.status === 'needs_reconciliation'
   return (
     <>
       <TableRow
@@ -113,6 +158,7 @@ function BatchRow({ batch }: { batch: ImportBatch }) {
         </TableCell>
       </TableRow>
       {expanded && <ExpandedRows batch={batch} />}
+      {needsReconcile && <ReconciliationRow batch={batch} />}
     </>
   )
 }
