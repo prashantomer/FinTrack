@@ -16,7 +16,11 @@ module TermAccounts
 
         @ta.close!(closed_date: closed_date, closed_amount: closed_amount)
 
-        @ta.parent_account.credit!(closed_amount)
+        # The maturity Transaction's after_create callback runs
+        # `apply_balance_delta`, which already credits the parent account.
+        # Previously we also called `parent_account.credit!(closed_amount)`
+        # explicitly here — that was a duplicate write, so closing an
+        # FD/PPF double-credited the parent and produced two audit rows.
         @ta.user.transactions.create!(
           amount:           closed_amount,
           transaction_type: "credit",
