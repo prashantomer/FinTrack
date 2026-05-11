@@ -44,7 +44,9 @@ module Cleanup
     def delete_for(sector, scope)
       case sector
       when "import_batches"
-        # destroy_all so ActiveStorage blobs are purged and import_records cascade.
+        # Bulk-delete child import_records first (no callbacks/attachments),
+        # then destroy_all the batches so ActiveStorage blobs still purge.
+        ImportRecord.where(import_batch_id: scope.select(:id)).delete_all
         scope.destroy_all.size
       else
         scope.delete_all
