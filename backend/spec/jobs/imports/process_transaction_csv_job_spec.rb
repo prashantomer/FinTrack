@@ -24,7 +24,7 @@ RSpec.describe Imports::ProcessTransactionCsvJob, type: :job do
       described_class.new.perform(batch.id)
       batch.reload
       expect(batch.status).to eq("completed")
-      expect(batch.total_rows).to    eq(2)
+      expect(batch.total_rows).to eq(2)
       expect(batch.processed_rows).to eq(2)
       expect(batch.failed_rows).to    eq(0)
       expect(user.transactions.where(source: "imported").count).to eq(2)

@@ -35,7 +35,17 @@ module Api
 
         case params[:action_choice].to_s
         when "adjust"
-          account = batch.linked_account_type.safe_constantize.find(batch.linked_account_id)
+          # Explicit allowlist — safe_constantize on a DB value tripped
+          # brakeman as a possible RCE surface even though we only ever
+          # write "Account" or "TermAccount" into linked_account_type.
+          klass =
+            case batch.linked_account_type
+            when "Account"     then Account
+            when "TermAccount" then TermAccount
+            else return render_error(message: "Batch is not linked to a balance-bearing account")
+            end
+          account = klass.find_by(id: batch.linked_account_id)
+          return render_error(message: "Linked account not found") if account.nil?
           Accounts::AdjustBalanceService.new(
             current_user, account,
             target_balance: batch.expected_balance,

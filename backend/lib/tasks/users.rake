@@ -110,11 +110,12 @@ namespace :users do
 
   desc "List all users with their kind (real / dummy). Pass KIND=dummy or KIND=real to filter."
   task list: :environment do
-    scope = case ENV["KIND"].to_s.downcase
-            when "dummy" then User.dummy
-            when "real"  then User.real
-            else              User.all
-            end
+    scope =
+      case ENV["KIND"].to_s.downcase
+      when "dummy" then User.dummy
+      when "real"  then User.real
+      else              User.all
+      end
     scope = scope.order(:id)
 
     if scope.empty?

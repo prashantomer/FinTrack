@@ -78,7 +78,7 @@ module Cleanup
     def format_row(sector, r)
       case sector
       when "transactions"
-        "#{r.date}  #{r.transaction_type[0,3].upcase}  ₹#{format('%.2f', r.amount)}  #{r.description&.slice(0, 50)}"
+        "#{r.date}  #{r.transaction_type[0, 3].upcase}  ₹#{format('%.2f', r.amount)}  #{r.description&.slice(0, 50)}"
       when "investments"
         "#{r.purchase_date}  #{r.investment_type}  #{r.name&.slice(0, 50)}"
       when "holdings"
