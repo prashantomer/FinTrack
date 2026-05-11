@@ -271,6 +271,7 @@ Detailed docs live in `docs/`:
 - [docs/backend-architecture.md](docs/backend-architecture.md) — full DB schema, request lifecycle, service patterns.
 - [docs/frontend-architecture.md](docs/frontend-architecture.md) — routing, state management, form patterns, chart setup.
 - [docs/dev-commands.md](docs/dev-commands.md) — scenario-grouped command reference.
+- [docs/importer.md](docs/importer.md) — CSV / bank-statement import flow, adapter contract, dedup ladder, opening-balance seed, worked example.
 
 ## Code Review Graph
 
