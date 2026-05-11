@@ -36,6 +36,7 @@ export interface User {
   full_name: string
   is_active: boolean
   is_superuser: boolean
+  is_dummy: boolean
   currency_code: string
   currency_locale: string
   created_at: string
@@ -372,7 +373,9 @@ export type FolioListResponse = HoldingListResponse
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 export type ImportType   = 'investments' | 'transactions' | 'term_accounts'
-export type ImportStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type ImportStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'needs_reconciliation'
+
+export type ReconciliationMode = 'ask' | 'adjust' | 'fail'
 
 export interface ImportRowResult {
   row_index: number
@@ -382,6 +385,8 @@ export interface ImportRowResult {
 
 export interface ImportBatch {
   id:             number
+  /** Friendly per-user sequence (#1, #2, ...) shown in the UI. Global across import types. */
+  import_number:  number
   import_type:    ImportType
   status:         ImportStatus
   file_name:      string
@@ -393,6 +398,11 @@ export interface ImportBatch {
   progress_pct:   number
   import_records: ImportRowResult[]
   created_at:     string
+  // Populated for transaction imports from balance-aware sources (e.g. ICICI xls):
+  // the source file's last running balance + the user's policy for what to
+  // do when it disagrees with the computed account.balance.
+  on_balance_mismatch?: ReconciliationMode
+  expected_balance?:    number | null
 }
 
 export interface ImportListResponse {

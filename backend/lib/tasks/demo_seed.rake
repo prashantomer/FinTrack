@@ -1,18 +1,47 @@
 namespace :db do
   namespace :seed do
-    desc "Wipe and recreate heavy demo data with proper transaction accounting"
+    desc <<~DESC
+      Wipe and recreate heavy demo data on a DUMMY user. Safety guard: the task
+      refuses to run unless the target user exists and has is_dummy=true. The
+      target email is read interactively from stdin every run — no ENV
+      fallback, no default, no silent re-use of the last one.
+
+        $ bin/rails db:seed:demo
+        Target user email (must be marked dummy): test@fintrack.dev
+    DESC
     task demo: :environment do
-      EMAIL    = "test@fintrack.dev"
+      # Always prompt — never read from ENV. The seed task is destructive
+      # (wipes accounts, txns, investments) so we force an interactive
+      # confirmation that the operator typed a real (dummy) user's email.
+      print "Target user email (must be marked dummy): "
+      email = $stdin.gets.to_s.strip
+      abort "Email is required. Aborting." if email.empty?
+
       PASSWORD = "password123"
 
-      user = User.find_or_initialize_by(email: EMAIL)
+      user = User.find_by(email: email)
+      if user.nil?
+        abort "No user with email '#{email}'. Create one first via " \
+              "`bin/rails users:create DUMMY=1` (or `bin/rails users:create` then " \
+              "`bin/rails users:mark EMAIL=#{email}`)."
+      end
+      unless user.is_dummy?
+        abort "Refusing to run db:seed:demo on a REAL user (#{user.email}). " \
+              "Mark them dummy first via `bin/rails users:mark EMAIL=#{user.email}` " \
+              "if you really mean to, or pass EMAIL=<a-dummy-user>."
+      end
+
       user.assign_attributes(
         first_name: "Demo", last_name: "User",
         password: PASSWORD, is_active: true, is_superuser: false,
-        currency_code: "INR", currency_locale: "en-IN"
+        currency_code: "INR", currency_locale: "en-IN",
+        # Demo data — flag explicitly so the user count / admin reports
+        # can filter this row out of "real users". A pre-existing real user
+        # would have been rejected by the guard above, so it's safe to set.
+        is_dummy: true
       )
       user.save!
-      puts "User: #{user.email}"
+      puts "User: #{user.email} (dummy: #{user.is_dummy?})"
 
       user.transactions.delete_all
       user.investments.delete_all

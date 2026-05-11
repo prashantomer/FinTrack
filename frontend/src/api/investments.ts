@@ -1,4 +1,4 @@
-import type { ApiResponse, Investment, InvestmentListResponse, InvestmentType, TradeType } from '@/types'
+import type { ApiResponse, Investment, InvestmentListResponse, InvestmentType, RecordSource, TradeType } from '@/types'
 import client from './client'
 
 export interface InvestmentListFilters {
@@ -7,18 +7,24 @@ export interface InvestmentListFilters {
   search?: string
   date_from?: string
   date_to?: string
+  source?: RecordSource
+  sort_by?: 'date'
+  sort_dir?: 'asc' | 'desc'
   page?: number
   page_size?: number
 }
 
 export async function listInvestments(filters: InvestmentListFilters = {}): Promise<InvestmentListResponse> {
-  const { type, trade_type, search, date_from, date_to, page = 1, page_size = 20 } = filters
+  const { type, trade_type, search, date_from, date_to, source, sort_by, sort_dir, page = 1, page_size = 20 } = filters
   const params: Record<string, unknown> = { page, page_size }
   if (type?.length)        params.investment_type = type
   if (trade_type)          params.trade_type = trade_type
   if (search)              params.search = search
   if (date_from)           params.date_from = date_from
   if (date_to)             params.date_to = date_to
+  if (source)              params.source = source
+  if (sort_by)             params.sort_by = sort_by
+  if (sort_dir)            params.sort_dir = sort_dir
   const res = await client.get<ApiResponse<Investment[]>>('/investments', { params })
   return {
     items: res.data.data,

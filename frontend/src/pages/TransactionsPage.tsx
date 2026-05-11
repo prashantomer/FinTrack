@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Lock, Pencil, Plus, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Lock, Pencil, Plus, Search, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -14,7 +14,7 @@ import { TransactionForm } from '@/components/transactions/TransactionForm'
 import { useAccounts } from '@/hooks/useBanks'
 import { useTermAccounts } from '@/hooks/useTermAccounts'
 import { useCreateTransaction, useTransactions, useUpdateTransaction } from '@/hooks/useTransactions'
-import { useTransactionFilters } from '@/hooks/useTransactionFilters'
+import { PAGE_SIZE_OPTIONS, useTransactionFilters } from '@/hooks/useTransactionFilters'
 import { useCurrency } from '@/hooks/useCurrency'
 import { resolveAccountLabel } from '@/lib/finance'
 import { TRANSACTION_TYPE_LABELS } from '@/lib/labels'
@@ -75,16 +75,26 @@ export function TransactionsPage() {
       </PageHeader>
 
       <div className="flex-1 min-h-0 px-6 py-6 flex flex-col gap-4 overflow-hidden">
-        <div className="flex flex-wrap gap-3 shrink-0">
-          <div className="relative">
+        <div className="flex flex-wrap items-end gap-3 shrink-0">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Search description, ref, tags…"
               value={filters.searchInput}
               onChange={e => filters.setSearchInput(e.target.value)}
-              className="pl-8 w-64"
+              className="pl-8 pr-8"
             />
+            {filters.searchInput && (
+              <button
+                onClick={() => filters.setSearchInput('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
+
           <Select value={filters.type} onValueChange={filters.setType}>
             <SelectTrigger className="w-32"><SelectValue placeholder="Type" /></SelectTrigger>
             <SelectContent>
@@ -94,8 +104,65 @@ export function TransactionsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Input type="date" value={filters.dateFrom} onChange={e => filters.setDateFrom(e.target.value)} className="w-36" />
-          <Input type="date" value={filters.dateTo} onChange={e => filters.setDateTo(e.target.value)} className="w-36" />
+
+          <Select value={filters.account} onValueChange={filters.setAccount}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Account" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Accounts</SelectItem>
+              {accounts.map(a => (
+                <SelectItem key={`a-${a.id}`} value={`account:${a.id}`}>
+                  {a.nickname}
+                </SelectItem>
+              ))}
+              {termAccounts.map(t => (
+                <SelectItem key={`t-${t.id}`} value={`term_account:${t.id}`}>
+                  {`${t.type.toUpperCase()} ${t.account_number ?? `#${t.id}`}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="date"
+              value={filters.dateFrom}
+              onChange={e => filters.setDateFrom(e.target.value)}
+              className="w-[140px]"
+              title="From date"
+            />
+            <span className="text-muted-foreground text-xs">→</span>
+            <Input
+              type="date"
+              value={filters.dateTo}
+              onChange={e => filters.setDateTo(e.target.value)}
+              className="w-[140px]"
+              title="To date"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Select value={filters.sortBy} onValueChange={v => filters.setSortBy(v as 'date' | 'account')}>
+              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Sort: Date</SelectItem>
+                <SelectItem value="account">Sort: Account</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={() => filters.setSortDir(filters.sortDir === 'asc' ? 'desc' : 'asc')}
+              title={filters.sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {filters.sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+            </Button>
+          </div>
+
+          {filters.active && (
+            <Button variant="ghost" size="sm" onClick={filters.reset} className="gap-1">
+              <X size={14} /> Clear
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -106,7 +173,6 @@ export function TransactionsPage() {
               <TableHeader className="sticky top-0 z-10 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/70 [&_th]:shadow-[inset_0_-1px_0_var(--border)]">
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Source</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Tags</TableHead>
@@ -119,15 +185,6 @@ export function TransactionsPage() {
                 {items.map(t => (
                   <TableRow key={t.id} className={t.is_active ? '' : 'opacity-40 line-through'}>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{fmtDate(t.date)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={t.source === 'imported' ? 'secondary' : 'outline'}
-                        className="text-[10px] uppercase tracking-wide gap-1"
-                      >
-                        {t.source === 'imported' && <Lock size={9} />}
-                        {t.source}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-sm whitespace-nowrap">
                       {resolveAccountLabel(t.linked_account_type, t.linked_account_id, accounts, termAccounts)}
                     </TableCell>
@@ -167,7 +224,7 @@ export function TransactionsPage() {
                   </TableRow>
                 ))}
                 {items.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No transactions</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No transactions</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -176,19 +233,31 @@ export function TransactionsPage() {
       </div>
 
       {data && data.total > 0 && (
-        <div className="min-h-14 border-t bg-background px-6 py-3 flex items-center gap-3 shrink-0">
-          <span className="text-muted-foreground text-sm flex-1">{data.total.toLocaleString()} total</span>
-          {data.total > 20 && (
-            <>
-              <Button variant="outline" size="sm" disabled={filters.page === 1} onClick={() => filters.setPage(p => p - 1)}>
-                <ChevronLeft size={14} />Prev
-              </Button>
-              <span className="text-sm text-muted-foreground px-1">Page {filters.page}</span>
-              <Button variant="outline" size="sm" disabled={items.length < 20} onClick={() => filters.setPage(p => p + 1)}>
-                Next<ChevronRight size={14} />
-              </Button>
-            </>
-          )}
+        <div className="shrink-0 min-h-14 border-t bg-background px-6 py-3 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{data.total.toLocaleString()} total</span>
+
+          <div className="flex items-center gap-3">
+            <Select value={String(filters.pageSize)} onValueChange={v => filters.setPageSize(Number(v))}>
+              <SelectTrigger className="w-24 h-7"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map(n => (
+                  <SelectItem key={n} value={String(n)}>{n}/page</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {data.total > filters.pageSize && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={filters.page === 1} onClick={() => filters.setPage(p => p - 1)}>
+                  <ChevronLeft size={14} />Prev
+                </Button>
+                <span className="text-muted-foreground px-1">Page {filters.page}</span>
+                <Button variant="outline" size="sm" disabled={items.length < filters.pageSize} onClick={() => filters.setPage(p => p + 1)}>
+                  Next<ChevronRight size={14} />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

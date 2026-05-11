@@ -23,6 +23,7 @@ export async function updateMe(data: {
   password?: string
   currency_code?: string
   currency_locale?: string
+  is_dummy?: boolean
 }) {
   const res = await client.put<ApiResponse<User>>('/auth/me', data)
   return res.data.data

@@ -10,8 +10,15 @@ gem "kaminari"
 gem "audited", "~> 5.4"
 gem "redis", "~> 5.0"
 gem "sidekiq", "~> 7.0"
+# Adds queue pause/unpause to OSS Sidekiq — server middleware skips pulling
+# from paused queues, and the Web UI gains pause buttons per queue.
+gem "sidekiq-pauzer", "~> 1.0"
 gem "connection_pool", "< 3.0"
 gem "csv"
+# Reads Excel imports. roo handles .xlsx natively; roo-xls adds legacy .xls
+# support (ICICI exports the older binary format via JasperReports).
+gem "roo",     "~> 2.10"
+gem "roo-xls", "~> 1.2"
 gem "bootsnap", require: false
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

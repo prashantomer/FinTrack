@@ -1,4 +1,5 @@
 require "sidekiq/web"
+require "sidekiq/pauzer/web"   # adds the per-queue Pause/Unpause buttons in the Sidekiq Web UI
 
 # Sidekiq Web UI — HTTP basic auth gated. Set SIDEKIQ_USERNAME and
 # SIDEKIQ_PASSWORD in `.env`; without them the UI is disabled (returns 404).
@@ -34,7 +35,8 @@ Rails.application.routes.draw do
       resources :accounts do
         member do
           post :close
-          get "audit-logs", to: "accounts#audit_logs"
+          get "audit-logs",     to: "accounts#audit_logs"
+          post "adjust-balance", to: "accounts#adjust_balance"
         end
       end
 
@@ -72,6 +74,7 @@ Rails.application.routes.draw do
       end
 
       resources :imports, only: [ :index, :create, :show ] do
+        member { post :resolve }
         collection { get "template/:import_type", to: "imports#template", as: :template }
       end
 
@@ -86,6 +89,11 @@ Rails.application.routes.draw do
       end
 
       post "errors", to: "client_errors#create"
+
+      scope :cleanup do
+        post :preview, to: "cleanup#preview"
+        post :execute, to: "cleanup#execute"
+      end
 
       namespace :assistant do
         resource :setting, only: [ :show, :update ]

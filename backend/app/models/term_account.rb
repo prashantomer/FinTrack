@@ -66,6 +66,9 @@ class TermAccount < ApplicationRecord
 
   def close!(closed_date:, closed_amount:)
     raise Error, "Term account is already closed" if closed?
+    # Stamp the audit row so the Balance History sidebar can label this
+    # "Account closed" instead of an anonymous "Balance update".
+    self.audit_comment = "close:term_account_#{id}"
     update!(closed_date: closed_date, closed_amount: closed_amount, balance: 0, is_active: false)
   end
 

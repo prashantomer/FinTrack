@@ -9,7 +9,7 @@
 #  closed_amount  :decimal(14, 2)
 #  closed_date    :date
 #  nickname       :string(100)      not null
-#  open_date      :date
+#  open_date      :date             not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
 #  bank_id        :bigint           not null
@@ -35,6 +35,8 @@ FactoryBot.define do
     nickname     { generate(:account_nickname) }
     account_type { "savings" }
     balance      { 10_000.00 }
-    open_date    { Date.today - 1.year }
+    # Far enough in the past that any test-fixture transaction date is
+    # safely after the account's open_date validation.
+    open_date    { Date.new(2000, 1, 1) }
   end
 end

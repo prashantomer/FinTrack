@@ -9,7 +9,7 @@
 #  closed_amount  :decimal(14, 2)
 #  closed_date    :date
 #  nickname       :string(100)      not null
-#  open_date      :date
+#  open_date      :date             not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
 #  bank_id        :bigint           not null

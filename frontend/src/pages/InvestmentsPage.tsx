@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Pencil, Plus, Search, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,10 +12,10 @@ import { InvestmentForm } from '@/components/investments/InvestmentForm'
 import { useCreateInvestment, useFilteredInvestments, useUpdateInvestment } from '@/hooks/useInvestments'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDebounce } from '@/hooks/useDebounce'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/hooks/useTransactionFilters'
 import { INVESTMENT_TYPE_LABELS } from '@/lib/labels'
 import type { Investment, InvestmentType, TradeType } from '@/types'
 
-const PAGE_SIZE = 15
 const ALL_TYPES: InvestmentType[] = ['stock', 'mutual_fund']
 
 export function InvestmentsPage() {
@@ -24,8 +24,10 @@ export function InvestmentsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Investment | null>(null)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
   const [typeFilter, setTypeFilter] = useState<InvestmentType | undefined>(undefined)
   const [tradeTypeFilter, setTradeTypeFilter] = useState<TradeType | undefined>(undefined)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -37,14 +39,17 @@ export function InvestmentsPage() {
     search:     debouncedSearch || undefined,
     date_from:  dateFrom || undefined,
     date_to:    dateTo || undefined,
+    sort_by:    'date',
+    sort_dir:   sortDir,
     page,
-    page_size:  PAGE_SIZE,
+    page_size:  pageSize,
   })
 
   const filtersActive = !!(typeFilter || tradeTypeFilter || debouncedSearch || dateFrom || dateTo)
   function clearFilters() {
     setTypeFilter(undefined); setTradeTypeFilter(undefined)
     setSearch(''); setDateFrom(''); setDateTo('')
+    setSortDir('desc')
     setPage(1)
   }
   const createMutation = useCreateInvestment()
@@ -138,6 +143,20 @@ export function InvestmentsPage() {
               className="w-[140px]"
               title="To date"
             />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <div className="px-2.5 h-7 text-[0.8rem] inline-flex items-center rounded-md border border-border bg-background text-muted-foreground">
+              Sort: Date
+            </div>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={() => { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); setPage(1) }}
+              title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+            </Button>
           </div>
 
           {filtersActive && (
@@ -253,17 +272,29 @@ export function InvestmentsPage() {
       {total > 0 && (
         <div className="shrink-0 min-h-14 border-t bg-background px-6 py-3 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">{total.toLocaleString()} total</span>
-          {total > PAGE_SIZE && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-                <ChevronLeft size={14} />Prev
-              </Button>
-              <span className="text-muted-foreground px-1">Page {page}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={investments.length < PAGE_SIZE}>
-                Next<ChevronRight size={14} />
-              </Button>
-            </div>
-          )}
+
+          <div className="flex items-center gap-3">
+            <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1) }}>
+              <SelectTrigger className="w-24 h-7"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map(n => (
+                  <SelectItem key={n} value={String(n)}>{n}/page</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {total > pageSize && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+                  <ChevronLeft size={14} />Prev
+                </Button>
+                <span className="text-muted-foreground px-1">Page {page}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={investments.length < pageSize}>
+                  Next<ChevronRight size={14} />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

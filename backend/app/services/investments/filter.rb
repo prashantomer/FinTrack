@@ -10,14 +10,26 @@ module Investments
 
     attribute :investment_type, array: true
     attribute :trade_type
+    attribute :source
     attribute :search
     attribute :date_from, :date_to
+    attribute :sort_by, :sort_dir
 
     def apply(scope)
       scope = with_in(scope, "investments.investment_type", investment_type)
       scope = with_eq(scope, "investments.trade_type", trade_type)
+      scope = with_eq(scope, "investments.source", source)
       scope = with_range(scope, "investments.purchase_date", gte: date_from, lte: date_to)
       with_ilike_any(scope, SEARCH_COLUMNS + [ "investments.transaction_public_id" ], search, casts: SEARCH_CASTS)
+    end
+
+    # Resolves the sort_by/sort_dir attributes to a hash suitable for
+    # `scope.order(...)`. Defaults to purchase_date desc + id desc when not
+    # specified. Only "date" is exposed; secondary sort by id keeps ties
+    # deterministic so the UI doesn't need its own tiebreaker.
+    def order_clause
+      dir = (sort_dir.to_s.downcase == "asc") ? :asc : :desc
+      { "investments.purchase_date" => dir, "investments.id" => :desc }
     end
   end
 end

@@ -32,9 +32,26 @@ module Api
       private
 
       def query_params
-        p = params.permit(:transaction_type, :type, :start_date, :end_date, :cursor, :limit,
-                          :linked_account_type, :linked_account_id, :search)
+        p = params.permit(:transaction_type, :type, :start_date, :end_date, :date_from, :date_to,
+                          :cursor, :limit, :page, :page_size,
+                          :linked_account_type, :linked_account_id, :search,
+                          :source, :sort_by, :sort_dir)
         p[:transaction_type] ||= p.delete(:type)
+        # Frontend mirrors the investments page and sends date_from/date_to;
+        # the service still reads start_date/end_date for back-compat.
+        p[:start_date] ||= p.delete(:date_from)
+        p[:end_date]   ||= p.delete(:date_to)
+        # Page-based pagination → translate to cursor/limit. Without this the
+        # service silently kept returning page 1 even when the UI asked for
+        # page 2+, since it only ever reads `:cursor` and `:limit`.
+        if p[:page].present? || p[:page_size].present?
+          page_size = p.delete(:page_size).to_i.nonzero? || 50
+          page_size = page_size.clamp(1, 200)
+          page      = p.delete(:page).to_i.nonzero? || 1
+          page      = page.clamp(1, 10_000)
+          p[:limit]  = page_size
+          p[:cursor] = (page - 1) * page_size
+        end
         p[:linked_account_type] = classify_linked_type(p[:linked_account_type])
         p
       end

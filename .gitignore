@@ -43,8 +43,10 @@ pnpm-debug.log*
 .claude/scheduled_tasks.lock
 .claude/settings.json.bak
 
-# User broker exports / personal financial data — kept local only
-Imports/
+# User broker exports / personal financial data — kept local only.
+# Anchored to repo root so it doesn't shadow legitimate `imports/` dirs on
+# case-insensitive filesystems (macOS APFS).
+/Imports/
 
 # Local archives of the deprecated Python backend — keep on disk, not in repo
 backend_python.zip

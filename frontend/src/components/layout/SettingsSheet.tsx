@@ -25,6 +25,7 @@ const CURRENCY_OPTIONS = [
 interface FormValues {
   full_name: string
   currency_code: string
+  is_dummy: boolean
 }
 
 interface Props {
@@ -40,6 +41,7 @@ export function SettingsSheet({ open, onClose }: Props) {
     values: {
       full_name: user ? `${user.first_name} ${user.last_name}` : '',
       currency_code: user?.currency_code ?? 'INR',
+      is_dummy: user?.is_dummy ?? false,
     },
   })
 
@@ -54,6 +56,7 @@ export function SettingsSheet({ open, onClose }: Props) {
         full_name: data.full_name,
         currency_code: option.code,
         currency_locale: option.locale,
+        is_dummy: data.is_dummy,
       })
       updateUser(updated)
       toast.success('Settings saved')
@@ -125,6 +128,28 @@ export function SettingsSheet({ open, onClose }: Props) {
                 </p>
               )}
             </div>
+
+            <div className="space-y-1.5 pt-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account kind</p>
+              <Separator />
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                {...register('is_dummy')}
+              />
+              <div>
+                <p className="text-sm font-medium">Mark this account as a demo / dummy account</p>
+                <p className="text-xs text-muted-foreground">
+                  Dummy accounts are filtered out of admin reports and real-user counts,
+                  and unlock destructive seed/reset tasks (e.g. <code>db:seed:demo</code>)
+                  which refuse to run on real users. Flip this off once you start
+                  entering real data you don&apos;t want to lose.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="border-t px-6 py-4 shrink-0">

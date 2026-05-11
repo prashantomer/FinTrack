@@ -10,6 +10,7 @@
 #  last_price      :decimal(15, 4)
 #  last_price_at   :datetime
 #  name            :string(255)      not null
+#  profile_enabled :boolean          default(FALSE), not null
 #  ticker_symbol   :string(20)
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
