@@ -12,11 +12,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': 'http://localhost:3000',
       // Active Storage download endpoints (signed URLs from rails_blob_path)
-      '/rails': 'http://localhost:8000',
+      '/rails': 'http://localhost:3000',
       // Sidekiq Web UI (HTTP basic auth gated by SIDEKIQ_USERNAME/PASSWORD env)
-      '/sidekiq': 'http://localhost:8000',
+      '/sidekiq': 'http://localhost:3000',
     },
   },
 })

@@ -34,6 +34,7 @@
 #
 class ImportBatch < ApplicationRecord
   belongs_to :user
+  belongs_to :linked_account, polymorphic: true, optional: true
   has_many   :import_records, dependent: :destroy
   has_one_attached :file
 

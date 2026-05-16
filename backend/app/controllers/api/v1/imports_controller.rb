@@ -58,7 +58,12 @@ module Api
           )
           render_success(data: batch.reload)
         when "abort"
-          Imports::AbortBatchService.new(batch).call(reason: "Aborted by user from the reconciliation banner.")
+          # The abort action is only exposed by the UI when the batch is in
+          # needs_reconciliation — i.e. the file's terminal balance disagrees
+          # with the computed account balance. Capture the specific gap so
+          # the persisted reason explains *what* the user rejected, not just
+          # the fact that they clicked Abort.
+          Imports::AbortBatchService.new(batch).call(reason: user_abort_reason(batch))
           render_success(data: batch.reload)
         else
           render_error(message: "action_choice must be 'adjust' or 'abort'")
@@ -87,6 +92,7 @@ module Api
 
         # Bank-statement Excel imports (ICICI, etc.) don't carry per-row
         # account info — the user picks the target account at upload time.
+        debugger
         linked_type, linked_id = resolve_linked_account_param
 
         # User's reconciliation policy. Accept the canonical values from the
@@ -134,6 +140,30 @@ module Api
 
       def set_batch
         @batch = current_user.import_batches.includes(:import_records).find(params[:id])
+      end
+
+      # Build the technical reason string for a user-initiated abort. The
+      # abort button is only surfaced when `batch.status == needs_reconciliation`,
+      # so reaching this code path means the user reviewed a specific
+      # balance mismatch and chose to discard the import rather than
+      # auto-adjust it. Capture the dollar figures that drove the decision.
+      def user_abort_reason(batch)
+        return "User aborted the import." if batch.expected_balance.nil?
+
+        klass   = batch.linked_account_type == "TermAccount" ? TermAccount : Account
+        account = klass.find_by(id: batch.linked_account_id, user_id: current_user.id)
+
+        if account.nil?
+          return "User aborted: expected balance ₹#{batch.expected_balance.to_f.round(2)}, " \
+                 "linked account no longer exists."
+        end
+
+        gap = (account.balance.to_f - batch.expected_balance.to_f).round(2)
+        new_rows = batch.import_records.where(status: "ok").count
+        "User aborted reconciliation. File expected ₹#{batch.expected_balance.to_f.round(2)}, " \
+          "account at ₹#{account.balance.to_f.round(2)} after applying #{new_rows} new " \
+          "transaction#{'s' unless new_rows == 1} (gap ₹#{gap}). " \
+          "All #{new_rows} imported row#{'s' unless new_rows == 1} rolled back."
       end
 
       # Accepts either:

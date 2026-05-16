@@ -30,7 +30,12 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
           </p>
         )}
         {batch.import_records.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No row details available.</p>
+          // Suppress the stub when result_message already explains the
+          // outcome — common after an abort, which wipes import_records
+          // and leaves the message as the only artefact.
+          !batch.result_message && (
+            <p className="text-xs text-muted-foreground">No row details available.</p>
+          )
         ) : (
         <>
         <div className="flex flex-wrap gap-2 text-xs">
