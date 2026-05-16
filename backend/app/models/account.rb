@@ -30,7 +30,7 @@ class Account < ApplicationRecord
 
   audited only: [ :balance ]
 
-  has_many :imports, class_name: 'ImportBatch', as: :linked_account
+  has_many :imports, class_name: "ImportBatch", as: :linked_account
   has_many :transactions, as: :linked_account
 
   belongs_to :user
