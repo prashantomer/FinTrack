@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { PlusCircle, TrendingDown, TrendingUp } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { type AuditTarget, useAuditLogs } from '@/hooks/useAuditLogs'
@@ -23,7 +24,31 @@ function fmtTxnDate(iso: string) {
 export function AuditLogSidebar({ target, onClose }: Props) {
   const { formatCurrency } = useCurrency()
   const fmtCurrency = { format: formatCurrency }
-  const { data: logs = [], isLoading } = useAuditLogs(target)
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useAuditLogs(target)
+
+  const logs = data?.pages.flatMap(p => p.items) ?? []
+
+  // Infinite scroll inside the Sheet. Memory: shadcn Sheet uses overflow-hidden
+  // on its body, which breaks IntersectionObserver — use a scroll listener
+  // attached to the scroll container instead (same pattern as ImportsPage).
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !hasNextPage || isFetchingNextPage) return
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      if (scrollHeight - scrollTop - clientHeight < 300) fetchNextPage()
+    }
+    el.addEventListener('scroll', onScroll)
+    onScroll() // trigger immediately if first page is shorter than the viewport
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   return (
     <Sheet open={target !== null} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -40,7 +65,7 @@ export function AuditLogSidebar({ target, onClose }: Props) {
           )}
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {isLoading && (
             <p className="text-sm text-muted-foreground py-12 text-center">Loading…</p>
           )}
@@ -107,6 +132,10 @@ export function AuditLogSidebar({ target, onClose }: Props) {
               </div>
             )
           })}
+
+          {isFetchingNextPage && (
+            <p className="text-xs text-muted-foreground py-4 text-center">Loading more…</p>
+          )}
         </div>
       </SheetContent>
     </Sheet>

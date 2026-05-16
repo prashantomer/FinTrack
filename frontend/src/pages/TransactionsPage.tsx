@@ -35,7 +35,16 @@ export function TransactionsPage() {
   const { data: termAccounts = [] } = useTermAccounts()
   const createMutation = useCreateTransaction()
 
-  const items = data?.items ?? []
+  // Client-side tag filter: clicking a chip narrows the *currently-fetched*
+  // page in-memory, no API roundtrip. Server-side pagination still rules,
+  // so this filter only applies within the rows already on screen — callout
+  // banner makes that explicit.
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  const fetched = data?.items ?? []
+  const items = tagFilter
+    ? fetched.filter(t => Array.isArray(t.tags) && t.tags.includes(tagFilter))
+    : fetched
 
   async function handleSubmit(values: {
     amount: number
@@ -165,6 +174,31 @@ export function TransactionsPage() {
           )}
         </div>
 
+        {tagFilter && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+            <span>
+              Tag filter:
+              <Badge
+                variant="default"
+                className="rounded-full px-1.5 py-0 h-4 text-[10px] font-normal leading-none ml-1.5"
+              >
+                {tagFilter}
+              </Badge>
+              <span className="ml-2">
+                ({items.length} of {fetched.length} rows on this page · other pages may have more — use search for a global match)
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setTagFilter(null)}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              title="Clear tag filter"
+            >
+              <X size={12} /> clear
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="text-muted-foreground">Loading…</div>
         ) : (
@@ -175,7 +209,7 @@ export function TransactionsPage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Tags</TableHead>
+                  <TableHead className="w-[180px]">Tags</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead />
@@ -195,10 +229,28 @@ export function TransactionsPage() {
                         <div className="text-xs text-muted-foreground">Bank ref: <span className="font-mono">{t.bank_ref}</span></div>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-[180px] max-w-[180px]">
                       {t.tags && t.tags.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {t.tags.map((tag, i) => <Badge key={`${tag}-${i}`} variant="secondary" className="text-xs">{tag}</Badge>)}
+                        <div className="flex flex-wrap gap-0.5">
+                          {t.tags.map((tag, i) => {
+                            const active = tagFilter === tag
+                            return (
+                              <button
+                                key={`${tag}-${i}`}
+                                type="button"
+                                onClick={() => setTagFilter(active ? null : tag)}
+                                title={active ? `Clear "${tag}" filter` : `Filter rows by tag "${tag}"`}
+                                className="cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-full"
+                              >
+                                <Badge
+                                  variant={active ? 'default' : 'secondary'}
+                                  className="rounded-full px-1.5 py-0 h-4 text-[10px] font-normal leading-none hover:opacity-80 transition-opacity"
+                                >
+                                  {tag}
+                                </Badge>
+                              </button>
+                            )
+                          })}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>

@@ -13,6 +13,7 @@
 #  linked_account_type :string
 #  on_balance_mismatch :string           default("ask"), not null
 #  processed_rows      :integer          default(0), not null
+#  result_message      :text
 #  status              :string           default("pending"), not null
 #  total_rows          :integer          default(0), not null
 #  created_at          :datetime         not null
@@ -33,6 +34,7 @@
 #
 class ImportBatch < ApplicationRecord
   belongs_to :user
+  belongs_to :linked_account, polymorphic: true, optional: true
   has_many   :import_records, dependent: :destroy
   has_one_attached :file
 

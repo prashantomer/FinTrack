@@ -18,20 +18,26 @@ function statusVariant(status: ImportStatus): 'default' | 'secondary' | 'destruc
 }
 
 function ExpandedRows({ batch }: { batch: ImportBatch }) {
-  if (!batch.import_records.length) {
-    return (
-      <TableRow>
-        <TableCell colSpan={7} className="bg-muted/30 text-center text-xs text-muted-foreground py-2">
-          No row details available.
-        </TableCell>
-      </TableRow>
-    )
-  }
   const errors     = batch.import_records.filter(r => r.status === 'error')
   const duplicates = batch.import_records.filter(r => r.status === 'skipped')
+
   return (
     <TableRow>
       <TableCell colSpan={7} className="bg-muted/30 p-3">
+        {batch.result_message && (
+          <p className="mb-2 text-xs text-foreground">
+            <span className="font-semibold">Outcome:</span> {batch.result_message}
+          </p>
+        )}
+        {batch.import_records.length === 0 ? (
+          // Suppress the stub when result_message already explains the
+          // outcome — common after an abort, which wipes import_records
+          // and leaves the message as the only artefact.
+          !batch.result_message && (
+            <p className="text-xs text-muted-foreground">No row details available.</p>
+          )
+        ) : (
+        <>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="text-muted-foreground">
             <span className="font-medium text-green-600">{batch.import_records.filter(r => r.status === 'ok').length} ok</span>
@@ -59,6 +65,8 @@ function ExpandedRows({ batch }: { batch: ImportBatch }) {
             ))}
           </ul>
         )}
+        </>
+        )}
       </TableCell>
     </TableRow>
   )
@@ -79,7 +87,9 @@ function ReconciliationRow({ batch }: { batch: ImportBatch }) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-amber-900 dark:text-amber-200">Balance mismatch</p>
-            {batch.expected_balance != null && (
+            {batch.result_message ? (
+              <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">{batch.result_message}</p>
+            ) : batch.expected_balance != null && (
               <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">
                 The source file says the account should end at{' '}
                 <strong>

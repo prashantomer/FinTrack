@@ -13,10 +13,18 @@ module Imports
     def call
       date   = parse_date!(@row[:date])
       amount = @row[:amount].to_f
-      raise "amount must be greater than 0" unless amount > 0
+      unless amount > 0
+        raise Imports::Error.new("amount must be greater than 0",
+                                 code: :amount_invalid,
+                                 context: { raw: @row[:amount] })
+      end
 
       type = @row[:type].to_s.strip.downcase
-      raise "type must be 'credit' or 'debit'" unless %w[credit debit].include?(type)
+      unless %w[credit debit].include?(type)
+        raise Imports::Error.new("type must be 'credit' or 'debit'",
+                                 code: :type_invalid,
+                                 context: { raw: @row[:type] })
+      end
 
       linked_account = resolve_linked_account
       tags           = parse_tags(@row[:tags])
@@ -57,7 +65,8 @@ module Imports
         amount:         amount,
         type:           type,
         linked_account: linked_account,
-        bank_ref:       bank_ref
+        bank_ref:       bank_ref,
+        batch:          @batch
       )
     end
 
@@ -66,25 +75,41 @@ module Imports
     # "would this row be treated as a duplicate?" without instantiating
     # the service or constructing a partial ImportRecord side-effect.
     #
-    #   1. If bank_ref is supplied, that IS the uniqueness key — exact match
-    #      or nothing. Structural match is intentionally NOT a fallback here:
-    #      ICICI emits a unique bank_ref per row, but multiple genuine UPIs
-    #      can share (date, amount, type, account), so falling back to
-    #      structural would collapse legitimate repeat payments.
-    #   2. Without bank_ref (legacy canonical CSV with the column blank),
-    #      fall back to structural (date, amount, type, linked_account).
-    def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:)
-      if bank_ref
-        return user.transactions.find_by(bank_ref: bank_ref)
-      end
-
-      user.transactions.where(
+    # The uniqueness key is always the full tuple
+    # `(date, amount, type, linked_account, bank_ref)` — bank_ref alone is
+    # NOT sufficient. ICICI (and many banks) reuse the same remark string
+    # across genuinely distinct sweep / closure / interest entries dated
+    # different days for different amounts; collapsing on `bank_ref` alone
+    # would drop ~12% of a typical year's statement and leave the account
+    # short by the sum of the merged rows.
+    #
+    # Adding `(date, amount, type)` to the key still catches every real
+    # duplicate (a re-uploaded statement matches all four fields exactly)
+    # and still distinguishes genuine repeat UPIs (two ₹500 payments to
+    # the same merchant on the same day have different UTRs → different
+    # bank_refs → no false merge).
+    #
+    # **`batch:` excludes in-flight rows from this same batch's run.** ICICI
+    # ATM cash-withdrawal remarks don't include a transaction sequence
+    # number, so two ₹10,000 withdrawals from the same ATM on the same day
+    # produce identical `bank_ref` strings (e.g. "ICICI:NFS/MPZ08171/CASH
+    # WDL/15-06-23"). With internal-batch rows in the dedup pool, the
+    # second withdrawal would collapse against the first one this loop
+    # just created — losing a real ₹10k debit and breaking end-balance
+    # reconciliation. Filtering to txns that existed BEFORE the batch
+    # started keeps both intra-file twins, while still catching re-uploads
+    # of a previously-imported statement (those match prior-batch rows).
+    def self.duplicate_for(user:, date:, amount:, type:, linked_account:, bank_ref:, batch: nil)
+      scope = user.transactions.where(
         date:                date,
         amount:              amount,
         transaction_type:    type,
         linked_account_type: linked_account ? linked_account.class.name : nil,
         linked_account_id:   linked_account&.id
-      ).first
+      )
+      scope = scope.where(bank_ref: bank_ref) if bank_ref
+      scope = scope.where("transactions.created_at < ?", batch.created_at) if batch
+      scope.first
     end
 
     def register_duplicate(existing)
@@ -132,7 +157,7 @@ module Imports
 
     def self.parse_date!(value)
       raw = value.to_s.strip
-      raise "date is required" if raw.blank?
+      raise Imports::Error.new("date is required", code: :date_invalid) if raw.blank?
 
       DATE_FORMATS.each do |fmt|
         parsed = Date.strptime(raw, fmt)
@@ -141,7 +166,10 @@ module Imports
         next
       end
 
-      raise "Invalid date: \"#{raw}\" — expected YYYY-MM-DD, DD/MM/YYYY, or DD-MM-YYYY"
+      raise Imports::Error.new(
+        "Invalid date: \"#{raw}\" — expected YYYY-MM-DD, DD/MM/YYYY, or DD-MM-YYYY",
+        code: :date_invalid, context: { raw: raw }
+      )
     end
   end
 end

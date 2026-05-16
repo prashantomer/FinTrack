@@ -1,0 +1,1 @@
+frontend: cd frontend && /Users/prashanto/.nvm/versions/node/v24.15.0/bin/npm run dev 2>&1 | tee ../logs/frontend.log

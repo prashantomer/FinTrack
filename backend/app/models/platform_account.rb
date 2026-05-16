@@ -24,6 +24,7 @@ class PlatformAccount < ApplicationRecord
   belongs_to :user
   belongs_to :platform
 
+  has_many :imports, class_name: "ImportBatch", as: :linked_account
   has_many :investments, dependent: :nullify
 
   validates :nickname, presence: true

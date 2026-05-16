@@ -1,6 +1,7 @@
 module Api
   module V1
     class AccountsController < ApplicationController
+      include AuditPagination
       before_action :set_account, only: [ :show, :update, :destroy, :close, :audit_logs, :adjust_balance ]
 
       def index
@@ -41,13 +42,17 @@ module Api
       end
 
       def audit_logs
-        audits = Audited::Audit.where(auditable_type: "Account", auditable_id: @account.id)
-                               .order(created_at: :desc)
+        page, next_cursor = paginate_audits(
+          Audited::Audit.where(auditable_type: "Account", auditable_id: @account.id)
+        )
         # Bulk-load the transactions referenced by audit_comment ("txn:<id>")
         # in one query so the controller stays O(audits + 1) instead of N+1.
-        txn_ids = audits.map { |a| a.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i }.compact.uniq
+        txn_ids = page.map { |a| a.comment.to_s[/\Atxn:(\d+)\z/, 1]&.to_i }.compact.uniq
         txns_by_id = current_user.transactions.where(id: txn_ids).index_by(&:id)
-        render_success(data: audits.map { |a| audit_log_json(a, txns_by_id) })
+        render_success(
+          data:      page.map { |a| audit_log_json(a, txns_by_id) },
+          meta_data: { next_cursor: next_cursor }
+        )
       end
 
       # POST /api/v1/accounts/:id/adjust-balance

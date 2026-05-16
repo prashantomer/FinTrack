@@ -635,7 +635,7 @@ export function ImportWizard({ open, onClose }: Props) {
             linkedAccount={
               importType === 'transactions' && config.defaultLinkedAccountId
                 ? `account:${config.defaultLinkedAccountId}`
-                : undefined
+                : `platform_account:${config.defaultPlatformAccountId}`
             }
             onBalanceMismatch={importType === 'transactions' ? config.onBalanceMismatch : undefined}
             onDone={handleDone}

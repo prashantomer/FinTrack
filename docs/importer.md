@@ -81,10 +81,18 @@ flowchart TD
 
 Lives in `ProcessTransactionRowService.duplicate_for` — class method, reusable from anywhere.
 
-1. **`bank_ref` present** → exact match by `bank_ref` is the answer. No structural fallback (multiple genuine UPIs can share `(date, amount, type, account)` — falling back would collapse legitimate repeat payments).
-2. **`bank_ref` absent** → structural match on `(date, amount, type, linked_account)`.
+The uniqueness tuple is always `(date, amount, type, linked_account, bank_ref?)` — `bank_ref` is *part* of the key when present, not the whole key:
+
+- A row dedups if every populated field matches an existing transaction for this user.
+- Two ₹500 UPIs to the same merchant on the same day stay distinct (different UTR → different `bank_ref`).
+- Recurring ICICI sweep / closure / interest entries that reuse the same remark string across different dates and amounts stay distinct too.
+- A re-uploaded statement matches on all four/five fields, so it cleanly dedups.
 
 A match writes an `ImportRecord` with `status: :skipped` and `notes: "Duplicate of Transaction #N (bank_ref … | date, ₹amount type)"`, and bumps `import_batches.duplicate_rows`.
+
+> **Why not just `bank_ref` when it's present?** That's what the ladder used to do. ICICI (and many banks) reuse remark strings across genuinely distinct rows — e.g. ten `Rev Sweep From 328713003095` entries spanning a year, each with different dates and amounts. Keying on `bank_ref` alone collapsed all ten into one transaction and left the account short by the sum of the merged rows. Including `(date, amount, type)` in the key fixes that without weakening the "genuine repeat UPI" guarantee, because real repeat UPIs have *different* `bank_ref`s.
+
+> **In-flight rows from the same batch are excluded from the dedup pool.** Some bank remarks don't carry a per-transaction sequence number — ICICI ATM cash-withdrawal entries (`NFS/MPZ08171/CASH WDL/15-06-23`) are a notable example, where two ₹10,000 withdrawals from the same ATM on the same day produce *identical* `bank_ref` strings. If both rows are present in one statement, the second one would collapse against the first that the loop just created. The dedup query therefore restricts to txns whose `created_at` is strictly before `batch.created_at`. Re-uploads of a prior statement still match (those rows belong to an earlier batch); intra-file twins stay distinct.
 
 ## End-of-import reconciliation
 

@@ -12,7 +12,7 @@ module Imports
       @batch = batch
     end
 
-    def call
+    def call(reason: nil)
       ActiveRecord::Base.transaction do
         # CRITICAL: only walk :ok rows. A :skipped ImportRecord's `importable`
         # is the pre-existing Transaction the duplicate matched (registered
@@ -49,7 +49,8 @@ module Imports
           status:          :failed,
           processed_rows:  0,
           duplicate_rows:  0,
-          failed_rows:     0
+          failed_rows:     0,
+          result_message:  reason.presence || "Aborted: all imported transactions removed and balance restored."
         )
       end
       @batch

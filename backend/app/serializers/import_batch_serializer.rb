@@ -13,6 +13,7 @@
 #  linked_account_type :string
 #  on_balance_mismatch :string           default("ask"), not null
 #  processed_rows      :integer          default(0), not null
+#  result_message      :text
 #  status              :string           default("pending"), not null
 #  total_rows          :integer          default(0), not null
 #  created_at          :datetime         not null
@@ -49,6 +50,7 @@ class ImportBatchSerializer < BaseSerializer
       linked_account_id:   r.linked_account_id,
       on_balance_mismatch: r.on_balance_mismatch,
       expected_balance:    r.expected_balance&.to_f,
+      result_message:      r.result_message,
       import_records: r.association(:import_records).loaded? ? import_records_data(r) : [],
       created_at:     r.created_at
     }
