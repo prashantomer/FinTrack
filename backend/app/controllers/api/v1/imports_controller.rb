@@ -92,7 +92,6 @@ module Api
 
         # Bank-statement Excel imports (ICICI, etc.) don't carry per-row
         # account info — the user picks the target account at upload time.
-        debugger
         linked_type, linked_id = resolve_linked_account_param
 
         # User's reconciliation policy. Accept the canonical values from the
@@ -117,8 +116,7 @@ module Api
           "term_accounts"=> Imports::ProcessTermAccountCsvJob
         }.fetch(import_type)
 
-        job = job_class.perform_later(batch.id)
-        batch.update_column(:sidekiq_job_id, job.provider_job_id)
+        batch.process!
 
         render_created(data: batch)
       end

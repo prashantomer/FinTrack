@@ -64,6 +64,23 @@ class ImportBatch < ApplicationRecord
     (processed_rows * 100.0 / total_rows).round
   end
 
+  def process!(job_class = "Imports::ProcessInvestmentCsvJob")
+    batch = self
+    return "Can not Re-process: #{batch.status}" unless batch.pending? || batch.failed? || batch.completed?
+
+    job = job_class.constantize.perform_later(batch.id)
+    batch.update_column(:sidekiq_job_id, job.provider_job_id)
+  end
+
+  def reset_counts!
+    batch = self
+    batch.update(
+      total_rows: 0,
+      processed_rows: 0,
+      failed_rows: 0
+    )
+  end
+
   private
 
   def set_import_version

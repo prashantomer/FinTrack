@@ -6,7 +6,11 @@ module Imports
 
     def perform(import_batch_id)
       batch = ImportBatch.find(import_batch_id)
-      batch.update!(status: :processing)
+      batch.processing!
+
+      # Clear ImportRecords if reprocessing
+      batch.import_records.destroy_all
+      batch.reset_counts!
 
       rows = CSV.parse(batch.file.download.force_encoding("UTF-8"), headers: true, header_converters: :symbol)
       batch.update!(total_rows: rows.count)
@@ -18,7 +22,7 @@ module Imports
       # cheaper for hundred-row imports.
       Current.skip_holding_refresh = true
 
-      rows.each_with_index do |row, idx|
+      rows.each.with_index(1) do |row, idx|
         begin
           normalized = adapter.transform(row.to_h)
           result = Imports::ProcessInvestmentRowService.new(batch, normalized, idx).call
@@ -38,7 +42,11 @@ module Imports
       batch.update!(status: :completed)
     rescue => e
       Rails.logger.error("ImportBatch #{import_batch_id} failed: #{e.message}")
-      ImportBatch.find_by(id: import_batch_id)&.update!(status: :failed)
+      batch = ImportBatch.find_by(id: import_batch_id)
+      batch.update!(
+        result_message: "ImportBatch #{import_batch_id} failed: #{e.message}"
+      )
+      batch.failed!
     ensure
       Current.skip_holding_refresh = false
       Holdings::RefreshJob.perform_later(batch.user_id) if batch

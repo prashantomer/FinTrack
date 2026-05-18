@@ -30,72 +30,47 @@ module Imports
       # in CSV files exported before the schema unification.
       price = (@row[:price].presence || @row[:buy_price].presence || @row[:nav_at_purchase].presence)&.to_f
 
-      if (existing = find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type))
-        return register_duplicate(existing)
+      existing, match_term = find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type)
+      return register_duplicate(existing, match_term) if existing
+
+      Investment.transaction do
+        matched_txn = match_transaction(amount_invested, purchase_date, instrument)
+        match_notes = "Linked to txn ##{matched_txn.id}"
+
+        investment = Investment.create!(
+          user:                @user,
+          source:              :imported,
+          trade_type:          trade_type,
+          investment_type:     investment_type,
+          name:                instrument.name,
+          amount_invested:     amount_invested,
+          current_value:       @row[:current_value].presence&.to_f,
+          purchase_date:       purchase_date,
+          quantity:            @row[:quantity].presence&.to_f,
+          units:               @row[:units].presence&.to_f,
+          price:               price,
+          order_id:            @row[:order_id].presence,
+          trade_id:            @row[:trade_id].presence,
+          folio_number:        @row[:folio_number].presence,
+          notes:               matched_txn ? match_notes : nil,
+          user_instrument:     user_instrument,
+          platform_account:    platform_account
+        )
+
+        @batch.import_records.create!(
+          importable: investment,
+          row_index:  @idx,
+          status:     :ok,
+          notes:      notes
+        )
+
+        investment
       end
-
-      investment = Investment.create!(
-        user:                @user,
-        source:              :imported,
-        trade_type:          trade_type,
-        investment_type:     investment_type,
-        name:                instrument.name,
-        amount_invested:     amount_invested,
-        current_value:       @row[:current_value].presence&.to_f,
-        purchase_date:       purchase_date,
-        quantity:            @row[:quantity].presence&.to_f,
-        units:               @row[:units].presence&.to_f,
-        price:               price,
-        order_id:            @row[:order_id].presence,
-        trade_id:            @row[:trade_id].presence,
-        folio_number:        @row[:folio_number].presence,
-        notes:               @row[:notes].presence,
-        user_instrument:     user_instrument,
-        platform_account:    platform_account
-      )
-
-      matched_txn = match_transaction(amount_invested, purchase_date, instrument)
-
-      @batch.import_records.create!(
-        importable: investment,
-        row_index:  @idx,
-        status:     :ok,
-        notes:      matched_txn ? "Linked to txn ##{matched_txn.id}" : nil
-      )
-      investment
     end
 
     private
 
-    # Dedupe ladder, strongest key first:
-    #   1. trade_id  — broker-assigned, globally unique per fill
-    #   2. order_id + purchase_date — covers files where trade_id is absent
-    #      but order_id is reused only within the same date for that user
-    #   3. structural exact match — instrument × platform × date × amount × side
-    def find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type)
-      trade_id = @row[:trade_id].presence
-      if trade_id
-        existing = @user.investments.find_by(trade_id: trade_id)
-        return existing if existing
-      end
-
-      order_id = @row[:order_id].presence
-      if order_id
-        existing = @user.investments.find_by(order_id: order_id, purchase_date: purchase_date)
-        return existing if existing
-      end
-
-      return nil unless user_instrument && platform_account
-      @user.investments.find_by(
-        user_instrument_id:  user_instrument.id,
-        platform_account_id: platform_account.id,
-        purchase_date:       purchase_date,
-        amount_invested:     amount_invested,
-        trade_type:          trade_type
-      )
-    end
-
-    def register_duplicate(existing)
+    def import_note(existing, match_term = nil)
       reference =
         if existing.trade_id.present?
           "trade_id #{existing.trade_id}"
@@ -105,11 +80,49 @@ module Imports
           "purchase_date #{existing.purchase_date}, amount #{existing.amount_invested}"
         end
 
+      reference += " - #{match_term}" if match_term
+
+      "Duplicate of Investment ##{existing.id} (#{reference})"
+    end
+
+    # Dedupe ladder, strongest key first:
+    #   1. trade_id  — broker-assigned, globally unique per fill
+    #   2. order_id + purchase_date — covers files where trade_id is absent
+    #      but order_id is reused only within the same date for that user
+    #   3. structural exact match — instrument × platform × date × amount × side
+    def find_duplicate(user_instrument, platform_account, purchase_date, amount_invested, trade_type)
+      trade_id = @row[:trade_id].presence
+      order_id = @row[:order_id].presence
+
+      if trade_id && order_id
+        existing = @user.investments.find_by(
+          order_id: order_id, trade_id: trade_id
+        )
+        return existing, "Matching by Order and Trade IDs" if existing
+      elsif trade_id
+        existing = @user.investments.find_by(trade_id: trade_id)
+        return existing, "Matching by Trade ID" if existing
+      elsif order_id
+        existing = @user.investments.find_by(order_id: order_id, purchase_date: purchase_date)
+        return existing, "Matching by Order ID" if existing
+      end
+
+      return nil unless user_instrument && platform_account
+      return @user.investments.find_by(
+        user_instrument_id:  user_instrument.id,
+        platform_account_id: platform_account.id,
+        purchase_date:       purchase_date,
+        amount_invested:     amount_invested,
+        trade_type:          trade_type
+      ), "Match by Instrument, Date, Amount, Trade type"
+    end
+
+    def register_duplicate(existing, match_term = nil)
       @batch.import_records.create!(
         importable: existing,
         row_index:  @idx,
         status:     :skipped,
-        notes:      "Duplicate of Investment ##{existing.id} (#{reference})"
+        notes:      import_note(existing, match_term)
       )
       DUPLICATE
     end
@@ -125,11 +138,11 @@ module Imports
     def normalize_trade_type!
       raw = @row[:trade_type].to_s.strip.downcase
       return "buy" if raw.empty? # default for files without the column
-      mapped = case raw
-      when "buy", "b", "purchase" then "buy"
-      when "sell", "s", "sale", "exit" then "sell"
-      else raw
-      end
+      mapped =  case raw
+                when "buy", "b", "purchase" then "buy"
+                when "sell", "s", "sale", "exit" then "sell"
+                else raw
+                end
       unless Investment.trade_types.key?(mapped)
         raise "trade_type \"#{@row[:trade_type]}\" is not valid (buy/sell)"
       end
