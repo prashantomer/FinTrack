@@ -35,7 +35,7 @@ module Imports
 
       Investment.transaction do
         matched_txn = match_transaction(amount_invested, purchase_date, instrument)
-        match_notes = "Linked to txn ##{matched_txn.id}"
+        match_notes = matched_txn ? "Linked to txn ##{matched_txn.id}" : nil
 
         investment = Investment.create!(
           user:                @user,
@@ -52,7 +52,7 @@ module Imports
           order_id:            @row[:order_id].presence,
           trade_id:            @row[:trade_id].presence,
           folio_number:        @row[:folio_number].presence,
-          notes:               matched_txn ? match_notes : nil,
+          notes:               match_notes,
           user_instrument:     user_instrument,
           platform_account:    platform_account
         )
@@ -61,7 +61,7 @@ module Imports
           importable: investment,
           row_index:  @idx,
           status:     :ok,
-          notes:      notes
+          notes:      match_notes
         )
 
         investment
@@ -139,10 +139,10 @@ module Imports
       raw = @row[:trade_type].to_s.strip.downcase
       return "buy" if raw.empty? # default for files without the column
       mapped =  case raw
-                when "buy", "b", "purchase" then "buy"
-                when "sell", "s", "sale", "exit" then "sell"
-                else raw
-                end
+      when "buy", "b", "purchase" then "buy"
+      when "sell", "s", "sale", "exit" then "sell"
+      else raw
+      end
       unless Investment.trade_types.key?(mapped)
         raise "trade_type \"#{@row[:trade_type]}\" is not valid (buy/sell)"
       end
