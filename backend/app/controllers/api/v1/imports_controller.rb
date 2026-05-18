@@ -111,12 +111,12 @@ module Api
         batch.save!
 
         job_class = {
-          "investments"  => Imports::ProcessInvestmentCsvJob,
-          "transactions" => Imports::ProcessTransactionCsvJob,
-          "term_accounts"=> Imports::ProcessTermAccountCsvJob
+          "investments"  => "Imports::ProcessInvestmentCsvJob",
+          "transactions" => "Imports::ProcessTransactionCsvJob",
+          "term_accounts"=> "Imports::ProcessTermAccountCsvJob"
         }.fetch(import_type)
 
-        batch.process!
+        batch.process!(job_class)
 
         render_created(data: batch)
       end

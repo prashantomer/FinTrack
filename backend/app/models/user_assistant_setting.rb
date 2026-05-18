@@ -24,17 +24,16 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class UserAssistantSetting < ApplicationRecord
-  # PROVIDERS = %w[anthropic openai ollama].freeze
-  PROVIDERS = %w[openai ollama].freeze
+  PROVIDERS = %w[anthropic openai ollama].freeze
 
   DEFAULT_MODEL_BY_PROVIDER = {
-    # "anthropic" => "claude-sonnet-4-6",
+    "anthropic" => "claude-sonnet-4-6",
     "openai"    => "gpt-4o-mini",
     "ollama"    => "gemma4:e4b"
   }.freeze
 
   DEFAULT_BASE_URL_BY_PROVIDER = {
-    # "anthropic" => "https://api.anthropic.com",
+    "anthropic" => "https://api.anthropic.com",
     "openai"    => "https://api.openai.com/v1",
     "ollama"    => "http://localhost:11434"
   }.freeze

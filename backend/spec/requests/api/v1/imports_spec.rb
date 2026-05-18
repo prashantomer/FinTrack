@@ -197,7 +197,7 @@ RSpec.describe "Api::V1::Imports", type: :request do
         post "/api/v1/imports",
              params:  { file: csv_file, import_type: "unknown_type" },
              headers: headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
 
       it "returns a descriptive error message" do
@@ -214,7 +214,7 @@ RSpec.describe "Api::V1::Imports", type: :request do
         post "/api/v1/imports",
              params:  { import_type: "investments" },
              headers: headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
 
       it "returns an error indicating file is required" do
@@ -239,7 +239,7 @@ RSpec.describe "Api::V1::Imports", type: :request do
         post "/api/v1/imports",
              params:  { file: non_csv_file, import_type: "investments" },
              headers: headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
 
       it "returns an error about file format" do
@@ -265,7 +265,7 @@ RSpec.describe "Api::V1::Imports", type: :request do
         post "/api/v1/imports",
              params:  { file: large_csv_file, import_type: "investments" },
              headers: headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
 
       it "returns a file size error" do
@@ -305,7 +305,7 @@ RSpec.describe "Api::V1::Imports", type: :request do
     context "with an unknown import_type" do
       it "returns HTTP 422" do
         get "/api/v1/imports/template/bogus", headers: headers
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:unprocessable_content)
       end
     end
 

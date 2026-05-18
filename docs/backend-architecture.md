@@ -1105,7 +1105,7 @@ module Responder
     }, status: status
   end
 
-  def render_error(message, status = :unprocessable_entity)
+  def render_error(message, status = :unprocessable_content)
     render json: {
       success: false,
       code: Rack::Utils::SYMBOL_TO_STATUS_CODE[status],
@@ -1134,7 +1134,7 @@ module Api::V1
       transaction = Transactions::CreateService.call(current_user, transaction_params)
       render_success(transaction, status: :created)
     rescue ActiveRecord::RecordInvalid => e
-      render_error(e.message, :unprocessable_entity)
+      render_error(e.message, :unprocessable_content)
     end
 
     private
@@ -1452,7 +1452,7 @@ class ApplicationController < ActionController::API
   include Responder
 
   rescue_from ActiveRecord::RecordNotFound    do |e| render_error(e.message, :not_found)            end
-  rescue_from ActiveRecord::RecordInvalid     do |e| render_error(e.message, :unprocessable_entity) end
+  rescue_from ActiveRecord::RecordInvalid     do |e| render_error(e.message, :unprocessable_content) end
   rescue_from ActionController::ParameterMissing do |e| render_error(e.message, :bad_request)       end
   rescue_from JWT::DecodeError                do |_| render_error("Unauthorized", :unauthorized)    end
 end

@@ -64,7 +64,7 @@ class ImportBatch < ApplicationRecord
     (processed_rows * 100.0 / total_rows).round
   end
 
-  def process!(job_class = "Imports::ProcessInvestmentCsvJob")
+  def process!(job_class)
     batch = self
     return "Can not Re-process: #{batch.status}" unless batch.pending? || batch.failed? || batch.completed?
 

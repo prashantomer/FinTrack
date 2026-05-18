@@ -18,7 +18,7 @@ module Api
       # confirmation step.
       def execute
         unless params[:confirm].to_s == "DELETE"
-          return render_error(message: "confirm token must be the literal string 'DELETE'", status: :unprocessable_entity)
+          return render_error(message: "confirm token must be the literal string 'DELETE'", status: :unprocessable_content)
         end
 
         result = Cleanup::ExecuteService.new(current_user, cleanup_params).call

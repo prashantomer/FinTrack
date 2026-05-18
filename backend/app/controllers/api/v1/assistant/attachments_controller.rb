@@ -9,7 +9,7 @@ module Api
         def create
           file = params[:file]
           return render_error(message: "file is required", status: :bad_request) if file.blank?
-          return render_error(message: "file too large (max 5 MB)", status: :unprocessable_entity) if file.size > MAX_BYTES
+          return render_error(message: "file too large (max 5 MB)", status: :unprocessable_content) if file.size > MAX_BYTES
 
           # Stash the upload as a placeholder AssistantMessage (role=user, no content yet).
           # The next /messages POST will reference this attachment_id and promote the file

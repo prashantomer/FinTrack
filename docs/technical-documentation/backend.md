@@ -42,7 +42,7 @@ end
 Render helpers (defined in `ApplicationController`):
 - `render_success(data:, meta_data: nil, status: :ok)`
 - `render_created(data:, meta_data: nil)` — `:created` + Location header
-- `render_error(message:, status: :unprocessable_entity, errors: nil)`
+- `render_error(message:, status: :unprocessable_content, errors: nil)`
 
 Every JSON response is wrapped as `{ data: ..., meta_data: ... }` (or
 `{ errors: { message: ... } }`). The frontend client unwraps `data` /

@@ -15,7 +15,7 @@ module Responder
     render_success(data: data, status: :created, meta_data: meta_data)
   end
 
-  def render_error(message:, errors: nil, status: :unprocessable_entity)
+  def render_error(message:, errors: nil, status: :unprocessable_content)
     body = {
       success:    false,
       code:       Rack::Utils.status_code(status),

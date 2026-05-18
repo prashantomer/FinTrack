@@ -12,6 +12,6 @@ class ApplicationController < ActionController::API
   end
 
   def unprocessable(e)
-    render_error(message: "Validation failed", errors: e.record.errors.to_hash, status: :unprocessable_entity)
+    render_error(message: "Validation failed", errors: e.record.errors.to_hash, status: :unprocessable_content)
   end
 end
